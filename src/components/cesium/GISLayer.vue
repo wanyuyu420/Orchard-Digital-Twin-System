@@ -100,6 +100,24 @@ function setupSelectionHandler() {
         refreshGraphicsFromFeatures()
       }
     }
+
+    // Delete or Backspace to remove selected features
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      // Don't delete if in edit mode (vertex editing) or if user is in an input field
+      if (editingFeatureId || isInputFocused()) return
+
+      e.preventDefault()
+      deleteSelectedFeatures()
+    }
+
+    // Ctrl+A to select all features
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      // Don't select all if user is in an input field
+      if (isInputFocused()) return
+
+      e.preventDefault()
+      selectAllFeatures()
+    }
   }
   const handleKeyUp = (e: KeyboardEvent) => {
     if (e.key === 'Control' || e.key === 'Meta') {
@@ -524,6 +542,50 @@ function updateFeatureGeometry(featureId: string, graphic: any) {
 
   // Update timestamp
   gisStore.updateFeature(featureId, { updatedAt: new Date() })
+}
+
+/**
+ * Check if user is focused on an input field
+ */
+function isInputFocused(): boolean {
+  const activeElement = document.activeElement
+  if (!activeElement) return false
+  const tagName = activeElement.tagName.toLowerCase()
+  return tagName === 'input' || tagName === 'textarea' || activeElement.getAttribute('contenteditable') === 'true'
+}
+
+/**
+ * Delete all selected features
+ */
+function deleteSelectedFeatures(): void {
+  const selectedIds = Array.from(gisStore.selectedFeatureIds)
+  if (selectedIds.length === 0) return
+
+  console.log('Deleting selected features:', selectedIds)
+
+  // Remove each selected feature
+  selectedIds.forEach(featureId => {
+    gisStore.removeFeature(featureId)
+  })
+
+  // Clear selection
+  gisStore.deselectFeature()
+}
+
+/**
+ * Select all features
+ */
+function selectAllFeatures(): void {
+  const allFeatureIds = Array.from(gisStore.features.keys())
+  if (allFeatureIds.length === 0) return
+
+  console.log('Selecting all features:', allFeatureIds.length)
+
+  // Select all features
+  gisStore.selectFeature(allFeatureIds, true)
+
+  // Apply highlights
+  applySelectionHighlights()
 }
 
 /**

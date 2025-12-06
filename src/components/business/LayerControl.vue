@@ -52,7 +52,7 @@
             :key="tool.id"
             class="tool-btn"
             :class="{ active: gisStore.toolType === tool.id }"
-            :title="tool.name"
+            :title="tool.tooltip"
             @click="toggleDrawTool(tool.id)"
           >
             <i :class="tool.icon"></i>
@@ -61,11 +61,35 @@
           <button
             class="tool-btn snap-btn"
             :class="{ active: gisStore.snapEnabled }"
-            title="吸附功能"
+            title="吸附功能 - 绘制时自动吸附到附近顶点/边"
             @click="toggleSnap"
           >
             <i class="fa-solid fa-magnet"></i>
           </button>
+          <!-- Help Button for Shortcuts -->
+          <button
+            class="tool-btn help-btn"
+            title="快捷键帮助"
+            @click="showShortcutsHelp = !showShortcutsHelp"
+          >
+            <i class="fa-solid fa-keyboard"></i>
+          </button>
+        </div>
+
+        <!-- Keyboard Shortcuts Help Panel -->
+        <div v-if="showShortcutsHelp" class="shortcuts-help">
+          <div class="shortcuts-header">
+            <span>快捷键</span>
+            <button class="close-btn" @click="showShortcutsHelp = false">
+              <i class="fa-solid fa-times"></i>
+            </button>
+          </div>
+          <div class="shortcuts-list">
+            <div v-for="shortcut in keyboardShortcuts" :key="shortcut.key" class="shortcut-item">
+              <kbd>{{ shortcut.key }}</kbd>
+              <span>{{ shortcut.action }}</span>
+            </div>
+          </div>
         </div>
 
         <!-- Search Bar -->
@@ -76,6 +100,12 @@
             type="text"
             placeholder="搜索要素..."
           />
+        </div>
+
+        <!-- Performance Warning -->
+        <div v-if="isHighFeatureCount" class="performance-warning">
+          <i class="fa-solid fa-exclamation-triangle"></i>
+          <span>要素数量较多 ({{ gisStore.featureCount }})，可能影响性能</span>
         </div>
 
         <!-- Feature List -->
@@ -556,17 +586,31 @@ const layers = ref<Layer[]>([
   { id: 'stations', name: '水雨情站', icon: 'fa-solid fa-location-dot', active: true },
 ])
 
-// Draw tools configuration
+// Draw tools configuration with tooltips
 const drawTools = [
-  { id: 'point', name: '点标注', icon: 'fa-solid fa-location-dot' },
-  { id: 'line', name: '线绘制', icon: 'fa-solid fa-minus' },
-  { id: 'circle', name: '圆形', icon: 'fa-regular fa-circle' },
-  { id: 'rectangle', name: '矩形', icon: 'fa-regular fa-square' },
-  { id: 'polygon', name: '多边形', icon: 'fa-solid fa-draw-polygon' },
+  { id: 'point', name: '点标注', icon: 'fa-solid fa-location-dot', tooltip: '点标注 - 单击放置点' },
+  { id: 'line', name: '线绘制', icon: 'fa-solid fa-minus', tooltip: '线绘制 - 连续点击添加节点，双击完成' },
+  { id: 'circle', name: '圆形', icon: 'fa-regular fa-circle', tooltip: '圆形 - 点击设置圆心，拖动设置半径' },
+  { id: 'rectangle', name: '矩形', icon: 'fa-regular fa-square', tooltip: '矩形 - 点击对角两点绘制' },
+  { id: 'polygon', name: '多边形', icon: 'fa-solid fa-draw-polygon', tooltip: '多边形 - 连续点击添加节点，双击完成' },
+]
+
+// Keyboard shortcuts reference
+const keyboardShortcuts = [
+  { key: 'Ctrl+Z', action: '撤销' },
+  { key: 'Ctrl+Y', action: '重做' },
+  { key: 'Ctrl+A', action: '全选' },
+  { key: 'Delete', action: '删除选中' },
+  { key: 'ESC', action: '取消/退出编辑' },
+  { key: '双击', action: '编辑顶点' },
+  { key: 'Shift+点击', action: '删除顶点' },
 ]
 
 // Search query
 const searchQuery = ref('')
+
+// Shortcuts help visibility
+const showShortcutsHelp = ref(false)
 
 // File input ref for import
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -596,6 +640,20 @@ function toggleDrawTool(toolId: DrawToolType) {
 function toggleSnap() {
   gisStore.setSnapEnabled(!gisStore.snapEnabled)
 }
+
+// Performance thresholds
+const FEATURE_WARNING_THRESHOLD = 100
+const FEATURE_LIMIT = 500
+
+/**
+ * Check if feature count is high (performance warning)
+ */
+const isHighFeatureCount = computed(() => gisStore.featureCount > FEATURE_WARNING_THRESHOLD)
+
+/**
+ * Check if feature count exceeds limit
+ */
+const isFeatureCountExceeded = computed(() => gisStore.featureCount > FEATURE_LIMIT)
 
 /**
  * Filter features by search query
@@ -994,6 +1052,100 @@ function clearAllFeatures() {
       border-color: #f97316;
       color: #f97316;
       text-shadow: 0 0 5px #f97316;
+    }
+  }
+
+  // Help button
+  &.help-btn {
+    flex: 0 0 auto;
+    width: 36px;
+
+    &:hover {
+      color: $neon-cyan;
+    }
+  }
+}
+
+// Performance Warning
+.performance-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 10px 8px;
+  padding: 8px 10px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 4px;
+  font-size: 11px;
+  color: #fbbf24;
+
+  i {
+    font-size: 12px;
+  }
+}
+
+// Keyboard Shortcuts Help Panel
+.shortcuts-help {
+  margin: 0 10px 10px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+
+  .shortcuts-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+    span {
+      font-size: 12px;
+      font-weight: 500;
+      color: $text-main;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: $text-sub;
+      cursor: pointer;
+      padding: 2px;
+
+      &:hover {
+        color: $text-main;
+      }
+    }
+  }
+
+  .shortcuts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .shortcut-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+
+    kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 10px;
+      color: $neon-cyan;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    span {
+      color: $text-sub;
     }
   }
 }
