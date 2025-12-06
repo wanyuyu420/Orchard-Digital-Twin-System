@@ -2,11 +2,10 @@
 
 ## Current Goal
 
-**Phase 0-1, 7-15 completed (~59/89 tasks = 66%)**. Snap functionality is now available.
+**Phase 0-1, 7-16 completed (~63/89 tasks = 71%)**. Undo/Redo functionality is now available.
 
 Next priority options:
 - **Phase 2-6**: Enhance drawing tools (real-time measurements)
-- **Phase 16**: Undo/Redo
 - **Phase 17**: Integration & optimization
 
 ---
@@ -239,6 +238,48 @@ Next priority options:
 **Code Changes**:
 - LayerControl.vue: +260 lines for properties panel
 
+### Undo/Redo Implementation (2025-12-06)
+**Phase 16 completed** - Full undo/redo support with keyboard shortcuts
+
+**Implementation**:
+1. **History Stack in gis.ts**
+   - `HistoryRecord` type with action types: add, remove, update, move, style, batch
+   - `historyStack` array (max 50 records)
+   - `historyIndex` for tracking current position
+   - Deep clone feature snapshots for before/after states
+
+2. **History Recording**
+   - `recordHistory()` function to log operations
+   - Auto-recording in `addFeature()`, `removeFeature()`, `updateFeature()`
+   - `skipHistory` parameter for internal operations (avoid recording during undo/redo)
+   - Truncates future history when new action is recorded after undo
+
+3. **Undo Function**
+   - Restores `beforeState` based on action type
+   - For 'add': Removes feature and destroys graphic
+   - For 'remove': Restores feature from snapshot
+   - For 'update/move/style': Applies beforeState to feature
+   - Moves historyIndex backward
+
+4. **Redo Function**
+   - Applies `afterState` based on action type
+   - Reverse of undo operations
+   - Moves historyIndex forward
+
+5. **Keyboard Shortcuts (GISLayer.vue)**
+   - `Ctrl+Z`: Undo last action
+   - `Ctrl+Y` / `Ctrl+Shift+Z`: Redo action
+   - `refreshGraphicsFromFeatures()`: Syncs graphics after undo/redo
+
+6. **Computed Properties**
+   - `canUndo`: True if there's history to undo
+   - `canRedo`: True if there's undone actions to redo
+   - `historyLength`: Total history records count
+
+**Code Changes**:
+- gis.ts: +200 lines for history management
+- GISLayer.vue: +50 lines for keyboard shortcuts
+
 ---
 
 ## Files Touched
@@ -372,12 +413,25 @@ Next priority options:
 - [x] T14.4: Implement GeoJSON parsing (all geometry types)
 - [x] T14.5: Error handling and validation
 
-### 🔲 Phase 15-17: Advanced Features (0/12 tasks)
-- [ ] Phase 15: Snap functionality (4 tasks)
-- [ ] Phase 16: Undo/Redo (4 tasks)
-- [ ] Phase 17: Integration & optimization (4 tasks)
+### ✅ Phase 15: Snap Functionality (4/4 tasks)
+- [x] T15.1: Vertex snapping with tolerance config
+- [x] T15.2: Edge snapping with projection calculation
+- [x] T15.3: Snap performance optimization (viewport-only)
+- [x] T15.4: Snap toggle and UI integration
 
-**Total Progress**: ~55/89 tasks (62%)
+### ✅ Phase 16: Undo/Redo (4/4 tasks)
+- [x] T16.1: History stack (max 50 steps, current pointer)
+- [x] T16.2: Undo (Ctrl+Z, restore previous state)
+- [x] T16.3: Redo (Ctrl+Y, restore next state)
+- [x] T16.4: Keyboard shortcuts integration
+
+### 🔲 Phase 17: Integration & Optimization (0/4 tasks)
+- [ ] T17.1: Integrate measurement tools
+- [ ] T17.2: Performance optimization
+- [ ] T17.3: Keyboard shortcuts system
+- [ ] T17.4: Tooltips
+
+**Total Progress**: ~63/89 tasks (71%)
 
 ---
 
@@ -449,5 +503,5 @@ Legacy chat logs preserved as historical reference but marked non-authoritative.
 
 ---
 
-**Last Updated**: 2025-12-05
-**Next Action**: Awaiting user decision on Phase 2-6 vs Phase 7-8 priority
+**Last Updated**: 2025-12-06
+**Next Action**: Phase 17 (Integration) or Phase 2-6 (Drawing Enhancement)

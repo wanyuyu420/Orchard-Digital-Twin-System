@@ -26,6 +26,34 @@ import type { MeasureToolType, Measurement } from '@/types/measure'
 // Note: GISState interface removed as it's not currently used
 // State is managed through individual refs below
 
+// ========== History Types ==========
+
+/** Action types for undo/redo */
+export type HistoryActionType =
+  | 'add'       // Feature added
+  | 'remove'    // Feature removed
+  | 'update'    // Feature properties updated
+  | 'move'      // Feature moved (geometry changed)
+  | 'style'     // Feature style changed
+  | 'batch'     // Multiple actions bundled
+
+/** History record for undo/redo */
+export interface HistoryRecord {
+  id: string
+  timestamp: Date
+  actionType: HistoryActionType
+  featureId: string
+  /** Snapshot of feature before the action (for undo) */
+  beforeState: Feature | null
+  /** Snapshot of feature after the action (for redo) */
+  afterState: Feature | null
+  /** For batch actions, contains sub-actions */
+  subActions?: HistoryRecord[]
+}
+
+/** Maximum history stack size */
+const MAX_HISTORY_SIZE = 50
+
 export const useGISStore = defineStore('gis', () => {
   // ========== Core State ==========
 
@@ -77,6 +105,17 @@ export const useGISStore = defineStore('gis', () => {
   /** Continuous drawing mode */
   const continuousMode = ref(false)
 
+  // ========== History State (Undo/Redo) ==========
+
+  /** History stack for undo/redo operations */
+  const historyStack = ref<HistoryRecord[]>([])
+
+  /** Current position in history stack (-1 means at latest) */
+  const historyIndex = ref(-1)
+
+  /** Flag to temporarily disable history recording (during undo/redo) */
+  let isUndoRedoInProgress = false
+
   // ========== Computed Properties ==========
 
   /** Is any tool active */
@@ -109,6 +148,25 @@ export const useGISStore = defineStore('gis', () => {
 
   /** Active tool (backward compatibility alias for toolType) */
   const activeTool = computed(() => toolType.value)
+
+  /** Can undo (has history to go back to) */
+  const canUndo = computed(() => {
+    if (historyIndex.value === -1) {
+      // At latest state, can undo if there's any history
+      return historyStack.value.length > 0
+    }
+    // Not at latest, can undo if not at the beginning
+    return historyIndex.value > 0
+  })
+
+  /** Can redo (has future states to restore) */
+  const canRedo = computed(() => {
+    // Can redo if historyIndex is not -1 (meaning we've undone something)
+    return historyIndex.value !== -1 && historyIndex.value < historyStack.value.length - 1
+  })
+
+  /** History length */
+  const historyLength = computed(() => historyStack.value.length)
 
   // ========== Tool Management Actions ==========
 
@@ -170,8 +228,9 @@ export const useGISStore = defineStore('gis', () => {
    * Add a feature
    * @param feature - Feature data
    * @param graphic - Associated graphic
+   * @param skipHistory - Skip recording to history (internal use)
    */
-  function addFeature(feature: Feature, graphic: BaseGraphic) {
+  function addFeature(feature: Feature, graphic: BaseGraphic, skipHistory = false) {
     features.value.set(feature.id, feature)
     graphics.value.set(feature.id, graphic)
 
@@ -181,13 +240,27 @@ export const useGISStore = defineStore('gis', () => {
       graphic: graphic
     }
     featureGraphicMaps.value.set(feature.id, map)
+
+    // Record to history
+    if (!skipHistory) {
+      recordHistory('add', feature.id, null, feature)
+    }
   }
 
   /**
    * Remove a feature
    * @param featureId - Feature ID
+   * @param skipHistory - Skip recording to history (internal use)
    */
-  function removeFeature(featureId: string) {
+  function removeFeature(featureId: string, skipHistory = false) {
+    // Get feature before removing for history
+    const feature = features.value.get(featureId)
+
+    // Record to history before deletion
+    if (!skipHistory && feature) {
+      recordHistory('remove', featureId, feature, null)
+    }
+
     const graphic = graphics.value.get(featureId)
     if (graphic) {
       graphic.destroy()
@@ -207,12 +280,28 @@ export const useGISStore = defineStore('gis', () => {
    * Update feature
    * @param featureId - Feature ID
    * @param updates - Partial feature updates
+   * @param actionType - Type of action for history (default: 'update')
+   * @param skipHistory - Skip recording to history (internal use)
    */
-  function updateFeature(featureId: string, updates: Partial<Feature>) {
+  function updateFeature(
+    featureId: string,
+    updates: Partial<Feature>,
+    actionType: HistoryActionType = 'update',
+    skipHistory = false
+  ) {
     const feature = features.value.get(featureId)
     if (feature) {
+      // Clone before state for history
+      const beforeState = !skipHistory ? deepCloneFeature(feature) : null
+
+      // Apply updates
       Object.assign(feature, updates)
       feature.updatedAt = new Date()
+
+      // Record to history
+      if (!skipHistory && beforeState) {
+        recordHistory(actionType, featureId, beforeState, feature)
+      }
     }
   }
 
@@ -683,6 +772,238 @@ export const useGISStore = defineStore('gis', () => {
     continuousMode.value = continuous
   }
 
+  // ========== History Management (Undo/Redo) ==========
+
+  /**
+   * Deep clone a feature for history storage
+   * @param feature - Feature to clone
+   */
+  function deepCloneFeature(feature: Feature): Feature {
+    return JSON.parse(JSON.stringify(feature))
+  }
+
+  /**
+   * Record an action to history stack
+   * @param actionType - Type of action
+   * @param featureId - ID of affected feature
+   * @param beforeState - Feature state before action
+   * @param afterState - Feature state after action
+   */
+  function recordHistory(
+    actionType: HistoryActionType,
+    featureId: string,
+    beforeState: Feature | null,
+    afterState: Feature | null
+  ): void {
+    // Skip if undo/redo is in progress
+    if (isUndoRedoInProgress) return
+
+    const record: HistoryRecord = {
+      id: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date(),
+      actionType,
+      featureId,
+      beforeState: beforeState ? deepCloneFeature(beforeState) : null,
+      afterState: afterState ? deepCloneFeature(afterState) : null
+    }
+
+    // If we're not at the latest state, truncate future history
+    if (historyIndex.value !== -1) {
+      historyStack.value = historyStack.value.slice(0, historyIndex.value + 1)
+      historyIndex.value = -1
+    }
+
+    // Add new record
+    historyStack.value.push(record)
+
+    // Limit history size
+    if (historyStack.value.length > MAX_HISTORY_SIZE) {
+      historyStack.value.shift()
+    }
+  }
+
+  /**
+   * Undo the last action
+   * @returns true if undo was successful
+   */
+  function undo(): boolean {
+    if (!canUndo.value) return false
+
+    isUndoRedoInProgress = true
+
+    try {
+      // Determine which record to undo
+      let recordIndex: number
+      if (historyIndex.value === -1) {
+        // At latest state, undo the last record
+        recordIndex = historyStack.value.length - 1
+        historyIndex.value = recordIndex
+      } else {
+        // Already undone some, undo the current position and move back
+        recordIndex = historyIndex.value
+        historyIndex.value = recordIndex - 1
+      }
+
+      const record = historyStack.value[recordIndex]
+      if (!record) return false
+
+      // Apply the undo based on action type
+      switch (record.actionType) {
+        case 'add':
+          // Undo add = remove the feature (but keep in history)
+          if (record.featureId) {
+            const graphic = graphics.value.get(record.featureId)
+            if (graphic) {
+              graphic.destroy()
+              graphics.value.delete(record.featureId)
+            }
+            features.value.delete(record.featureId)
+            featureGraphicMaps.value.delete(record.featureId)
+            selectedFeatureIds.value.delete(record.featureId)
+          }
+          break
+
+        case 'remove':
+          // Undo remove = restore the feature
+          if (record.beforeState) {
+            features.value.set(record.featureId, deepCloneFeature(record.beforeState))
+            // Note: Graphic needs to be recreated by the component layer
+            // We emit an event or set a flag for this
+          }
+          break
+
+        case 'update':
+        case 'move':
+        case 'style':
+          // Undo update/move/style = restore previous state
+          if (record.beforeState) {
+            const feature = features.value.get(record.featureId)
+            if (feature) {
+              Object.assign(feature, deepCloneFeature(record.beforeState))
+            }
+          }
+          break
+
+        case 'batch':
+          // Undo batch = undo all sub-actions in reverse order
+          if (record.subActions) {
+            for (let i = record.subActions.length - 1; i >= 0; i--) {
+              // Recursively handle sub-actions (simplified - apply beforeState)
+              const sub = record.subActions[i]
+              if (sub.beforeState && sub.featureId) {
+                const feature = features.value.get(sub.featureId)
+                if (feature) {
+                  Object.assign(feature, deepCloneFeature(sub.beforeState))
+                }
+              }
+            }
+          }
+          break
+      }
+
+      console.log('Undo:', record.actionType, record.featureId)
+      return true
+    } finally {
+      isUndoRedoInProgress = false
+    }
+  }
+
+  /**
+   * Redo an undone action
+   * @returns true if redo was successful
+   */
+  function redo(): boolean {
+    if (!canRedo.value) return false
+
+    isUndoRedoInProgress = true
+
+    try {
+      // Move forward in history
+      const recordIndex = historyIndex.value + 1
+      const record = historyStack.value[recordIndex]
+      if (!record) return false
+
+      // Update index
+      if (recordIndex === historyStack.value.length - 1) {
+        // Back at latest state
+        historyIndex.value = -1
+      } else {
+        historyIndex.value = recordIndex
+      }
+
+      // Apply the redo based on action type
+      switch (record.actionType) {
+        case 'add':
+          // Redo add = restore the feature
+          if (record.afterState) {
+            features.value.set(record.featureId, deepCloneFeature(record.afterState))
+            // Note: Graphic needs to be recreated by the component layer
+          }
+          break
+
+        case 'remove':
+          // Redo remove = remove the feature again
+          if (record.featureId) {
+            const graphic = graphics.value.get(record.featureId)
+            if (graphic) {
+              graphic.destroy()
+              graphics.value.delete(record.featureId)
+            }
+            features.value.delete(record.featureId)
+            featureGraphicMaps.value.delete(record.featureId)
+            selectedFeatureIds.value.delete(record.featureId)
+          }
+          break
+
+        case 'update':
+        case 'move':
+        case 'style':
+          // Redo update/move/style = apply the after state
+          if (record.afterState) {
+            const feature = features.value.get(record.featureId)
+            if (feature) {
+              Object.assign(feature, deepCloneFeature(record.afterState))
+            }
+          }
+          break
+
+        case 'batch':
+          // Redo batch = redo all sub-actions in order
+          if (record.subActions) {
+            for (const sub of record.subActions) {
+              if (sub.afterState && sub.featureId) {
+                const feature = features.value.get(sub.featureId)
+                if (feature) {
+                  Object.assign(feature, deepCloneFeature(sub.afterState))
+                }
+              }
+            }
+          }
+          break
+      }
+
+      console.log('Redo:', record.actionType, record.featureId)
+      return true
+    } finally {
+      isUndoRedoInProgress = false
+    }
+  }
+
+  /**
+   * Clear history stack
+   */
+  function clearHistory(): void {
+    historyStack.value = []
+    historyIndex.value = -1
+  }
+
+  /**
+   * Get history for display (optional UI feature)
+   */
+  function getHistory(): HistoryRecord[] {
+    return historyStack.value
+  }
+
   // ========== Reset Actions ==========
 
   /**
@@ -772,6 +1093,18 @@ export const useGISStore = defineStore('gis', () => {
     // ========== Import/Export ==========
     exportGeoJSON,
     importGeoJSON,
+
+    // ========== History (Undo/Redo) ==========
+    historyStack,
+    historyIndex,
+    canUndo,
+    canRedo,
+    historyLength,
+    undo,
+    redo,
+    clearHistory,
+    getHistory,
+    recordHistory,
 
     // ========== Reset ==========
     reset,

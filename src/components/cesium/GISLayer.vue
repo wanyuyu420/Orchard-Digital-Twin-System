@@ -80,6 +80,26 @@ function setupSelectionHandler() {
     if (e.key === 'Escape') {
       exitEditMode()
     }
+
+    // Ctrl+Z for undo
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault()
+      if (gisStore.canUndo) {
+        gisStore.undo()
+        // Refresh graphics after undo (feature may have been restored/removed)
+        refreshGraphicsFromFeatures()
+      }
+    }
+
+    // Ctrl+Y or Ctrl+Shift+Z for redo
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+      e.preventDefault()
+      if (gisStore.canRedo) {
+        gisStore.redo()
+        // Refresh graphics after redo (feature may have been restored/removed)
+        refreshGraphicsFromFeatures()
+      }
+    }
   }
   const handleKeyUp = (e: KeyboardEvent) => {
     if (e.key === 'Control' || e.key === 'Meta') {
@@ -519,6 +539,46 @@ function applySelectionHighlights() {
       graphic.setHighlight(shouldHighlight)
     }
   })
+}
+
+/**
+ * Refresh graphics from features after undo/redo
+ * This ensures the visual representation matches the feature state
+ */
+function refreshGraphicsFromFeatures() {
+  const viewer = cesiumStore.viewer
+  if (!viewer) return
+
+  // Find features that need graphics created (restored by undo)
+  gisStore.features.forEach((feature, featureId) => {
+    if (!gisStore.graphics.has(featureId)) {
+      // Feature exists but no graphic - create one
+      const graphic = createGraphicFromFeature(feature, viewer)
+      if (graphic) {
+        gisStore.graphics.set(featureId, graphic)
+        console.log('Recreated graphic for restored feature:', featureId)
+      }
+    }
+  })
+
+  // Find graphics that need to be removed (feature removed by undo)
+  const graphicsToRemove: string[] = []
+  gisStore.graphics.forEach((_, featureId) => {
+    if (!gisStore.features.has(featureId)) {
+      graphicsToRemove.push(featureId)
+    }
+  })
+  graphicsToRemove.forEach(featureId => {
+    const graphic = gisStore.graphics.get(featureId)
+    if (graphic) {
+      graphic.destroy()
+      gisStore.graphics.delete(featureId)
+      console.log('Removed graphic for deleted feature:', featureId)
+    }
+  })
+
+  // Update highlights
+  applySelectionHighlights()
 }
 
 // Watch for selection changes (from list or other sources)
