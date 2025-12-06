@@ -682,9 +682,19 @@ function activateTool(toolType: DrawToolType) {
   }
 
   try {
-    // Create new tool instance
+    // Create new tool instance with style from store
+    const style = gisStore.drawStyle
     const tool = new DrawTool(viewer, {
       geometryType: toolType as any, // toolType is 'point' | 'line' | 'circle' | 'rectangle' | 'polygon'
+      style: {
+        strokeColor: style.strokeColor,
+        strokeWidth: style.strokeWidth,
+        fillColor: style.fillColor,
+        fillOpacity: style.fillOpacity,
+        lineType: style.lineType,
+        pointColor: style.pointColor,
+        pointSize: style.pointSize
+      },
       onComplete: (feature: Feature) => {
         // Convert Feature to Graphic
         const graphic = createGraphicFromFeature(feature, viewer)

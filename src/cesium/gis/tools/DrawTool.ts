@@ -22,6 +22,11 @@ import type { Feature } from '@/types/feature'
 export type DrawGeometryType = 'point' | 'line' | 'polygon' | 'circle' | 'rectangle'
 
 /**
+ * 线型类型
+ */
+export type LineType = 'solid' | 'dashed' | 'dotted'
+
+/**
  * 绘制工具配置
  */
 export interface DrawToolOptions extends BaseToolOptions {
@@ -42,6 +47,7 @@ export interface DrawToolOptions extends BaseToolOptions {
     strokeWidth?: number
     pointSize?: number
     pointColor?: string
+    lineType?: LineType
   }
 }
 
@@ -79,7 +85,8 @@ export class DrawTool extends BaseTool {
     strokeColor: '#22D3EE',
     strokeWidth: 3,
     pointSize: 10,
-    pointColor: '#22D3EE'
+    pointColor: '#22D3EE',
+    lineType: 'solid' as LineType
   }
 
   /** 当前绘制的顶点 */
@@ -325,18 +332,49 @@ export class DrawTool extends BaseTool {
       lastVertex.height || 0
     )
 
+    // 计算已完成线段的总长度
+    const completedLength = this.calculateCompletedLineLength()
+
     // 使用 CallbackProperty 动态更新位置
+    const strokeColor = Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.5)
     const previewLine = this.viewer.entities.add({
       polyline: {
         positions: new Cesium.CallbackProperty(() => {
           return this.drawCursorPosition ? [lastCartesian, this.drawCursorPosition] : []
         }, false),
         width: this.style.strokeWidth,
-        material: Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.5),
+        material: this.createLineMaterial(strokeColor, this.style.lineType),
         clampToGround: true
       }
     })
     this.previewEntities.push(previewLine)
+
+    // 实时长度标签 - 显示当前段长度和总长度
+    const lengthLabel = this.viewer.entities.add({
+      position: new Cesium.CallbackProperty(() => this.drawCursorPosition || lastCartesian, false),
+      label: {
+        text: new Cesium.CallbackProperty(() => {
+          if (!this.drawCursorPosition) return ''
+          const segmentLength = Cesium.Cartesian3.distance(lastCartesian, this.drawCursorPosition)
+          const totalLength = completedLength + segmentLength
+          const segmentText = this.formatLength(segmentLength)
+          const totalText = this.formatLength(totalLength)
+          return this.vertices.length > 1
+            ? `当前: ${segmentText}\n总计: ${totalText}`
+            : segmentText
+        }, false),
+        font: '12px sans-serif',
+        fillColor: Cesium.Color.WHITE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        pixelOffset: new Cesium.Cartesian2(15, -15),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.6)')
+      }
+    })
+    this.previewEntities.push(lengthLabel)
 
     // 完整线预览(仅在有多个顶点时)
     if (this.vertices.length >= 2) {
@@ -344,17 +382,74 @@ export class DrawTool extends BaseTool {
         Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, v.height || 0)
       )
 
+      const completeStrokeColor = Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.3)
       const completeLine = this.viewer.entities.add({
         polyline: {
           positions: new Cesium.CallbackProperty(() => {
             return this.drawCursorPosition ? [...staticPositions, this.drawCursorPosition] : staticPositions
           }, false),
           width: this.style.strokeWidth,
-          material: Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.3),
+          material: this.createLineMaterial(completeStrokeColor, this.style.lineType),
           clampToGround: true
         }
       })
       this.previewEntities.push(completeLine)
+    }
+  }
+
+  /**
+   * 计算已完成线段的总长度
+   */
+  private calculateCompletedLineLength(): number {
+    if (this.vertices.length < 2) return 0
+
+    let totalLength = 0
+    for (let i = 1; i < this.vertices.length; i++) {
+      const p1 = Cesium.Cartesian3.fromDegrees(
+        this.vertices[i - 1].longitude,
+        this.vertices[i - 1].latitude,
+        this.vertices[i - 1].height || 0
+      )
+      const p2 = Cesium.Cartesian3.fromDegrees(
+        this.vertices[i].longitude,
+        this.vertices[i].latitude,
+        this.vertices[i].height || 0
+      )
+      totalLength += Cesium.Cartesian3.distance(p1, p2)
+    }
+    return totalLength
+  }
+
+  /**
+   * 格式化长度显示
+   */
+  private formatLength(meters: number): string {
+    if (meters >= 1000) {
+      return `${(meters / 1000).toFixed(2)} km`
+    }
+    return `${meters.toFixed(1)} m`
+  }
+
+  /**
+   * 根据线型创建材质
+   */
+  private createLineMaterial(color: Cesium.Color, lineType: LineType): Cesium.Material | Cesium.MaterialProperty {
+    switch (lineType) {
+      case 'dashed':
+        return new Cesium.PolylineDashMaterialProperty({
+          color: color,
+          dashLength: 16.0,
+          dashPattern: parseInt('1111000011110000', 2) // 标准虚线
+        })
+      case 'dotted':
+        return new Cesium.PolylineDashMaterialProperty({
+          color: color,
+          dashLength: 8.0,
+          dashPattern: parseInt('1100110011001100', 2) // 点线
+        })
+      case 'solid':
+      default:
+        return color
     }
   }
 
@@ -388,6 +483,137 @@ export class DrawTool extends BaseTool {
       }
     })
     this.previewEntities.push(previewPolygon)
+
+    // 实时面积/周长标签 (3个顶点以上才显示)
+    if (this.vertices.length >= 2) {
+      const measurementLabel = this.viewer.entities.add({
+        position: new Cesium.CallbackProperty(() => {
+          // 计算多边形质心作为标签位置
+          const positions = this.drawCursorPosition
+            ? [...staticPositions, this.drawCursorPosition]
+            : staticPositions
+          return this.calculateCentroid(positions)
+        }, false),
+        label: {
+          text: new Cesium.CallbackProperty(() => {
+            if (!this.drawCursorPosition) return ''
+            const positions = [...staticPositions, this.drawCursorPosition]
+
+            // 计算周长
+            const perimeter = this.calculatePolygonPerimeter(positions)
+
+            // 只有3个点以上才计算面积
+            if (positions.length >= 3) {
+              const area = this.calculatePolygonArea(positions)
+              return `面积: ${this.formatArea(area)}\n周长: ${this.formatLength(perimeter)}`
+            }
+            return `周长: ${this.formatLength(perimeter)}`
+          }, false),
+          font: '12px sans-serif',
+          fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          pixelOffset: new Cesium.Cartesian2(0, 0),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          showBackground: true,
+          backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.6)')
+        }
+      })
+      this.previewEntities.push(measurementLabel)
+    }
+
+    // 闭合预览线 - 显示到第一个点的闭合线
+    if (this.vertices.length >= 2) {
+      const firstVertex = this.vertices[0]
+      const firstCartesian = Cesium.Cartesian3.fromDegrees(
+        firstVertex.longitude,
+        firstVertex.latitude,
+        firstVertex.height || 0
+      )
+
+      const closingLine = this.viewer.entities.add({
+        polyline: {
+          positions: new Cesium.CallbackProperty(() => {
+            return this.drawCursorPosition ? [this.drawCursorPosition, firstCartesian] : []
+          }, false),
+          width: this.style.strokeWidth,
+          material: new Cesium.PolylineDashMaterialProperty({
+            color: Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.5),
+            dashLength: 8.0
+          }),
+          clampToGround: true
+        }
+      })
+      this.previewEntities.push(closingLine)
+    }
+  }
+
+  /**
+   * 计算多边形质心
+   */
+  private calculateCentroid(positions: Cesium.Cartesian3[]): Cesium.Cartesian3 {
+    if (positions.length === 0) return Cesium.Cartesian3.ZERO
+
+    let x = 0, y = 0, z = 0
+    for (const pos of positions) {
+      x += pos.x
+      y += pos.y
+      z += pos.z
+    }
+    return new Cesium.Cartesian3(x / positions.length, y / positions.length, z / positions.length)
+  }
+
+  /**
+   * 计算多边形周长
+   */
+  private calculatePolygonPerimeter(positions: Cesium.Cartesian3[]): number {
+    if (positions.length < 2) return 0
+
+    let perimeter = 0
+    for (let i = 0; i < positions.length; i++) {
+      const nextIndex = (i + 1) % positions.length
+      perimeter += Cesium.Cartesian3.distance(positions[i], positions[nextIndex])
+    }
+    return perimeter
+  }
+
+  /**
+   * 计算多边形面积 (使用球面多边形面积公式)
+   */
+  private calculatePolygonArea(positions: Cesium.Cartesian3[]): number {
+    if (positions.length < 3) return 0
+
+    // 转换为经纬度
+    const coordinates = positions.map(pos => {
+      const carto = Cesium.Cartographic.fromCartesian(pos)
+      return { lon: carto.longitude, lat: carto.latitude }
+    })
+
+    // 使用球面多边形面积公式 (Girard's theorem approximation)
+    const earthRadius = 6371000 // 地球平均半径 (米)
+    let area = 0
+
+    for (let i = 0; i < coordinates.length; i++) {
+      const j = (i + 1) % coordinates.length
+      area += (coordinates[j].lon - coordinates[i].lon) *
+              (2 + Math.sin(coordinates[i].lat) + Math.sin(coordinates[j].lat))
+    }
+
+    area = Math.abs(area * earthRadius * earthRadius / 2)
+    return area
+  }
+
+  /**
+   * 格式化面积显示
+   */
+  private formatArea(squareMeters: number): string {
+    if (squareMeters >= 1000000) {
+      return `${(squareMeters / 1000000).toFixed(2)} km²`
+    } else if (squareMeters >= 10000) {
+      return `${(squareMeters / 10000).toFixed(2)} 公顷`
+    }
+    return `${squareMeters.toFixed(0)} m²`
   }
 
   /**
@@ -422,22 +648,25 @@ export class DrawTool extends BaseTool {
     })
     this.previewEntities.push(previewCircle)
 
-    // 动态半径标签
+    // 动态半径和面积标签
     const radiusLabel = this.viewer.entities.add({
       position: new Cesium.CallbackProperty(() => this.drawCursorPosition || centerCartesian, false),
       label: {
         text: new Cesium.CallbackProperty(() => {
           if (!this.drawCursorPosition) return ''
           const radius = Cesium.Cartesian3.distance(centerCartesian, this.drawCursorPosition)
-          return `r=${(radius / 1000).toFixed(2)}km`
+          const area = Math.PI * radius * radius
+          return `半径: ${this.formatLength(radius)}\n面积: ${this.formatArea(area)}`
         }, false),
         font: '12px sans-serif',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        pixelOffset: new Cesium.Cartesian2(0, -20),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
+        pixelOffset: new Cesium.Cartesian2(15, -15),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.6)')
       }
     })
     this.previewEntities.push(radiusLabel)
@@ -475,7 +704,7 @@ export class DrawTool extends BaseTool {
     })
     this.previewEntities.push(previewRectangle)
 
-    // 动态尺寸标签
+    // 动态尺寸和面积标签
     const dimensionsLabel = this.viewer.entities.add({
       position: new Cesium.CallbackProperty(() => {
         if (!this.drawCursorPosition) return Cesium.Cartesian3.fromDegrees(corner1.longitude, corner1.latitude)
@@ -502,14 +731,17 @@ export class DrawTool extends BaseTool {
             Cesium.Cartesian3.fromRadians(centerLon, Math.max(corner1Carto.latitude, corner2Carto.latitude), 0)
           )
 
-          return `${(width / 1000).toFixed(2)}km × ${(height / 1000).toFixed(2)}km`
+          const area = width * height
+          return `${this.formatLength(width)} × ${this.formatLength(height)}\n面积: ${this.formatArea(area)}`
         }, false),
         font: '12px sans-serif',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.6)')
       }
     })
     this.previewEntities.push(dimensionsLabel)
@@ -539,9 +771,12 @@ export class DrawTool extends BaseTool {
       },
       style: {
         strokeColor: this.style.strokeColor,
-        strokeWidth: this.style.strokeWidth
+        strokeWidth: this.style.strokeWidth,
+        lineType: this.style.lineType
       },
-      properties: {},
+      properties: {
+        length: this.calculateCompletedLineLength()
+      },
       visible: true,
       createdAt: new Date()
     }

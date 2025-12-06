@@ -105,6 +105,17 @@ export const useGISStore = defineStore('gis', () => {
   /** Continuous drawing mode */
   const continuousMode = ref(false)
 
+  /** Drawing style configuration */
+  const drawStyle = ref({
+    strokeColor: '#22D3EE',
+    strokeWidth: 3,
+    fillColor: '#3B82F6',
+    fillOpacity: 0.3,
+    lineType: 'solid' as 'solid' | 'dashed' | 'dotted',
+    pointColor: '#22D3EE',
+    pointSize: 10
+  })
+
   // ========== History State (Undo/Redo) ==========
 
   /** History stack for undo/redo operations */
@@ -1038,6 +1049,7 @@ export const useGISStore = defineStore('gis', () => {
     snapTolerance,
     showTips,
     continuousMode,
+    drawStyle,
 
     // ========== Computed ==========
     isActive,

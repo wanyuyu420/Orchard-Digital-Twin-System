@@ -76,6 +76,68 @@
           </button>
         </div>
 
+        <!-- Drawing Style Configuration Panel -->
+        <div v-if="gisStore.toolType && isDrawingTool(gisStore.toolType)" class="style-config-panel">
+          <div class="style-config-header">
+            <span>绘制样式</span>
+          </div>
+          <div class="style-config-body">
+            <!-- Stroke Color -->
+            <div class="style-row">
+              <label>线条颜色</label>
+              <input
+                type="color"
+                v-model="drawStyle.strokeColor"
+                class="color-input"
+              />
+            </div>
+            <!-- Stroke Width -->
+            <div class="style-row">
+              <label>线条宽度</label>
+              <input
+                type="range"
+                v-model.number="drawStyle.strokeWidth"
+                min="1"
+                max="10"
+                step="1"
+                class="range-input"
+              />
+              <span class="value-label">{{ drawStyle.strokeWidth }}px</span>
+            </div>
+            <!-- Line Type (only for line tool) -->
+            <div v-if="gisStore.toolType === 'line'" class="style-row">
+              <label>线型</label>
+              <select v-model="drawStyle.lineType" class="select-input">
+                <option value="solid">实线</option>
+                <option value="dashed">虚线</option>
+                <option value="dotted">点线</option>
+              </select>
+            </div>
+            <!-- Fill Color (for shapes) -->
+            <div v-if="isShapeTool(gisStore.toolType)" class="style-row">
+              <label>填充颜色</label>
+              <input
+                type="color"
+                v-model="drawStyle.fillColor"
+                class="color-input"
+              />
+            </div>
+            <!-- Fill Opacity (for shapes) -->
+            <div v-if="isShapeTool(gisStore.toolType)" class="style-row">
+              <label>填充透明度</label>
+              <input
+                type="range"
+                v-model.number="drawStyle.fillOpacity"
+                min="0"
+                max="1"
+                step="0.1"
+                class="range-input"
+              />
+              <span class="value-label">{{ Math.round(drawStyle.fillOpacity * 100) }}%</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Keyboard Shortcuts Help Panel -->
         <div v-if="showShortcutsHelp" class="shortcuts-help">
           <div class="shortcuts-header">
@@ -612,6 +674,25 @@ const searchQuery = ref('')
 // Shortcuts help visibility
 const showShortcutsHelp = ref(false)
 
+// Use store's drawStyle (shared with GISLayer.vue)
+const drawStyle = gisStore.drawStyle
+
+/**
+ * Check if tool is a drawing tool
+ */
+function isDrawingTool(toolType: string | null): boolean {
+  if (!toolType) return false
+  return ['point', 'line', 'circle', 'rectangle', 'polygon'].includes(toolType)
+}
+
+/**
+ * Check if tool is a shape tool (has fill)
+ */
+function isShapeTool(toolType: string | null): boolean {
+  if (!toolType) return false
+  return ['circle', 'rectangle', 'polygon'].includes(toolType)
+}
+
 // File input ref for import
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -1062,6 +1143,106 @@ function clearAllFeatures() {
 
     &:hover {
       color: $neon-cyan;
+    }
+  }
+}
+
+// Drawing Style Configuration Panel
+.style-config-panel {
+  margin: 0 10px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+
+  .style-config-header {
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+    span {
+      font-size: 11px;
+      font-weight: 500;
+      color: $text-main;
+    }
+  }
+
+  .style-config-body {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .style-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    label {
+      flex: 0 0 70px;
+      font-size: 11px;
+      color: $text-sub;
+    }
+
+    .color-input {
+      width: 32px;
+      height: 24px;
+      padding: 0;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      background: transparent;
+      cursor: pointer;
+
+      &::-webkit-color-swatch-wrapper {
+        padding: 2px;
+      }
+
+      &::-webkit-color-swatch {
+        border-radius: 2px;
+        border: none;
+      }
+    }
+
+    .range-input {
+      flex: 1;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      appearance: none;
+      cursor: pointer;
+
+      &::-webkit-slider-thumb {
+        appearance: none;
+        width: 12px;
+        height: 12px;
+        background: $neon-cyan;
+        border-radius: 50%;
+        cursor: pointer;
+      }
+    }
+
+    .select-input {
+      flex: 1;
+      padding: 4px 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      color: $text-main;
+      font-size: 11px;
+      cursor: pointer;
+
+      option {
+        background: #1a1a2e;
+        color: $text-main;
+      }
+    }
+
+    .value-label {
+      flex: 0 0 40px;
+      font-size: 10px;
+      color: $text-sub;
+      text-align: right;
     }
   }
 }
