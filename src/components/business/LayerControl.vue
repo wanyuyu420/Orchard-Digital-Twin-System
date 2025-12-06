@@ -57,6 +57,20 @@
           >
             <i :class="tool.icon"></i>
           </button>
+          <span class="tool-divider"></span>
+          <!-- 3D Analysis Tools -->
+          <button
+            v-for="tool in analysisTools"
+            :key="tool.id"
+            class="tool-btn analysis-btn"
+            :class="{ active: gisStore.toolType === tool.id, disabled: tool.disabled }"
+            :title="tool.tooltip"
+            :disabled="tool.disabled"
+            @click="!tool.disabled && toggleDrawTool(tool.id)"
+          >
+            <i :class="tool.icon"></i>
+          </button>
+          <span class="tool-divider"></span>
           <!-- Snap Toggle -->
           <button
             class="tool-btn snap-btn"
@@ -426,7 +440,7 @@
 import { ref, computed, watch, reactive } from 'vue'
 import GlassPanel from '@/components/common/GlassPanel.vue'
 import { useGISStore } from '@/stores/gis'
-import type { DrawToolType } from '@/types/draw'
+import type { GISToolType } from '@/types/draw'
 
 interface Layer {
   id: string
@@ -649,12 +663,20 @@ const layers = ref<Layer[]>([
 ])
 
 // Draw tools configuration with tooltips
-const drawTools = [
+const drawTools: Array<{ id: GISToolType; name: string; icon: string; tooltip: string }> = [
   { id: 'point', name: '点标注', icon: 'fa-solid fa-location-dot', tooltip: '点标注 - 单击放置点' },
   { id: 'line', name: '线绘制', icon: 'fa-solid fa-minus', tooltip: '线绘制 - 连续点击添加节点，双击完成' },
   { id: 'circle', name: '圆形', icon: 'fa-regular fa-circle', tooltip: '圆形 - 点击设置圆心，拖动设置半径' },
   { id: 'rectangle', name: '矩形', icon: 'fa-regular fa-square', tooltip: '矩形 - 点击对角两点绘制' },
   { id: 'polygon', name: '多边形', icon: 'fa-solid fa-draw-polygon', tooltip: '多边形 - 连续点击添加节点，双击完成' },
+]
+
+// 3D Analysis tools configuration
+const analysisTools: Array<{ id: GISToolType; name: string; icon: string; tooltip: string; disabled?: boolean }> = [
+  { id: 'volume', name: '方量分析', icon: 'fa-solid fa-cubes-stacked', tooltip: '方量分析 - 绘制多边形计算体积' },
+  { id: 'flood', name: '淹没分析', icon: 'fa-solid fa-water', tooltip: '淹没分析 - 模拟水位变化（开发中）', disabled: true },
+  { id: 'profile', name: '剖面分析', icon: 'fa-solid fa-chart-line', tooltip: '剖面分析 - 绘制线获取地形剖面（开发中）', disabled: true },
+  { id: 'measure3d', name: '3D测量', icon: 'fa-solid fa-ruler-combined', tooltip: '3D测量 - 考虑地形的距离测量（开发中）', disabled: true },
 ]
 
 // Keyboard shortcuts reference
@@ -705,13 +727,13 @@ function toggleLayer(layer: Layer) {
 // === GIS Feature Functions (New) ===
 
 /**
- * Toggle draw tool
+ * Toggle draw/analysis tool
  */
-function toggleDrawTool(toolId: DrawToolType) {
+function toggleDrawTool(toolId: GISToolType) {
   if (gisStore.toolType === toolId) {
     gisStore.setTool(null) // Deactivate if clicking same tool
   } else {
-    gisStore.setTool(toolId) // Activate tool
+    gisStore.setTool(toolId as any) // Activate tool
   }
 }
 
@@ -1145,6 +1167,36 @@ function clearAllFeatures() {
       color: $neon-cyan;
     }
   }
+
+  // Analysis tool button (different accent color)
+  &.analysis-btn {
+    &.active {
+      background: rgba(255, 107, 107, 0.15);
+      border-color: #FF6B6B;
+      color: #FF6B6B;
+      text-shadow: 0 0 5px #FF6B6B;
+    }
+
+    &.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.3);
+        color: $text-sub;
+        border-color: rgba(255, 255, 255, 0.1);
+      }
+    }
+  }
+}
+
+// Tool button divider
+.tool-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.15);
+  align-self: center;
+  margin: 0 2px;
 }
 
 // Drawing Style Configuration Panel

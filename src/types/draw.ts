@@ -22,6 +22,20 @@ export type DrawToolType =
   | null              // 无激活工具
 
 /**
+ * 3D 分析工具类型
+ */
+export type AnalysisToolType =
+  | 'volume'          // 方量分析
+  | 'flood'           // 淹没分析
+  | 'profile'         // 剖面分析
+  | 'measure3d'       // 3D测量
+
+/**
+ * 所有 GIS 工具类型（绘制 + 分析，不包含 null）
+ */
+export type GISToolType = Exclude<DrawToolType, null> | AnalysisToolType
+
+/**
  * 线型类型
  */
 export type LineType = 'solid' | 'dashed' | 'dotted'

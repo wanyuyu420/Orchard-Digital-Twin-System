@@ -7,6 +7,7 @@ import { watch, onMounted, onUnmounted, shallowRef } from 'vue'
 import { useCesiumStore } from '@/stores/cesium'
 import { useGISStore } from '@/stores/gis'
 import { DrawTool } from '@/cesium/gis/tools/DrawTool'
+import { VolumeTool, type VolumeAnalysisResult } from '@/cesium/gis/tools/VolumeTool'
 import { PointGraphic } from '@/cesium/gis/graphics/PointGraphic'
 import { LineGraphic } from '@/cesium/gis/graphics/LineGraphic'
 import { CircleGraphic } from '@/cesium/gis/graphics/CircleGraphic'
@@ -22,7 +23,10 @@ const cesiumStore = useCesiumStore()
 const gisStore = useGISStore()
 
 // Current active tool instance
-const currentTool = shallowRef<DrawTool | null>(null)
+const currentTool = shallowRef<DrawTool | VolumeTool | null>(null)
+
+// Volume analysis tool instance (persistent for result display)
+const volumeTool = shallowRef<VolumeTool | null>(null)
 
 // Selection event handler
 let selectionHandler: any = null
@@ -660,6 +664,8 @@ watch(() => gisStore.toolType, (newToolType, oldToolType) => {
 
   if (newToolType && isDrawTool(newToolType)) {
     activateTool(newToolType as DrawToolType)
+  } else if (newToolType && isAnalysisTool(newToolType)) {
+    activateAnalysisTool(newToolType)
   }
 })
 
@@ -669,6 +675,14 @@ watch(() => gisStore.toolType, (newToolType, oldToolType) => {
 function isDrawTool(toolType: string | null): boolean {
   if (!toolType) return false
   return ['point', 'line', 'circle', 'rectangle', 'polygon'].includes(toolType)
+}
+
+/**
+ * Check if tool type is an analysis tool
+ */
+function isAnalysisTool(toolType: string | null): boolean {
+  if (!toolType) return false
+  return ['volume', 'flood', 'profile', 'measure3d'].includes(toolType)
 }
 
 /**
@@ -744,6 +758,68 @@ function deactivateTool() {
       console.error('Failed to deactivate tool:', error)
     }
   }
+}
+
+/**
+ * Activate analysis tool
+ */
+function activateAnalysisTool(toolType: string) {
+  const viewer = cesiumStore.viewer
+  if (!viewer) {
+    console.warn('Cesium viewer not ready')
+    return
+  }
+
+  try {
+    switch (toolType) {
+      case 'volume':
+        activateVolumeTool(viewer)
+        break
+      case 'flood':
+        // TODO: Implement FloodTool
+        console.log('Flood tool not yet implemented')
+        break
+      case 'profile':
+        // TODO: Implement ProfileTool
+        console.log('Profile tool not yet implemented')
+        break
+      case 'measure3d':
+        // TODO: Implement Measure3DTool
+        console.log('3D Measure tool not yet implemented')
+        break
+      default:
+        console.warn('Unknown analysis tool type:', toolType)
+    }
+  } catch (error) {
+    console.error('Failed to activate analysis tool:', error)
+  }
+}
+
+/**
+ * Activate volume calculation tool
+ */
+function activateVolumeTool(viewer: any) {
+  // Clear previous volume result if any
+  if (volumeTool.value) {
+    volumeTool.value.clearResult()
+  }
+
+  const tool = new VolumeTool(viewer, {
+    baseHeight: 0,
+    onComplete: (result: VolumeAnalysisResult) => {
+      console.log('Volume analysis complete:', result)
+      // Emit event or update store with result
+      // For now, the result visualization is handled by VolumeTool itself
+    },
+    onCancel: () => {
+      console.log('Volume analysis cancelled')
+    }
+  })
+
+  tool.activate()
+  currentTool.value = tool
+  volumeTool.value = tool
+  gisStore.startDrawing()
 }
 
 /**
