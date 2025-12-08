@@ -113,38 +113,48 @@ The system SHALL maintain a list of measurements with create, read, and delete o
 - **AND** all measurement entities are removed from the map
 
 ### Requirement: GIS Drawing Tools
-The platform SHALL provide a comprehensive set of GIS drawing tools enabling users to create, edit, and manage geographic features on the 3D map.
+The system SHALL provide enhanced drawing tools with real-time feedback, style configuration, and smooth performance.
 
-#### Scenario: Draw point marker
-- **WHEN** user activates point tool and clicks on the map
-- **THEN** a point marker is created at the clicked location
-- **AND** the point appears in the feature list
+#### Scenario: Real-time line measurement during drawing
+- **WHEN** the user is drawing a line with the line tool
+- **AND** they have placed at least one point
+- **THEN** a label shows the length from the last point to the cursor
+- **AND** the total cumulative length is displayed
+- **AND** measurements update at 60fps without stuttering
 
-#### Scenario: Draw line path
-- **WHEN** user activates line tool and clicks multiple locations
-- **AND** user presses ESC or right-clicks to finish
-- **THEN** a polyline is created connecting all points
-- **AND** the line length is calculated and displayed
+#### Scenario: Line style configuration
+- **WHEN** the user selects the line drawing tool
+- **THEN** they can choose line type (solid, dashed, dotted)
+- **AND** they can set line color via color picker
+- **AND** they can adjust line width (1-10px)
+- **AND** selected styles apply to the drawn line
 
-#### Scenario: Draw polygon area
-- **WHEN** user activates polygon tool and clicks vertices
-- **AND** user double-clicks to complete
-- **THEN** a closed polygon is created
-- **AND** the area is calculated and displayed
+#### Scenario: Real-time circle measurement during drawing
+- **WHEN** the user is drawing a circle
+- **AND** they have placed the center point
+- **THEN** a label shows the current radius as they drag
+- **AND** the calculated area is displayed
+- **AND** measurements update smoothly during drag
 
-#### Scenario: Draw circle
-- **WHEN** user activates circle tool and clicks center point
-- **AND** user moves mouse to adjust radius
-- **AND** user clicks again to confirm
-- **THEN** a circle is created with specified radius
-- **AND** radius and area are displayed
+#### Scenario: Real-time rectangle measurement during drawing
+- **WHEN** the user is drawing a rectangle
+- **AND** they have placed the first corner
+- **THEN** labels show width × height dimensions
+- **AND** the calculated area is displayed
+- **AND** measurements update smoothly during drag
 
-#### Scenario: Draw rectangle
-- **WHEN** user activates rectangle tool and clicks start corner
-- **AND** user drags to opposite corner
-- **AND** user clicks to confirm
-- **THEN** a rectangle is created
-- **AND** dimensions and area are displayed
+#### Scenario: Real-time polygon measurement during drawing
+- **WHEN** the user is drawing a polygon
+- **AND** they have placed at least 3 vertices
+- **THEN** the area is calculated and displayed
+- **AND** the perimeter length is shown
+- **AND** measurements update as vertices are added
+
+#### Scenario: Shape style configuration
+- **WHEN** the user selects any shape drawing tool (circle, rectangle, polygon)
+- **THEN** they can set fill color and opacity
+- **AND** they can set outline color and width
+- **AND** selected styles apply to the completed shape
 
 ### Requirement: Feature Selection and Highlighting
 The platform SHALL allow users to select and visually highlight drawn features for editing or inspection.
