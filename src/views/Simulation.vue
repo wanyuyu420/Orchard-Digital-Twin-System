@@ -1,5 +1,8 @@
 <template>
   <div class="simulation-layout">
+    <!-- Flood Visualization Layer (rendered when engine is flood/hydro) -->
+    <FloodLayer v-if="isFloodEngine" />
+
     <!-- Left Sidebar: Config -->
     <transition name="sidebar-left">
       <aside v-show="!isUiHidden" class="sidebar left">
@@ -30,10 +33,17 @@ import { useSimulationStore } from '@/stores/simulation';
 import SimConfig from '@/components/business/SimConfig.vue';
 import SimResult from '@/components/business/SimResult.vue';
 import TimelineControl from '@/components/common/TimelineControl.vue';
+import FloodLayer from '@/components/cesium/FloodLayer.vue';
 
 const appStore = useAppStore();
 const simulationStore = useSimulationStore();
 const isUiHidden = computed(() => appStore.isUiHidden);
+
+// Show flood layer when engine is flood or hydro
+const isFloodEngine = computed(() => {
+  const engine = simulationStore.state.engine;
+  return engine === 'flood' || engine === 'hydro';
+});
 
 onMounted(() => {
   simulationStore.fetchData();
