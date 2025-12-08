@@ -11,6 +11,14 @@ import { init as initBaiduImageryProvider } from './imageryProvider/BaiduImagery
 
 declare const Cesium: any
 
+// Cesium Ion Access Token (for World Terrain and other Ion assets)
+// Register at: https://cesium.com/ion/tokens
+const CESIUM_ION_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlY2ViYjQyYy0xMzIyLTRlYjAtODdhOS1lMTM2ZTFhYjdhYjAiLCJpZCI6MzQ3OTk2LCJpYXQiOjE3NTk4MjkzODR9.dCi1uXY8ZD6Fym41vwc4-aTTeCdMR1EXM27V82Fp0ZI'
+
+// Set Ion default access token
+Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN
+
 // Register Baidu imagery provider
 initBaiduImageryProvider()
 
@@ -93,6 +101,9 @@ class Controller {
     // Enable depth testing against terrain
     viewer.scene.globe.depthTestAgainstTerrain = true
 
+    // Load Cesium World Terrain (async)
+    this.loadWorldTerrain(viewer)
+
     // Initialize navigation controls
     this.initCesiumNavigation(viewer)
 
@@ -104,6 +115,25 @@ class Controller {
 
     this.viewer = viewer
     return viewer
+  }
+
+  /**
+   * Load Cesium World Terrain asynchronously
+   * This enables 3D terrain for volume analysis and other 3D tools
+   */
+  async loadWorldTerrain(viewer: any): Promise<void> {
+    try {
+      // Use Cesium.createWorldTerrainAsync for Cesium 1.104+
+      const terrainProvider = await Cesium.createWorldTerrainAsync({
+        requestWaterMask: true,      // Enable water effects
+        requestVertexNormals: true   // Enable terrain lighting
+      })
+      viewer.terrainProvider = terrainProvider
+      console.log('✓ Cesium World Terrain loaded successfully')
+    } catch (error) {
+      console.warn('Failed to load World Terrain, using ellipsoid terrain:', error)
+      // Fallback: continue with default ellipsoid terrain
+    }
   }
 
   initCesiumNavigation(viewer: any): void {
