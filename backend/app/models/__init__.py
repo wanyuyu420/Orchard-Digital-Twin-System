@@ -5,6 +5,7 @@ from .reading import SensorReading
 from .alert import AlertRule, Alert
 from .product import RasterProduct, VectorProduct, ModelProduct
 from .hydrological import HydrologicalStation
+from .flood import FloodScenario, FloodFrame
 
 __all__ = [
     "Base",
@@ -23,4 +24,6 @@ __all__ = [
     "VectorProduct",
     "ModelProduct",
     "HydrologicalStation",
+    "FloodScenario",
+    "FloodFrame",
 ]
