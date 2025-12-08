@@ -65,55 +65,56 @@
   - Blue water icon
   - Verify: Tool accessible from UI
 
-## Phase 3: Terrain Profile Tool (4 tasks)
+## Phase 3: Terrain Profile Tool (4 tasks) ✅
 
-- [ ] **T3.1** Create ProfileTool class
-  - Line drawing for profile path
+- [x] **T3.1** Create ProfileTool class
+  - Line drawing for profile path (two-point mode)
   - Terrain height sampling along path
   - Distance calculation between samples
   - Verify: Can draw profile line
 
-- [ ] **T3.2** Implement terrain sampling
+- [x] **T3.2** Implement terrain sampling
   - Use Cesium.sampleTerrainMostDetailed
-  - Configurable sample density
-  - Handle terrain loading async
+  - Configurable sample density (default 20m)
+  - Handle terrain loading async with progress callback
   - Verify: Heights sampled correctly
 
-- [ ] **T3.3** Create Profile Chart component
-  - ECharts line chart
+- [x] **T3.3** Create Profile Chart component
+  - ECharts line chart with dark theme
   - X-axis: distance, Y-axis: elevation
   - Hover to show coordinates
-  - Zoom and pan support
+  - Data zoom and pan support
   - Verify: Chart displays correctly
 
-- [ ] **T3.4** Add profile export
+- [x] **T3.4** Add profile export
   - Export as CSV (distance, elevation, lat, lon)
-  - Export chart as image
+  - Export chart as PNG image
+  - Download functionality in ProfileTool
   - Verify: Export works correctly
 
-## Phase 4: 3D Measurement Tool (4 tasks)
+## Phase 4: 3D Measurement Tool (4 tasks) ✅
 
-- [ ] **T4.1** Create Measure3DTool class
+- [x] **T4.1** Create Measure3DTool class
   - Extend BaseTool
   - Support terrain-following measurement
   - Calculate horizontal, vertical, slope distances
   - Verify: Basic 3D measurement works
 
-- [ ] **T4.2** Implement height modes
+- [x] **T4.2** Implement height modes
   - Terrain mode (Shift key): snap to terrain
   - Custom height mode (Ctrl key): user input height
   - Relative mode (Alt key): relative to first point
   - Verify: All modes work correctly
 
-- [ ] **T4.3** Create HeightModePanel component
-  - Mode selector buttons
-  - Custom height input field
-  - Show current mode indicator
+- [x] **T4.3** Height mode UI (in-tool)
+  - Mode indicator in preview label
+  - Keyboard shortcuts for mode switching
+  - Shows current mode during measurement
   - Verify: UI controls work
 
-- [ ] **T4.4** Add 3D measurement display
+- [x] **T4.4** Add 3D measurement display
   - Show all distance types (horizontal, vertical, slope)
-  - Display elevation difference
+  - Display elevation difference with arrow
   - Angle/slope percentage
   - Verify: All measurements displayed
 
