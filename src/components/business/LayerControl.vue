@@ -36,13 +36,6 @@
 						<i :class="tool.icon"></i>
 					</button>
 					<span class="tool-divider"></span>
-					<!-- 3D Analysis Tools -->
-					<button v-for="tool in analysisTools" :key="tool.id" class="tool-btn analysis-btn"
-						:class="{ active: gisStore.toolType === tool.id, disabled: tool.disabled }" :title="tool.tooltip"
-						:disabled="tool.disabled" @click="!tool.disabled && toggleDrawTool(tool.id)">
-						<i :class="tool.icon"></i>
-					</button>
-					<span class="tool-divider"></span>
 					<!-- Snap Toggle -->
 					<button class="tool-btn snap-btn" :class="{ active: gisStore.snapEnabled }" title="吸附功能 - 绘制时自动吸附到附近顶点/边"
 						@click="toggleSnap">

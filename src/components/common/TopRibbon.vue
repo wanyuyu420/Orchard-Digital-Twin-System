@@ -17,12 +17,16 @@
 
 		<!-- Right: Tools -->
 		<div class="right-tools">
-			<!-- Measurement Tools -->
+			<!-- 3D Analysis Tools -->
 			<div class="tool-group">
-				<button class="btn-icon-text" :class="{ active: measureTool === 'distance' }"
-					@click="toggleMeasureTool('distance')" title="空间测距"><i class="fa-solid fa-ruler"></i></button>
-				<button class="btn-icon-text" :class="{ active: measureTool === 'area' }" @click="toggleMeasureTool('area')"
-					title="面积测量"><i class="fa-solid fa-draw-polygon"></i></button>
+				<button class="btn-icon-text" :class="{ active: gisStore.toolType === 'volume' }"
+					@click="toggleAnalysisTool('volume')" title="方量分析"><i class="fa-solid fa-cubes-stacked"></i></button>
+				<button class="btn-icon-text" :class="{ active: gisStore.toolType === 'flood' }"
+					@click="toggleAnalysisTool('flood')" title="淹没分析"><i class="fa-solid fa-water"></i></button>
+				<button class="btn-icon-text" :class="{ active: gisStore.toolType === 'profile' }"
+					@click="toggleAnalysisTool('profile')" title="剖面分析"><i class="fa-solid fa-chart-line"></i></button>
+				<button class="btn-icon-text" :class="{ active: gisStore.toolType === 'measure3d' }"
+					@click="toggleAnalysisTool('measure3d')" title="3D测量 (Shift:地形/Ctrl:自定义/Alt:相对)"><i class="fa-solid fa-ruler-combined"></i></button>
 			</div>
 
 			<div class="tool-divider"></div>
@@ -121,8 +125,7 @@ import { useAppStore } from '@/stores/app'
 import { useCesiumStore } from '@/stores/cesium'
 import { useGISStore } from '@/stores/gis'
 import { baseInkStyle, baseColorStyle } from '@/mock/baseMapData'
-import type { MeasureToolType } from '@/types/measure'
-import type { DrawToolType } from '@/types/draw'
+import type { DrawToolType, AnalysisToolType } from '@/types/draw'
 
 declare const Cesium: any
 
@@ -132,10 +135,6 @@ const gisStore = useGISStore()
 const isUiHidden = computed(() => appStore.isUiHidden)
 
 // Use activeTool to determine which type of tool is active
-const measureTool = computed(() => {
-	const tool = gisStore.activeTool
-	return (tool === 'measure-distance' || tool === 'distance' || tool === 'measure-area' || tool === 'area') ? tool as MeasureToolType : null
-})
 const drawTool = computed(() => {
 	const tool = gisStore.activeTool as string | null
 	return (tool === 'draw-point' || tool === 'point' || tool === 'draw-line' || tool === 'line' || tool === 'draw-polygon' || tool === 'polygon' || tool === 'draw-circle' || tool === 'circle' || tool === 'draw-rectangle' || tool === 'rectangle') ? tool as DrawToolType : null
@@ -291,12 +290,11 @@ function selectBasemap(type: string) {
 	updateUniforms()
 }
 
-function toggleMeasureTool(tool: MeasureToolType) {
+function toggleAnalysisTool(tool: AnalysisToolType) {
 	// Toggle: if clicking the same tool, deactivate it; otherwise, activate it
 	if (gisStore.activeTool === tool) {
 		gisStore.setTool(null)
 	} else {
-		// Activate the selected tool (will automatically deactivate other tools)
 		gisStore.setTool(tool)
 	}
 }

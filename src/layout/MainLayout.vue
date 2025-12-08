@@ -3,11 +3,7 @@
     <!-- Layer 4: Top Ribbon -->
     <TopRibbon />
 
-    <!-- Measure Panel (floating) -->
-    <MeasurePanel />
-
-    <!-- Logical Layers (no UI, pure logic) -->
-    <MeasureLayer />
+    <!-- GIS Layer (handles all drawing and analysis tools) -->
     <GISLayer />
 
     <!-- Layer 2: UI Layer (Router View) -->
@@ -26,8 +22,6 @@
 
 <script setup lang="ts">
 import TopRibbon from '@/components/common/TopRibbon.vue';
-import MeasurePanel from '@/components/common/MeasurePanel.vue';
-import MeasureLayer from '@/components/cesium/MeasureLayer.vue';
 import GISLayer from '@/components/cesium/GISLayer.vue';
 import BottomDock from '@/layout/BottomDock.vue';
 </script>
