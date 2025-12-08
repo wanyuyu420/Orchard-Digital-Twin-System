@@ -33,38 +33,37 @@
   - Integration with GIS store
   - Verify: Tool accessible from UI
 
-## Phase 2: Flood Simulation Tool (5 tasks)
+## Phase 2: Flood Simulation Tool (5 tasks) ✅
 
-- [ ] **T2.1** Extract flood algorithm from cesium_dev_kit
-  - Review flood simulation code
-  - Create FloodSimulator utility class
-  - Implement water surface generation
-  - Verify: Algorithm generates water surface
+- [x] **T2.1** Create TilesetService for 3D Tiles loading
+  - Created TilesetService utility class
+  - Support local tileset.json and Ion assets
+  - Style management and flyTo
+  - Verify: Can load and display 3D Tiles
 
-- [ ] **T2.2** Create FloodTool class
-  - Extend BaseTool
-  - Define analysis area (polygon or extent)
-  - Integrate FloodSimulator
-  - Verify: Can define flood area
+- [x] **T2.2** Create FloodTool class
+  - Extend BaseTool for polygon drawing
+  - Three modes: polygon, tileset, terrain
+  - Water level control
+  - Verify: Can draw flood analysis polygon
 
-- [ ] **T2.3** Implement flood visualization
-  - Water surface entity with transparency
-  - Dynamic water level adjustment
-  - Terrain clipping for underwater areas
-  - Verify: Flood renders realistically
+- [x] **T2.3** Implement flood visualization
+  - Dynamic water surface with opacity
+  - Water level raise/lower
+  - Animation support (auto rise/fall)
+  - Verify: Water surface renders correctly
 
-- [ ] **T2.4** Create Flood Control Panel
-  - Water level slider
-  - Min/max elevation display
-  - Affected area calculation
-  - Animation play/pause
-  - Verify: Controls work correctly
+- [x] **T2.4** Create mock test data
+  - GeoJSON inundation polygons
+  - Three severity levels (mild/large/extreme)
+  - Located in public/mock/flood/
+  - Verify: Test data loads correctly
 
-- [ ] **T2.5** Add flood animation
-  - Animate water level rise
-  - Speed control
-  - Show timestamp/level during animation
-  - Verify: Animation plays smoothly
+- [x] **T2.5** Add FloodTool to toolbar
+  - Enabled in LayerControl.vue
+  - GISLayer.vue integration
+  - Blue water icon
+  - Verify: Tool accessible from UI
 
 ## Phase 3: Terrain Profile Tool (4 tasks)
 

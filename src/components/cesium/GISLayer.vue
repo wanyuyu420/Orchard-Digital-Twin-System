@@ -8,6 +8,7 @@ import { useCesiumStore } from '@/stores/cesium'
 import { useGISStore } from '@/stores/gis'
 import { DrawTool } from '@/cesium/gis/tools/DrawTool'
 import { VolumeTool, type VolumeAnalysisResult } from '@/cesium/gis/tools/VolumeTool'
+import { FloodTool, type FloodAnalysisResult } from '@/cesium/gis/tools/FloodTool'
 import { PointGraphic } from '@/cesium/gis/graphics/PointGraphic'
 import { LineGraphic } from '@/cesium/gis/graphics/LineGraphic'
 import { CircleGraphic } from '@/cesium/gis/graphics/CircleGraphic'
@@ -23,10 +24,13 @@ const cesiumStore = useCesiumStore()
 const gisStore = useGISStore()
 
 // Current active tool instance
-const currentTool = shallowRef<DrawTool | VolumeTool | null>(null)
+const currentTool = shallowRef<DrawTool | VolumeTool | FloodTool | null>(null)
 
 // Volume analysis tool instance (persistent for result display)
 const volumeTool = shallowRef<VolumeTool | null>(null)
+
+// Flood analysis tool instance
+const floodTool = shallowRef<FloodTool | null>(null)
 
 // Selection event handler
 let selectionHandler: any = null
@@ -776,8 +780,7 @@ function activateAnalysisTool(toolType: string) {
         activateVolumeTool(viewer)
         break
       case 'flood':
-        // TODO: Implement FloodTool
-        console.log('Flood tool not yet implemented')
+        activateFloodTool(viewer)
         break
       case 'profile':
         // TODO: Implement ProfileTool
@@ -819,6 +822,43 @@ function activateVolumeTool(viewer: any) {
   tool.activate()
   currentTool.value = tool
   volumeTool.value = tool
+  gisStore.startDrawing()
+}
+
+/**
+ * Activate flood simulation tool
+ */
+function activateFloodTool(viewer: any) {
+  // Clear previous flood result if any
+  if (floodTool.value) {
+    floodTool.value.clear()
+  }
+
+  const tool = new FloodTool(viewer, {
+    mode: 'polygon',  // 默认使用多边形绘制模式
+    initialWaterLevel: 5,
+    waterLevelStep: 1,
+    waterColor: '#1E90FF',
+    waterOpacity: 0.6,
+    dataSource: {
+      type: 'polygon',
+      minWaterLevel: 0,
+      maxWaterLevel: 50
+    },
+    onWaterLevelChange: (level: number, result: FloodAnalysisResult) => {
+      console.log(`Water level: ${level}m, Area: ${result.floodedArea.toFixed(0)}m²`)
+    },
+    onComplete: (result: FloodAnalysisResult) => {
+      console.log('Flood analysis complete:', result)
+    },
+    onCancel: () => {
+      console.log('Flood analysis cancelled')
+    }
+  })
+
+  tool.activate()
+  currentTool.value = tool
+  floodTool.value = tool
   gisStore.startDrawing()
 }
 

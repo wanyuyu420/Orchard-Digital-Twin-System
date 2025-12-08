@@ -674,7 +674,7 @@ const drawTools: Array<{ id: GISToolType; name: string; icon: string; tooltip: s
 // 3D Analysis tools configuration
 const analysisTools: Array<{ id: GISToolType; name: string; icon: string; tooltip: string; disabled?: boolean }> = [
   { id: 'volume', name: '方量分析', icon: 'fa-solid fa-cubes-stacked', tooltip: '方量分析 - 绘制多边形计算体积' },
-  { id: 'flood', name: '淹没分析', icon: 'fa-solid fa-water', tooltip: '淹没分析 - 模拟水位变化（开发中）', disabled: true },
+  { id: 'flood', name: '淹没分析', icon: 'fa-solid fa-water', tooltip: '淹没分析 - 绘制多边形模拟水位变化' },
   { id: 'profile', name: '剖面分析', icon: 'fa-solid fa-chart-line', tooltip: '剖面分析 - 绘制线获取地形剖面（开发中）', disabled: true },
   { id: 'measure3d', name: '3D测量', icon: 'fa-solid fa-ruler-combined', tooltip: '3D测量 - 考虑地形的距离测量（开发中）', disabled: true },
 ]

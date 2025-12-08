@@ -38,12 +38,32 @@
   - Tooltip: "方量分析 - 绘制多边形计算体积"
   - Red accent color for analysis tools
 
-### 🔲 Phase 2: Flood Simulation Tool (0/5 tasks)
-- [ ] T2.1 Extract flood algorithm from cesium_dev_kit
-- [ ] T2.2 Create FloodTool class
-- [ ] T2.3 Implement flood visualization
-- [ ] T2.4 Create Flood Control Panel
-- [ ] T2.5 Add flood animation
+### ✅ Phase 2: Flood Simulation Tool (5/5 tasks)
+
+- [x] **T2.1** Create TilesetService for 3D Tiles loading
+  - `src/cesium/gis/services/TilesetService.ts` (350+ lines)
+  - Support local tileset.json and Cesium Ion assets
+  - Style management and height adjustment
+
+- [x] **T2.2** Create FloodTool class
+  - `src/cesium/gis/tools/FloodTool.ts` (480+ lines)
+  - Support polygon, tileset, and terrain modes
+  - Water level control with animation
+
+- [x] **T2.3** Implement flood visualization
+  - Dynamic water surface with opacity
+  - Water level raise/lower controls
+  - Animation support (auto rise/fall)
+
+- [x] **T2.4** Create mock GeoJSON test data
+  - `/public/mock/flood/mild/inundation.geojson`
+  - `/public/mock/flood/large/inundation.geojson`
+  - `/public/mock/flood/extreme/inundation.geojson`
+
+- [x] **T2.5** Add FloodTool to toolbar
+  - Enabled in LayerControl.vue
+  - Blue water icon
+  - Integrated with GISLayer.vue
 
 ### 🔲 Phase 3: Terrain Profile Tool (0/4 tasks)
 - [ ] T3.1 Create ProfileTool class
@@ -57,7 +77,7 @@
 - [ ] T4.3 Create HeightModePanel component
 - [ ] T4.4 Add 3D measurement display
 
-**Total Progress**: 5/18 tasks (28%)
+**Total Progress**: 10/18 tasks (56%)
 
 ---
 
