@@ -44,38 +44,16 @@ uvicorn app.main:app --reload
 git checkout -b feature/description
 ```
 
-### 提交信息 (Commit Messages)
+### 提交信息
 
-> ⚠️ **重要规范**: 所有提交信息必须使用**英文** (Conventional Commits 格式)
-
-**格式**: `<type>(<scope>): <description>`
-
-| 类型 | 用途 | 示例 |
-|------|------|------|
-| `feat` | 新功能 | `feat(flood): add water level interpolation` |
-| `fix` | 修复 BUG | `fix(cesium): resolve terrain loading issue` |
-| `docs` | 文档更新 | `docs: update API documentation` |
-| `style` | 格式调整 | `style: format code with prettier` |
-| `refactor` | 代码重构 | `refactor(gis): simplify polygon drawing logic` |
-| `perf` | 性能优化 | `perf: optimize entity rendering` |
-| `test` | 测试 | `test(gis): add unit tests for DrawTool` |
-| `chore` | 构建/工具 | `chore: update dependencies` |
-
-**规则**:
-- **语言**: 提交信息必须全英文
-- **时态**: 使用现在时 (`add` 而非 `added`)
-- **大小写**: 描述部分小写开头，不加句号
-- **长度**: 标题行不超过 72 字符
-
-**多行提交示例**:
 ```
-feat(simulation): implement flood animation timeline
-
-- Add playback timer with 50ms intervals
-- Implement drag-to-seek functionality
-- Connect FloodLayer to progress updates
-
-Closes #123
+feat: 新增功能
+fix: 修复 BUG
+docs: 文档更新
+style: 格式调整
+refactor: 代码重构
+perf: 性能优化
+test: 测试
 ```
 
 ### 风格
