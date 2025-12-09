@@ -77,6 +77,7 @@ backend/app/utils/scanner.py
 # .claude/ - 已移除忽略，用于项目共享配置
 .claude/settings.local.json  # 个人权限设置仍然忽略
 .gemini/
+.agent/
 
 # ========================================
 # 可选忽略规则（根据个人工具调整）
@@ -108,8 +109,30 @@ backend/app/utils/scanner.py
 # AGENTS.md - 已移至 openspec/AGENTS.md
 _context/
 
-# Note: openspec/ 包含项目规格文档，应该被提交
-# 如果有 openspec 的个人草稿，使用 openspec/draft/ 并在上面添加排除规则
-
 # 第三方库的 npm 包目录（有独立 git）
 public/cesium-draw/
+
+# ========================================
+# AI Agent 和文档目录（不需要版本控制）
+# ========================================
+
+# OpenSpec 规格文档（AI agent 生成，本地管理）
+openspec/
+
+# 开发日志（本地记录）
+devlogs/
+
+# 项目文档（可能包含敏感内容或草稿）
+docs/
+
+# Claude AI 配置目录
+.claude/
+
+# Skills 知识库
+skills/
+
+# AI Agent 配置文件
+CLAUDE.md
+new.md
+last-chat.txt
+dev.sh
