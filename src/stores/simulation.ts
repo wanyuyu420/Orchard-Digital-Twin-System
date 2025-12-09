@@ -44,6 +44,9 @@ export const useSimulationStore = defineStore('simulation', () => {
   // Selected event for simulation
   const selectedEventId = ref<string | null>(null);
 
+  // Current flood area from visualization layer (updated by FloodLayer)
+  const currentFloodArea = ref<number | null>(null);
+
   // Computed: current selected flood event
   const selectedEvent = computed(() => {
     return floodEvents.value.find(e => e.id === selectedEventId.value) || null;
@@ -67,6 +70,16 @@ export const useSimulationStore = defineStore('simulation', () => {
       };
     } else {
       // Flood/Hydro simulation
+      // If we have real-time flood area from visualization, use it
+      if (currentFloodArea.value !== null) {
+        return {
+          floodArea: currentFloodArea.value,
+          displacement: null,
+          peakFlow: state.value.flow,
+          maxWaterLevel: waterLevels.value[0]?.latest_level || 165.5
+        };
+      }
+      // Otherwise use event data or fallback calculation
       const event = selectedEvent.value;
       if (event) {
         // Use real event data
@@ -194,6 +207,11 @@ export const useSimulationStore = defineStore('simulation', () => {
     state.value.progress = Math.max(0, Math.min(100, val));
   }
 
+  // Set current flood area from external source (FloodLayer)
+  function setFloodArea(area: number | null) {
+    currentFloodArea.value = area;
+  }
+
   return {
     state,
     floodEvents,
@@ -208,6 +226,7 @@ export const useSimulationStore = defineStore('simulation', () => {
     setEngine,
     selectEvent,
     togglePlay,
-    setProgress
+    setProgress,
+    setFloodArea
   };
 });
