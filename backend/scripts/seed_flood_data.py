@@ -73,10 +73,10 @@ def generate_urumqi_river_scenario() -> tuple[FloodScenario, list[FloodFrame]]:
     )
 
     frames = []
-    # Generate 15 frames from t=0 to t=100
-    time_steps = [0, 7, 15, 22, 30, 40, 50, 60, 70, 80, 85, 90, 95, 98, 100]
+    # Generate frame every 2 progress units for smooth animation (51 frames)
+    time_steps = list(range(0, 101, 2))  # 0, 2, 4, 6, ..., 100
 
-    for i, t in enumerate(time_steps):
+    for t in time_steps:
         # Water level rises then stabilizes
         if t <= 50:
             water_level = 1.0 + (t / 50) * 4.5  # Rise to 5.5m
@@ -120,9 +120,10 @@ def generate_maquan_reservoir_scenario() -> tuple[FloodScenario, list[FloodFrame
     )
 
     frames = []
-    time_steps = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    # Generate frame every 2 progress units for smooth animation (51 frames)
+    time_steps = list(range(0, 101, 2))  # 0, 2, 4, 6, ..., 100
 
-    for i, t in enumerate(time_steps):
+    for t in time_steps:
         # Steady rise in water level (dam scenario)
         water_level = 2.0 + (t / 100) * 6.0  # 2.0 to 8.0m
         area_km2 = 1.0 + (t / 100) * 5.0  # 1.0 to 6.0 km²

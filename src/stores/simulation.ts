@@ -26,8 +26,13 @@ export const useSimulationStore = defineStore('simulation', () => {
     temperature: 24.5,
     agingFactor: 0.01,
     isPlaying: false,
-    progress: 30
+    progress: 0  // Start at beginning
   });
+
+  // Playback timer
+  let playbackInterval: ReturnType<typeof setInterval> | null = null;
+  const PLAYBACK_SPEED = 50; // ms per tick
+  const PROGRESS_PER_TICK = 0.5; // progress increment per tick
 
   // Backend data
   const floodEvents = ref<FloodEvent[]>([]);
@@ -155,10 +160,38 @@ export const useSimulationStore = defineStore('simulation', () => {
 
   function togglePlay() {
     state.value.isPlaying = !state.value.isPlaying;
+    if (state.value.isPlaying) {
+      startPlayback();
+    } else {
+      stopPlayback();
+    }
+  }
+
+  function startPlayback() {
+    if (playbackInterval) return;
+    // Reset to start if at end
+    if (state.value.progress >= 100) {
+      state.value.progress = 0;
+    }
+    playbackInterval = setInterval(() => {
+      state.value.progress += PROGRESS_PER_TICK;
+      if (state.value.progress >= 100) {
+        state.value.progress = 100;
+        stopPlayback();
+        state.value.isPlaying = false;
+      }
+    }, PLAYBACK_SPEED);
+  }
+
+  function stopPlayback() {
+    if (playbackInterval) {
+      clearInterval(playbackInterval);
+      playbackInterval = null;
+    }
   }
 
   function setProgress(val: number) {
-    state.value.progress = val;
+    state.value.progress = Math.max(0, Math.min(100, val));
   }
 
   return {

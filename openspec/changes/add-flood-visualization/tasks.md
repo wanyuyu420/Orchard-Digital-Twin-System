@@ -11,14 +11,14 @@
 - [x] **T1.4** Alembic migration `3d5b20b9361d_add_flood_scenarios`
 - [x] **T1.5** Create `backend/scripts/seed_flood_data.py` with 2 scenarios
 
-## Phase 2: Frontend Cesium Integration
+## Phase 2: Frontend Cesium Integration ✅
 
-- [ ] **T2.1** Create `src/components/cesium/FloodLayer.vue`
+- [x] **T2.1** Create `src/components/cesium/FloodLayer.vue`
   - Watch `simulationStore.state.progress`
   - Manage Cesium polygon entities lifecycle
-- [ ] **T2.2** Create API client for flood scenarios
-- [ ] **T2.3** Implement water surface rendering with color gradient
-- [ ] **T2.4** Connect to TimelineControl for animation
+- [x] **T2.2** Create API client for flood scenarios
+- [x] **T2.3** Implement water surface rendering with color gradient
+- [x] **T2.4** Connect to TimelineControl for animation
 
 ## Phase 3: Visual Polish
 

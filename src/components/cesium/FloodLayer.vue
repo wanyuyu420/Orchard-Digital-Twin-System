@@ -13,6 +13,7 @@
  * as dynamic polygons with water-like styling.
  */
 import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useCesiumStore } from '@/stores/cesium';
 import { useSimulationStore } from '@/stores/simulation';
 import { 
@@ -32,6 +33,7 @@ const props = defineProps<{
 // Stores
 const cesiumStore = useCesiumStore();
 const simulationStore = useSimulationStore();
+const { state: simState } = storeToRefs(simulationStore);
 
 // State
 const isLoading = ref(false);
@@ -82,9 +84,10 @@ const createFloodPolygon = (
       outline: true,
       outlineColor: getOutlineColor(),
       outlineWidth: 2,
-      height: 0,
-      extrudedHeight: waterLevel * 10, // Extrude for 3D effect (scaled)
-      perPositionHeight: false,
+      // Clamp to ground - renders ON terrain surface
+      heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      // Classification type renders on 3D Tiles and terrain
+      classificationType: Cesium.ClassificationType.BOTH,
     },
   });
 
@@ -179,7 +182,7 @@ const loadScenario = async (id: number) => {
     scenario.value = await getFloodScenarioDetail(id);
     
     // Set initial frame based on current progress
-    const progress = simulationStore.state.progress;
+    const progress = simState.value.progress;
     currentFrame.value = findFrameForProgress(progress);
     updateFloodVisualization();
 
@@ -215,14 +218,49 @@ const loadDefaultScenario = async () => {
   }
 };
 
-// Watch for progress changes
+// Track last update time for throttling
+let lastUpdateTime = 0;
+const UPDATE_INTERVAL = 100; // API calls need some throttling
+let pendingUpdate = false;
+
+// Fetch interpolated frame from API
+const fetchInterpolatedFrame = async (progress: number) => {
+  if (!scenario.value) return;
+  
+  try {
+    const { getFloodFrame } = await import('@/api/flood');
+    const frame = await getFloodFrame(scenario.value.id, Math.round(progress));
+    currentFrame.value = frame;
+    updateFloodVisualization();
+  } catch (e) {
+    console.error('[FloodLayer] Failed to fetch interpolated frame:', e);
+  }
+};
+
+// Watch for progress changes with immediate flush
 watch(
-  () => simulationStore.state.progress,
+  () => simState.value.progress,
   (progress) => {
     if (!scenario.value) return;
-    currentFrame.value = findFrameForProgress(progress);
-    updateFloodVisualization();
-  }
+    
+    // Throttle API calls
+    const now = Date.now();
+    if (now - lastUpdateTime < UPDATE_INTERVAL) {
+      // Schedule an update for when throttle expires
+      if (!pendingUpdate) {
+        pendingUpdate = true;
+        setTimeout(() => {
+          pendingUpdate = false;
+          fetchInterpolatedFrame(simState.value.progress);
+        }, UPDATE_INTERVAL - (now - lastUpdateTime));
+      }
+      return;
+    }
+    lastUpdateTime = now;
+    
+    fetchInterpolatedFrame(progress);
+  },
+  { flush: 'sync' }
 );
 
 // Watch for scenarioId prop changes

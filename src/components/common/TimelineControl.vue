@@ -20,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useSimulationStore } from '@/stores/simulation';
 import GlassPanel from '@/components/common/GlassPanel.vue';
@@ -28,6 +28,7 @@ import GlassPanel from '@/components/common/GlassPanel.vue';
 const store = useSimulationStore();
 const { state } = storeToRefs(store);
 const trackRef = ref<HTMLElement | null>(null);
+const isDragging = ref(false);
 
 function togglePlay() {
   store.togglePlay();
@@ -42,19 +43,51 @@ function formatTime(progress: number) {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 }
 
-// Mock drag logic (simplified)
-function seek(e: MouseEvent) {
-  if (!trackRef.value) return;
+// Calculate progress from mouse position
+function getProgressFromEvent(e: MouseEvent): number {
+  if (!trackRef.value) return state.value.progress;
   const rect = trackRef.value.getBoundingClientRect();
   const x = e.clientX - rect.left;
-  const pct = Math.max(0, Math.min(100, (x / rect.width) * 100));
+  return Math.max(0, Math.min(100, (x / rect.width) * 100));
+}
+
+// Click to seek
+function seek(e: MouseEvent) {
+  const pct = getProgressFromEvent(e);
   store.setProgress(pct);
 }
 
-function startDrag() {
-  // In a real app, attach window listeners for drag
-  console.log('Drag started');
+// Drag handlers
+function startDrag(e: MouseEvent) {
+  e.preventDefault();
+  isDragging.value = true;
+  
+  // Pause playback during drag
+  if (state.value.isPlaying) {
+    store.togglePlay();
+  }
+
+  window.addEventListener('mousemove', onDrag);
+  window.addEventListener('mouseup', stopDrag);
 }
+
+function onDrag(e: MouseEvent) {
+  if (!isDragging.value) return;
+  const pct = getProgressFromEvent(e);
+  store.setProgress(pct);
+}
+
+function stopDrag() {
+  isDragging.value = false;
+  window.removeEventListener('mousemove', onDrag);
+  window.removeEventListener('mouseup', stopDrag);
+}
+
+// Cleanup on unmount
+onUnmounted(() => {
+  window.removeEventListener('mousemove', onDrag);
+  window.removeEventListener('mouseup', stopDrag);
+});
 </script>
 
 <style scoped lang="scss">
