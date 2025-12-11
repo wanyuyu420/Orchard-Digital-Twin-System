@@ -66,10 +66,7 @@ const getWaterColor = (waterLevel: number, opacity: number = currentOpacity): an
 	);
 };
 
-// Get outline color (neon cyan glow)
-const getOutlineColor = (): any => {
-	return Cesium.Color.fromCssColorString('rgba(0, 255, 255, 0.9)');
-};
+
 
 // Get boundary glow color (brighter neon cyan)
 const getBoundaryGlowColor = (): any => {
@@ -98,13 +95,13 @@ const createFloodPolygon = (
 		polygon: {
 			hierarchy: Cesium.Cartesian3.fromDegreesArray(positions),
 			material: getWaterColor(waterLevel),
-			outline: true,
-			outlineColor: getOutlineColor(),
-			outlineWidth: 2,
-			// Clamp to ground - renders ON terrain surface
+			// For ground clamping: set height to 0 and use CLAMP_TO_GROUND
+			height: 0,
 			heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
 			// Classification type renders on 3D Tiles and terrain
 			classificationType: Cesium.ClassificationType.BOTH,
+			// Disable outlines for ground polygons (not supported on terrain)
+			outline: false,
 		},
 	});
 
@@ -113,6 +110,7 @@ const createFloodPolygon = (
 
 /**
  * Create boundary polyline for neon glow effect
+ * Note: Ground-clamped polylines with glow material
  */
 const createBoundaryPolyline = (
 	coordinates: number[][][],
@@ -121,21 +119,22 @@ const createBoundaryPolyline = (
 	const viewer = cesiumStore.viewer;
 	if (!viewer) return null;
 
-	// Get outer ring coordinates
+	// Get outer ring coordinates with heights for proper ground clamping
 	const outerRing = coordinates[0];
-	const positions: number[] = [];
+	const positionsWithHeight: number[] = [];
 	outerRing.forEach((coord: number[]) => {
-		positions.push(coord[0], coord[1]);
+		// [lon, lat, height] - height=0 for ground clamping
+		positionsWithHeight.push(coord[0], coord[1], 0);
 	});
 	// Close the ring
 	if (outerRing.length > 0) {
-		positions.push(outerRing[0][0], outerRing[0][1]);
+		positionsWithHeight.push(outerRing[0][0], outerRing[0][1], 0);
 	}
 
 	const entity = viewer.entities.add({
 		name: `flood_boundary_${index}`,
 		polyline: {
-			positions: Cesium.Cartesian3.fromDegreesArray(positions),
+			positions: Cesium.Cartesian3.fromDegreesArrayHeights(positionsWithHeight),
 			width: 4,
 			material: new Cesium.PolylineGlowMaterialProperty({
 				glowPower: 0.3,
