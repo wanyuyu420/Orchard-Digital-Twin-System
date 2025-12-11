@@ -116,16 +116,7 @@ class Controller {
     // Anti-aliasing settings
     this.removeJagged(viewer)
 
-    // IMPROVEMENT: Disable HDR to ensure consistent color/brightness across platforms
-    // (Prevents auto tone-mapping which can make scene look dark/washed out on some screens)
-    viewer.scene.highDynamicRange = false
-    
-    // Ensure background is correct
-    viewer.scene.backgroundColor = Cesium.Color.TRANSPARENT
-    viewer.scene.globe.baseColor = Cesium.Color.BLACK
-
     this.viewer = viewer
-
     return viewer
   }
 
