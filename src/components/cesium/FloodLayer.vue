@@ -11,6 +11,11 @@
  * 
  * Watches simulation store progress and renders interpolated flood extent
  * as dynamic polygons with water-like styling.
+ * 
+ * Key design decisions:
+ * - Uses ColorMaterialProperty for stable polygon rendering
+ * - Avoids frequent entity recreation by only updating on geometry changes
+ * - No opacity animation to prevent flickering on ground-clamped polygons
  */
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
@@ -24,12 +29,6 @@ import {
 } from '@/api/flood';
 
 declare const Cesium: any;
-
-// Animation constants
-const ANIMATION_INTERVAL = 50; // ms
-const OPACITY_MIN = 0.35;
-const OPACITY_MAX = 0.55;
-const OPACITY_STEP = 0.01;
 
 // Props
 const props = defineProps<{
@@ -47,132 +46,145 @@ const error = ref<string | null>(null);
 const scenario = ref<FloodScenarioDetail | null>(null);
 const currentFrame = ref<FloodFrame | null>(null);
 
-// Cesium entities
-let floodEntities: any[] = [];
-let boundaryEntities: any[] = [];
+// Cesium entities - single set, reused across updates when possible
+let floodEntity: any = null;
+let boundaryEntity: any = null;
 
-// Animation state
-let animationTimer: ReturnType<typeof setInterval> | null = null;
-let currentOpacity = OPACITY_MIN;
-let opacityDirection = 1; // 1 = increasing, -1 = decreasing
+// Track last geometry hash to avoid unnecessary updates
+let lastGeometryHash = '';
 
-// Water color based on depth (shallow → deep blue) with dynamic opacity
-const getWaterColor = (waterLevel: number, opacity: number = currentOpacity): any => {
+/**
+ * Get water color based on water level (static, no animation)
+ */
+const getWaterColor = (waterLevel: number): any => {
 	// Water level 0-10m mapped to color intensity
 	const intensity = Math.min(1, waterLevel / 10);
-	const baseOpacity = opacity + intensity * 0.15;
-	return Cesium.Color.fromCssColorString(
-		`rgba(30, 144, 255, ${baseOpacity})`  // DodgerBlue with varying alpha
-	);
+	const alpha = 0.45 + intensity * 0.15; // 0.45 to 0.60
+	return Cesium.Color.fromCssColorString(`rgba(30, 144, 255, ${alpha})`);
 };
 
-
-
-// Get boundary glow color (brighter neon cyan)
+/**
+ * Get boundary glow color (neon cyan)
+ */
 const getBoundaryGlowColor = (): any => {
-	return Cesium.Color.fromCssColorString('rgba(0, 255, 255, 1.0)');
+	return Cesium.Color.fromCssColorString('rgba(0, 255, 255, 0.9)');
 };
 
 /**
- * Create Cesium polygon entity from GeoJSON coordinates
+ * Create a simple hash of the polygon coordinates for change detection
  */
-const createFloodPolygon = (
-	coordinates: number[][][],
-	waterLevel: number,
-	index: number
-): any => {
-	const viewer = cesiumStore.viewer;
-	if (!viewer) return null;
-
-	// Flatten coordinates for Cesium (expects [lon, lat, lon, lat, ...])
-	const positions: number[] = [];
-	coordinates[0].forEach((coord: number[]) => {
-		positions.push(coord[0], coord[1]);
-	});
-
-	const entity = viewer.entities.add({
-		name: `flood_polygon_${index}`,
-		polygon: {
-			hierarchy: Cesium.Cartesian3.fromDegreesArray(positions),
-			material: getWaterColor(waterLevel),
-			// For ground clamping: set height to 0 and use CLAMP_TO_GROUND
-			height: 0,
-			heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-			// Classification type renders on 3D Tiles and terrain
-			classificationType: Cesium.ClassificationType.BOTH,
-			// Disable outlines for ground polygons (not supported on terrain)
-			outline: false,
-		},
-	});
-
-	return entity;
+const getGeometryHash = (polygons: any): string => {
+	if (!polygons || !polygons.coordinates) return '';
+	// Use first few coordinates to create a hash
+	const coords = polygons.coordinates.flat(2).slice(0, 10);
+	return coords.join(',');
 };
 
 /**
- * Create boundary polyline for neon glow effect
- * Note: Ground-clamped polylines with glow material
+ * Convert MultiPolygon coordinates to flat Cartesian3 array
  */
-const createBoundaryPolyline = (
-	coordinates: number[][][],
-	index: number
-): any => {
-	const viewer = cesiumStore.viewer;
-	if (!viewer) return null;
+const multiPolygonToPositions = (multiPolygon: any): any[] => {
+	const allRings: any[] = [];
+	if (multiPolygon.type !== 'MultiPolygon') return allRings;
 
-	// Get outer ring coordinates with heights for proper ground clamping
-	const outerRing = coordinates[0];
-	const positionsWithHeight: number[] = [];
-	outerRing.forEach((coord: number[]) => {
-		// [lon, lat, height] - height=0 for ground clamping
-		positionsWithHeight.push(coord[0], coord[1], 0);
+	// For each polygon in MultiPolygon
+	multiPolygon.coordinates.forEach((polygon: number[][][]) => {
+		const outerRing = polygon[0];
+		const positions: number[] = [];
+		outerRing.forEach((coord: number[]) => {
+			positions.push(coord[0], coord[1]);
+		});
+		allRings.push(Cesium.Cartesian3.fromDegreesArray(positions));
 	});
-	// Close the ring
-	if (outerRing.length > 0) {
-		positionsWithHeight.push(outerRing[0][0], outerRing[0][1], 0);
-	}
 
-	const entity = viewer.entities.add({
-		name: `flood_boundary_${index}`,
-		polyline: {
-			positions: Cesium.Cartesian3.fromDegreesArrayHeights(positionsWithHeight),
-			width: 4,
-			material: new Cesium.PolylineGlowMaterialProperty({
-				glowPower: 0.3,
-				taperPower: 0.5,
-				color: getBoundaryGlowColor()
-			}),
-			clampToGround: true
+	return allRings;
+};
+
+/**
+ * Convert MultiPolygon to boundary polyline positions
+ */
+const multiPolygonToBoundaryPositions = (multiPolygon: any): any => {
+	if (multiPolygon.type !== 'MultiPolygon') return null;
+
+	// Combine all outer rings into one polyline
+	const allPositions: number[] = [];
+	multiPolygon.coordinates.forEach((polygon: number[][][]) => {
+		const outerRing = polygon[0];
+		outerRing.forEach((coord: number[]) => {
+			allPositions.push(coord[0], coord[1], 0);
+		});
+		// Close each ring
+		if (outerRing.length > 0) {
+			allPositions.push(outerRing[0][0], outerRing[0][1], 0);
 		}
 	});
 
-	return entity;
+	return Cesium.Cartesian3.fromDegreesArrayHeights(allPositions);
 };
 
 /**
- * Update flood visualization based on current frame
+ * Update or create the flood polygon entity
  */
 const updateFloodVisualization = () => {
 	const viewer = cesiumStore.viewer;
 	if (!viewer || !currentFrame.value) return;
 
-	// Clear existing entities
+	const frame = currentFrame.value;
+	if (!frame.polygons) {
+		clearFloodEntities();
+		return;
+	}
+
+	// Check if geometry actually changed
+	const newHash = getGeometryHash(frame.polygons);
+	if (newHash === lastGeometryHash && floodEntity) {
+		// Only update the material color (water level may have changed)
+		if (floodEntity.polygon) {
+			floodEntity.polygon.material = new Cesium.ColorMaterialProperty(
+				getWaterColor(frame.water_level)
+			);
+		}
+		return;
+	}
+	lastGeometryHash = newHash;
+
+	// Geometry changed - need to recreate entities
 	clearFloodEntities();
 
-	const frame = currentFrame.value;
-	if (!frame.polygons) return;
+	// Create flood polygon(s)
+	const positions = multiPolygonToPositions(frame.polygons);
+	if (positions.length > 0) {
+		// For simplicity, use the first polygon (largest) as the main entity
+		// In a more complex implementation, we'd create multiple entities
+		floodEntity = viewer.entities.add({
+			name: 'flood_area',
+			polygon: {
+				hierarchy: positions[0],
+				material: new Cesium.ColorMaterialProperty(
+					getWaterColor(frame.water_level)
+				),
+				height: 0,
+				heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+				classificationType: Cesium.ClassificationType.BOTH,
+				outline: false,
+			},
+		});
+	}
 
-	// Handle MultiPolygon GeoJSON
-	if (frame.polygons.type === 'MultiPolygon') {
-		frame.polygons.coordinates.forEach((polygon: number[][][], index: number) => {
-			// Create filled polygon
-			const entity = createFloodPolygon(polygon, frame.water_level, index);
-			if (entity) {
-				floodEntities.push(entity);
-			}
-			// Create glowing boundary polyline
-			const boundary = createBoundaryPolyline(polygon, index);
-			if (boundary) {
-				boundaryEntities.push(boundary);
+	// Create boundary polyline
+	const boundaryPositions = multiPolygonToBoundaryPositions(frame.polygons);
+	if (boundaryPositions) {
+		boundaryEntity = viewer.entities.add({
+			name: 'flood_boundary',
+			polyline: {
+				positions: boundaryPositions,
+				width: 3,
+				material: new Cesium.PolylineGlowMaterialProperty({
+					glowPower: 0.2,
+					taperPower: 0.3,
+					color: getBoundaryGlowColor()
+				}),
+				clampToGround: true
 			}
 		});
 	}
@@ -185,7 +197,6 @@ const updateFloodVisualization = () => {
  * Sync flood area from current frame to simulation store
  */
 const syncFloodAreaToStore = (frame: FloodFrame) => {
-	// Update simulation store with the actual flood area from the frame
 	if (frame.area_km2 !== undefined && frame.area_km2 !== null) {
 		simulationStore.setFloodArea(frame.area_km2);
 	}
@@ -198,60 +209,25 @@ const clearFloodEntities = () => {
 	const viewer = cesiumStore.viewer;
 	if (!viewer) return;
 
-	floodEntities.forEach((entity) => {
+	if (floodEntity) {
 		try {
-			viewer.entities.remove(entity);
+			viewer.entities.remove(floodEntity);
 		} catch (e) {
 			// Entity might already be removed
 		}
-	});
-	floodEntities = [];
-
-	boundaryEntities.forEach((entity) => {
-		try {
-			viewer.entities.remove(entity);
-		} catch (e) {
-			// Entity might already be removed
-		}
-	});
-	boundaryEntities = [];
-};
-
-/**
- * Start water surface animation (opacity pulsing)
- */
-const startAnimation = () => {
-	if (animationTimer) return;
-
-	animationTimer = setInterval(() => {
-		// Update opacity with sine-wave-like pulsing
-		currentOpacity += OPACITY_STEP * opacityDirection;
-
-		if (currentOpacity >= OPACITY_MAX) {
-			currentOpacity = OPACITY_MAX;
-			opacityDirection = -1;
-		} else if (currentOpacity <= OPACITY_MIN) {
-			currentOpacity = OPACITY_MIN;
-			opacityDirection = 1;
-		}
-
-		// Update polygon materials with new opacity
-		floodEntities.forEach((entity) => {
-			if (entity.polygon && currentFrame.value) {
-				entity.polygon.material = getWaterColor(currentFrame.value.water_level, currentOpacity);
-			}
-		});
-	}, ANIMATION_INTERVAL);
-};
-
-/**
- * Stop water surface animation
- */
-const stopAnimation = () => {
-	if (animationTimer) {
-		clearInterval(animationTimer);
-		animationTimer = null;
+		floodEntity = null;
 	}
+
+	if (boundaryEntity) {
+		try {
+			viewer.entities.remove(boundaryEntity);
+		} catch (e) {
+			// Entity might already be removed
+		}
+		boundaryEntity = null;
+	}
+
+	lastGeometryHash = '';
 };
 
 /**
@@ -273,8 +249,6 @@ const findFrameForProgress = (progress: number): FloodFrame | null => {
 		}
 	}
 
-	// For now, just return the previous frame (no client-side geometric interpolation)
-	// The API endpoint /frame?progress=X handles numeric interpolation
 	return prevFrame;
 };
 
@@ -327,7 +301,7 @@ const loadDefaultScenario = async () => {
 
 // Track last update time for throttling
 let lastUpdateTime = 0;
-const UPDATE_INTERVAL = 100; // API calls need some throttling
+const UPDATE_INTERVAL = 200; // Increase throttle to reduce flickering
 let pendingUpdate = false;
 
 // Fetch interpolated frame from API
@@ -344,7 +318,7 @@ const fetchInterpolatedFrame = async (progress: number) => {
 	}
 };
 
-// Watch for progress changes with immediate flush
+// Watch for progress changes with throttling
 watch(
 	() => simState.value.progress,
 	(progress) => {
@@ -358,6 +332,7 @@ watch(
 				pendingUpdate = true;
 				setTimeout(() => {
 					pendingUpdate = false;
+					lastUpdateTime = Date.now();
 					fetchInterpolatedFrame(simState.value.progress);
 				}, UPDATE_INTERVAL - (now - lastUpdateTime));
 			}
@@ -387,12 +362,9 @@ onMounted(() => {
 	} else {
 		loadDefaultScenario();
 	}
-	// Start animation after a short delay to ensure entities are created
-	setTimeout(startAnimation, 500);
 });
 
 onUnmounted(() => {
-	stopAnimation();
 	clearFloodEntities();
 });
 
