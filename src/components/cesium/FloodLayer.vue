@@ -124,6 +124,7 @@ const initializeEntities = () => {
 	currentColor = computeWaterColor(5);
 
 	// Create flood polygon entity with CallbackProperty
+	// Using classificationType for terrain classification (no height/heightReference to avoid conflicts)
 	floodEntity = viewer.entities.add({
 		name: 'flood_polygon',
 		polygon: {
@@ -137,9 +138,9 @@ const initializeEntities = () => {
 					return currentColor || Cesium.Color.TRANSPARENT;
 				}, false)
 			),
-			height: 0,
-			heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-			classificationType: Cesium.ClassificationType.BOTH,
+			// Use TERRAIN classification for proper ground draping
+			// Do NOT use height/heightReference - they conflict with terrain clamping
+			classificationType: Cesium.ClassificationType.TERRAIN,
 		},
 		show: true,
 	});
