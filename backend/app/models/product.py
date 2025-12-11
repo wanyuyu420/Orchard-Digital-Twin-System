@@ -1,14 +1,15 @@
 from typing import Optional
 from sqlalchemy import Integer, String, Text, ForeignKey, Boolean, JSON
 from sqlalchemy.orm import Mapped, mapped_column
-from geoalchemy2 import Geometry
 from app.database import Base
+from app.compat import Geometry
 
 
 class RasterProduct(Base):
     __tablename__ = "raster_products"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True)
     domain: Mapped[Optional[str]] = mapped_column(String(50))
     name: Mapped[Optional[str]] = mapped_column(Text)
     product_type: Mapped[Optional[str]] = mapped_column(String(50))
@@ -19,14 +20,16 @@ class RasterProduct(Base):
     crs: Mapped[Optional[str]] = mapped_column(String(50))
     resolution: Mapped[Optional[str]] = mapped_column(String(50))
     meta: Mapped[Optional[dict]] = mapped_column(JSON)
-    ingest_file_id: Mapped[Optional[int]] = mapped_column(ForeignKey("ingest_files.id"))
+    ingest_file_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("ingest_files.id"))
     is_simulated: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class VectorProduct(Base):
     __tablename__ = "vector_products"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True)
     domain: Mapped[Optional[str]] = mapped_column(String(50))
     name: Mapped[Optional[str]] = mapped_column(Text)
     product_type: Mapped[Optional[str]] = mapped_column(String(50))
@@ -36,14 +39,16 @@ class VectorProduct(Base):
     srid: Mapped[Optional[int]] = mapped_column(Integer)
     bbox: Mapped[Optional[str]] = mapped_column(Geometry("POLYGON", srid=4326))
     meta: Mapped[Optional[dict]] = mapped_column(JSON)
-    ingest_file_id: Mapped[Optional[int]] = mapped_column(ForeignKey("ingest_files.id"))
+    ingest_file_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("ingest_files.id"))
     is_simulated: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class ModelProduct(Base):
     __tablename__ = "model_products"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True)
     domain: Mapped[Optional[str]] = mapped_column(String(50))
     name: Mapped[Optional[str]] = mapped_column(Text)
     version: Mapped[Optional[str]] = mapped_column(String(50))
@@ -52,5 +57,6 @@ class ModelProduct(Base):
     product_type: Mapped[Optional[str]] = mapped_column(String(50))
     path: Mapped[Optional[str]] = mapped_column(Text)
     meta: Mapped[Optional[dict]] = mapped_column(JSON)
-    ingest_file_id: Mapped[Optional[int]] = mapped_column(ForeignKey("ingest_files.id"))
+    ingest_file_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("ingest_files.id"))
     is_simulated: Mapped[bool] = mapped_column(Boolean, default=False)

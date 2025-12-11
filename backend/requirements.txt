@@ -12,3 +12,4 @@ geoalchemy2
 shapely
 pydantic-settings
 python-dotenv
+aiosqlite

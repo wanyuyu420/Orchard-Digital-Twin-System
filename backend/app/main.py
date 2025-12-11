@@ -44,8 +44,25 @@ _realtime_task = None
 
 @app.on_event("startup")
 async def startup_event():
-    """Start background tasks on app startup."""
+    """Start background tasks and initialize SQLite demo database if needed."""
     global _realtime_task
+
+    # Auto-initialize SQLite demo database if not using PostgreSQL
+    from app.config import get_settings
+    settings = get_settings()
+    if settings.is_sqlite:
+        from app.database import Base, engine
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("[startup] SQLite tables created/verified")
+
+        # Seed demo data if enabled
+        if settings.enable_seed_data:
+            from scripts.seed_demo import seed_database
+            from app.database import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await seed_database(session)
+
     _realtime_task = asyncio.create_task(realtime_push_task())
     print("[startup] Real-time push task started")
 

@@ -60,6 +60,8 @@ data/
 
 # 本地数据处理工具（不提交到仓库）
 local/
+backend/scripts/import_excel.py
+backend/scripts/ingest_hydrological.py
 
 # AI 助手配置
 .claude/
