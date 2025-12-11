@@ -17,6 +17,19 @@
 		<div class="tab-content">
 			<!-- Tab 1: Resource Layers (Original) -->
 			<div v-show="activeTab === 'resources'" class="layer-list">
+				<!-- Terrain Toggle (Special) -->
+				<div class="layer-item terrain-layer" :class="{ active: cesiumStore.terrainEnabled }" @click="toggleTerrain">
+					<div class="layer-info">
+						<i class="fa-solid fa-mountain layer-icon"></i>
+						<span>3D 地形</span>
+						<span v-if="cesiumStore.terrainLoading" class="loading-indicator">
+							<i class="fa-solid fa-spinner fa-spin"></i>
+						</span>
+					</div>
+					<i class="fa-solid toggle-icon" :class="cesiumStore.terrainEnabled ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
+				</div>
+
+				<!-- Other Resource Layers -->
 				<div v-for="layer in layers" :key="layer.id" class="layer-item" :class="{ active: layer.active }"
 					@click="toggleLayer(layer)">
 					<div class="layer-info">
@@ -305,6 +318,7 @@
 import { ref, computed, watch, reactive } from 'vue'
 import GlassPanel from '@/components/common/GlassPanel.vue'
 import { useGISStore } from '@/stores/gis'
+import { useCesiumStore } from '@/stores/cesium'
 import type { GISToolType } from '@/types/draw'
 
 interface Layer {
@@ -331,6 +345,7 @@ interface StylePreset {
 }
 
 const gisStore = useGISStore()
+const cesiumStore = useCesiumStore()
 
 // === Style Configuration ===
 const styleConfig = reactive<StyleConfig>({
@@ -587,6 +602,13 @@ const fileInput = ref<HTMLInputElement | null>(null)
 function toggleLayer(layer: Layer) {
 	layer.active = !layer.active
 	// TODO: Emit event to update Cesium layers
+}
+
+/**
+ * Toggle 3D terrain
+ */
+async function toggleTerrain() {
+	await cesiumStore.toggleTerrain()
 }
 
 // === GIS Feature Functions (New) ===
@@ -966,6 +988,25 @@ function clearAllFeatures() {
 .toggle-icon {
 	color: #555;
 	transition: color 0.2s;
+}
+
+.loading-indicator {
+	margin-left: 8px;
+	color: $neon-cyan;
+	font-size: 10px;
+}
+
+.terrain-layer {
+
+	// Special styling for terrain toggle
+	.layer-icon {
+		color: $warn-yellow;
+	}
+
+	&.active .layer-icon {
+		color: $neon-cyan;
+		text-shadow: 0 0 5px $neon-cyan;
+	}
 }
 
 // === GIS Features Panel (New) ===
