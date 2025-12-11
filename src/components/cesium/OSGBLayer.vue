@@ -27,7 +27,11 @@ declare const Cesium: any;
 // Props
 const props = defineProps<{
 	visible?: boolean;
+	heightOffset?: number; // Height adjustment in meters (negative = lower)
 }>();
+
+// Default height offset
+const DEFAULT_HEIGHT_OFFSET = -50;
 
 // Emits
 const emit = defineEmits<{
@@ -74,9 +78,18 @@ const loadTileset = async () => {
 		// Use Cesium3DTileset.fromUrl for async loading
 		// Note: fromUrl returns a ready tileset, no need for readyPromise
 		tileset = await Cesium.Cesium3DTileset.fromUrl(TILESET_URL, {
-			// Performance options
-			maximumScreenSpaceError: 16, // Higher = faster loading, lower quality
-			maximumMemoryUsage: 512,     // MB - limit memory usage
+			// === Performance Optimization ===
+			// Higher = faster loading, less tiles loaded (default 16)
+			maximumScreenSpaceError: 64,
+			// Limit memory usage (MB)
+			maximumMemoryUsage: 256,
+			// Limit simultaneous tile requests
+			maximumSimultaneousTileLoads: 6,
+			// Dynamic screen space error - reduces detail for distant tiles
+			dynamicScreenSpaceError: true,
+			dynamicScreenSpaceErrorDensity: 0.00278,
+			dynamicScreenSpaceErrorFactor: 4.0,
+			dynamicScreenSpaceErrorHeightFalloff: 0.25,
 			// Skip LOD levels for faster initial load
 			skipLevelOfDetail: true,
 			baseScreenSpaceError: 1024,
@@ -86,6 +99,22 @@ const loadTileset = async () => {
 
 		// Add to scene
 		viewer.scene.primitives.add(tileset);
+
+		// === Fix floating: Apply height offset ===
+		// Get the bounding sphere center and create a height adjustment
+		const boundingSphere = tileset.boundingSphere;
+		const cartographic = Cesium.Cartographic.fromCartesian(boundingSphere.center);
+
+		// Apply height offset (negative to bring it down)
+		const heightOffset = props.heightOffset ?? DEFAULT_HEIGHT_OFFSET;
+		const surface = Cesium.Cartesian3.fromRadians(
+			cartographic.longitude,
+			cartographic.latitude,
+			cartographic.height + heightOffset
+		);
+		const offset = Cesium.Cartesian3.subtract(surface, boundingSphere.center, new Cesium.Cartesian3());
+		tileset.modelMatrix = Cesium.Matrix4.fromTranslation(offset);
+		console.log('[OSGBLayer] Applied height offset:', heightOffset, 'meters');
 
 		tilesetReady.value = true;
 		console.log('[OSGBLayer] 3D Tileset loaded successfully');
