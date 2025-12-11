@@ -29,6 +29,18 @@
 					<i class="fa-solid toggle-icon" :class="cesiumStore.terrainEnabled ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
 				</div>
 
+				<!-- OSGB 3D Tiles Toggle -->
+				<div class="layer-item osgb-layer" :class="{ active: cesiumStore.osgbEnabled }" @click="toggleOSGB">
+					<div class="layer-info">
+						<i class="fa-solid fa-city layer-icon"></i>
+						<span>倾斜摄影</span>
+						<span v-if="cesiumStore.osgbLoading" class="loading-indicator">
+							<i class="fa-solid fa-spinner fa-spin"></i>
+						</span>
+					</div>
+					<i class="fa-solid toggle-icon" :class="cesiumStore.osgbEnabled ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
+				</div>
+
 				<!-- Other Resource Layers -->
 				<div v-for="layer in layers" :key="layer.id" class="layer-item" :class="{ active: layer.active }"
 					@click="toggleLayer(layer)">
@@ -609,6 +621,14 @@ function toggleLayer(layer: Layer) {
  */
 async function toggleTerrain() {
 	await cesiumStore.toggleTerrain()
+}
+
+/**
+ * Toggle OSGB 3D Tiles visibility
+ * The actual loading is handled by OSGBLayer component
+ */
+function toggleOSGB() {
+	cesiumStore.osgbEnabled = !cesiumStore.osgbEnabled
 }
 
 // === GIS Feature Functions (New) ===

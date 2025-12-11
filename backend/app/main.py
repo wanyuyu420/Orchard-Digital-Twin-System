@@ -2,7 +2,9 @@ import os
 import asyncio
 import random
 from datetime import datetime
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query, Depends, WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, desc, or_
 from sqlalchemy.orm import selectinload
@@ -19,6 +21,15 @@ from app.schemas.data import WaterLevelOut, RainfallOut, StatsOut, WarningOut, M
 from app.tasks import realtime_push_task
 
 app = FastAPI(title="Water Digital Twin Backend", version="1.0.0")
+
+# --- OSGB 3D Tiles Static Files ---
+# Mount OSGB 3D Tiles data from frontend project's data directory
+OSGB_TILES_PATH = Path(__file__).parent.parent.parent / "data" / "OSGB"
+if OSGB_TILES_PATH.exists():
+    app.mount("/tiles/osgb",
+              StaticFiles(directory=str(OSGB_TILES_PATH)), name="osgb_tiles")
+    print(
+        f"[startup] OSGB 3D Tiles mounted at /tiles/osgb from {OSGB_TILES_PATH}")
 
 # Background task reference
 _realtime_task = None
