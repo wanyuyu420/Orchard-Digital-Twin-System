@@ -100,6 +100,26 @@ class Controller {
       creditContainer.style.display = 'none'
     }
 
+    // === Performance Optimizations ===
+    const scene = viewer.scene
+
+    // Enable explicit render mode - only render when needed
+    scene.requestRenderMode = true
+    // Maximum milliseconds to wait before rendering (when idle)
+    scene.maximumRenderTimeChange = Infinity
+    
+    // Limit frame rate to reduce CPU usage
+    viewer.targetFrameRate = 30
+
+    // Disable expensive features
+    viewer.scene.fog.enabled = false
+    viewer.scene.globe.showGroundAtmosphere = false
+    viewer.scene.skyAtmosphere.show = false
+
+    // Optimize globe rendering
+    viewer.scene.globe.tileCacheSize = 100
+    viewer.scene.globe.maximumScreenSpaceError = 2
+
     // Enable depth testing against terrain
     viewer.scene.globe.depthTestAgainstTerrain = true
 
