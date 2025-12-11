@@ -48,6 +48,7 @@ app.include_router(api_router, prefix="/api/v1")
 
 # --- WebSocket Real-time Endpoint ---
 
+
 @app.websocket("/ws/realtime")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time data streaming."""
@@ -76,15 +77,18 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception:
         manager.disconnect(websocket)
 
+
 @app.get("/api/events")
 async def get_events():
     """获取洪水事件列表"""
     return get_mock_flood_events()
 
+
 @app.get("/api/rain_frames")
 async def get_rain_frames():
     """获取降雨格网帧列表"""
     return get_mock_rain_grid_frames()
+
 
 @app.get("/api/iot_devices")
 async def get_iot_devices(is_simulated: bool | None = None, session: AsyncSession = Depends(get_session)):
@@ -113,6 +117,7 @@ async def get_iot_devices(is_simulated: bool | None = None, session: AsyncSessio
     # fallback to mock
     return get_mock_iot_devices()
 
+
 @app.get("/api/models")
 async def get_3d_models():
     """获取三维资源列表"""
@@ -120,19 +125,24 @@ async def get_3d_models():
 
 # --- New DB-backed endpoints ---
 
+
 async def _latest_readings_for_metric(
     session: AsyncSession,
     metric_keys: list[str] | None = None,
     is_simulated: bool | None = None,
     warn_only: bool = False,
 ):
-    metrics_stmt = select(SensorMetric).options(selectinload(SensorMetric.sensor))
+    metrics_stmt = select(SensorMetric).options(
+        selectinload(SensorMetric.sensor))
     if metric_keys:
-        metrics_stmt = metrics_stmt.where(SensorMetric.metric_key.in_(metric_keys))
+        metrics_stmt = metrics_stmt.where(
+            SensorMetric.metric_key.in_(metric_keys))
     if warn_only:
-        metrics_stmt = metrics_stmt.where(or_(SensorMetric.warn_low.is_not(None), SensorMetric.warn_high.is_not(None)))
+        metrics_stmt = metrics_stmt.where(
+            or_(SensorMetric.warn_low.is_not(None), SensorMetric.warn_high.is_not(None)))
     if is_simulated is not None:
-        metrics_stmt = metrics_stmt.join(Sensor).where(Sensor.is_simulated == is_simulated)
+        metrics_stmt = metrics_stmt.join(Sensor).where(
+            Sensor.is_simulated == is_simulated)
     metrics_res = (await session.execute(metrics_stmt)).scalars().all()
     results = []
     for metric in metrics_res:
@@ -291,7 +301,7 @@ async def api_stress(is_simulated: bool | None = None, session: AsyncSession = D
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:5173", # Vite default port
+    "http://localhost:5173",  # Vite default port
     "http://127.0.0.1:5173",
 ]
 
@@ -303,18 +313,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 async def root():
     return {"message": "Water Digital Twin API is running", "status": "ok"}
+
 
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy", "service": "fastapi"}
 
+
 @app.get("/api/stations")
 async def get_stations():
     """获取监测站点目录结构"""
     return scan_data_directory()
+
 
 @app.get("/api/data")
 async def get_station_data(path: str = Query(..., description="文件的绝对路径或相对路径")):
@@ -324,26 +338,29 @@ async def get_station_data(path: str = Query(..., description="文件的绝对�
     target_path = path
     if not os.path.isabs(path):
         target_path = os.path.join(DATA_ROOT, path)
-    
+
     # 规范化路径
     target_path = os.path.abspath(target_path)
-    
+
     # 简单校验：确保目标路径在数据根目录下
     if not target_path.startswith(DATA_ROOT):
-        raise HTTPException(status_code=403, detail="Access denied: Invalid file path")
-    
+        raise HTTPException(
+            status_code=403, detail="Access denied: Invalid file path")
+
     if not os.path.exists(target_path):
         raise HTTPException(status_code=404, detail="File not found")
-        
+
     result = read_excel_data(target_path)
-    
+
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
-        
+
     return result
+
 
 async def _latest_by_metric(session: AsyncSession, metric_key: str):
     return await _latest_readings_for_metric(session, [metric_key], is_simulated=None)
+
 
 @app.get("/api/stats", response_model=StatsOut)
 async def get_overview_stats(is_simulated: bool | None = None, session: AsyncSession = Depends(get_session)):

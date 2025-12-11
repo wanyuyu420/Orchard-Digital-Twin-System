@@ -26,7 +26,8 @@
 				<button class="btn-icon-text" :class="{ active: gisStore.toolType === 'profile' }"
 					@click="toggleAnalysisTool('profile')" title="剖面分析"><i class="fa-solid fa-chart-line"></i></button>
 				<button class="btn-icon-text" :class="{ active: gisStore.toolType === 'measure3d' }"
-					@click="toggleAnalysisTool('measure3d')" title="3D测量 (Shift:地形/Ctrl:自定义/Alt:相对)"><i class="fa-solid fa-ruler-combined"></i></button>
+					@click="toggleAnalysisTool('measure3d')" title="3D测量 (Shift:地形/Ctrl:自定义/Alt:相对)"><i
+						class="fa-solid fa-ruler-combined"></i></button>
 			</div>
 
 			<div class="tool-divider"></div>
@@ -37,12 +38,12 @@
 					title="点标注"><i class="fa-solid fa-map-pin"></i></button>
 				<button class="btn-icon-text" :class="{ active: drawTool === 'line' }" @click="toggleDrawTool('line')"
 					title="线绘制"><i class="fa-solid fa-route"></i></button>
-			<button class="btn-icon-text" :class="{ active: drawTool === 'polygon' }" @click="toggleDrawTool('polygon')"
-				title="多边形"><i class="fa-solid fa-draw-polygon"></i></button>
+				<button class="btn-icon-text" :class="{ active: drawTool === 'polygon' }" @click="toggleDrawTool('polygon')"
+					title="多边形"><i class="fa-solid fa-draw-polygon"></i></button>
 				<button class="btn-icon-text" :class="{ active: drawTool === 'circle' }" @click="toggleDrawTool('circle')"
 					title="圆形"><i class="fa-solid fa-circle"></i></button>
-			<button class="btn-icon-text" :class="{ active: drawTool === 'rectangle' }" @click="toggleDrawTool('rectangle')"
-				title="矩形"><i class="fa-solid fa-square"></i></button>
+				<button class="btn-icon-text" :class="{ active: drawTool === 'rectangle' }" @click="toggleDrawTool('rectangle')"
+					title="矩形"><i class="fa-solid fa-square"></i></button>
 			</div>
 
 			<div class="tool-divider"></div>
