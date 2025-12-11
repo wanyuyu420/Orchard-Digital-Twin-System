@@ -82,6 +82,22 @@ const loadTileset = async () => {
 			skipLevels: 1,
 		});
 
+		// BIM tileset doesn't have a built-in transform matrix
+		// Apply modelMatrix to position it at the project's default location
+		// Using the same location as OSGB (~78.42°E, 39.78°N, Xinjiang)
+		const BIM_POSITION = {
+			lon: 87.57,
+			lat: 43.82,
+			height: 0
+		};
+		const position = Cesium.Cartesian3.fromDegrees(
+			BIM_POSITION.lon,
+			BIM_POSITION.lat,
+			BIM_POSITION.height
+		);
+		tileset.modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(position);
+		console.log('[BIMLayer] Applied modelMatrix at:', BIM_POSITION);
+
 		// Add to scene
 		viewer.scene.primitives.add(tileset);
 
