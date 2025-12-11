@@ -61,6 +61,8 @@ public/Cesium-1.82-epawse/
 
 # 数据文件（真实项目数据）
 backend/data/
+# OSGB 3D Tiles 倾斜摄影数据 (1.4GB)
+data/
 *.sqlite
 *.db
 *.xlsx
