@@ -19,6 +19,9 @@ export const useCesiumStore = defineStore('cesium', () => {
   // OSGB 3D Tiles state
   const osgbEnabled = ref(false)
   const osgbLoading = ref(false)
+  // BIM 3D Tiles state
+  const bimEnabled = ref(false)
+  const bimLoading = ref(false)
 
   // Store the last 3D camera position and orientation before switching to 2D
   const savedCameraState = ref<{
@@ -149,6 +152,9 @@ export const useCesiumStore = defineStore('cesium', () => {
     // OSGB 3D Tiles
     osgbEnabled,
     osgbLoading,
+    // BIM 3D Tiles
+    bimEnabled,
+    bimLoading,
     savedCameraState,
     setViewer,
     toggle2D3D,

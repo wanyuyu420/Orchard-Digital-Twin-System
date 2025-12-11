@@ -41,6 +41,18 @@
 					<i class="fa-solid toggle-icon" :class="cesiumStore.osgbEnabled ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
 				</div>
 
+				<!-- BIM 3D Tiles Toggle -->
+				<div class="layer-item bim-layer" :class="{ active: cesiumStore.bimEnabled }" @click="toggleBIM">
+					<div class="layer-info">
+						<i class="fa-solid fa-cubes layer-icon"></i>
+						<span>BIM 模型</span>
+						<span v-if="cesiumStore.bimLoading" class="loading-indicator">
+							<i class="fa-solid fa-spinner fa-spin"></i>
+						</span>
+					</div>
+					<i class="fa-solid toggle-icon" :class="cesiumStore.bimEnabled ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
+				</div>
+
 				<!-- Other Resource Layers -->
 				<div v-for="layer in layers" :key="layer.id" class="layer-item" :class="{ active: layer.active }"
 					@click="toggleLayer(layer)">
@@ -631,6 +643,16 @@ function toggleOSGB() {
 	console.log('[LayerControl] toggleOSGB called, current:', cesiumStore.osgbEnabled)
 	cesiumStore.osgbEnabled = !cesiumStore.osgbEnabled
 	console.log('[LayerControl] toggleOSGB new value:', cesiumStore.osgbEnabled)
+}
+
+/**
+ * Toggle BIM 3D Tiles visibility
+ * The actual loading is handled by BIMLayer component
+ */
+function toggleBIM() {
+	console.log('[LayerControl] toggleBIM called, current:', cesiumStore.bimEnabled)
+	cesiumStore.bimEnabled = !cesiumStore.bimEnabled
+	console.log('[LayerControl] toggleBIM new value:', cesiumStore.bimEnabled)
 }
 
 // === GIS Feature Functions (New) ===

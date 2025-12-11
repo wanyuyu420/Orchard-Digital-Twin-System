@@ -9,6 +9,9 @@
 		<!-- OSGB 3D Tiles Layer (conditional) -->
 		<OSGBLayer v-if="cesiumStore.osgbEnabled" :visible="cesiumStore.osgbEnabled" />
 
+		<!-- BIM 3D Tiles Layer (conditional) -->
+		<BIMLayer v-if="cesiumStore.bimEnabled" :visible="cesiumStore.bimEnabled" />
+
 		<!-- Layer 2: UI Layer (Router View) -->
 		<div class="ui-layer">
 			<router-view v-slot="{ Component }">
@@ -27,6 +30,7 @@
 import TopRibbon from '@/components/common/TopRibbon.vue';
 import GISLayer from '@/components/cesium/GISLayer.vue';
 import OSGBLayer from '@/components/cesium/OSGBLayer.vue';
+import BIMLayer from '@/components/cesium/BIMLayer.vue';
 import BottomDock from '@/layout/BottomDock.vue';
 import { useCesiumStore } from '@/stores/cesium';
 

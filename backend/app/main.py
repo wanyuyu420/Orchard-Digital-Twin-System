@@ -31,6 +31,15 @@ if OSGB_TILES_PATH.exists():
     print(
         f"[startup] OSGB 3D Tiles mounted at /tiles/osgb from {OSGB_TILES_PATH}")
 
+# --- BIM 3D Tiles Static Files ---
+# Mount BIM 3D Tiles data from frontend project's data directory
+BIM_TILES_PATH = Path(__file__).parent.parent.parent / "data" / "bim"
+if BIM_TILES_PATH.exists():
+    app.mount("/tiles/bim",
+              StaticFiles(directory=str(BIM_TILES_PATH)), name="bim_tiles")
+    print(
+        f"[startup] BIM 3D Tiles mounted at /tiles/bim from {BIM_TILES_PATH}")
+
 # Background task reference
 _realtime_task = None
 
