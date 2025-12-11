@@ -366,12 +366,7 @@ onMounted(() => {
 
 onUnmounted(() => {
 	clearEntities();
-	// Disable terrain when leaving simulation page
-	// This restores the default ellipsoid for better vector basemap compatibility
-	if (cesiumStore.terrainEnabled) {
-		cesiumStore.disableTerrain();
-		console.log('[FloodLayer] Disabled terrain on unmount');
-	}
+	// Note: Terrain is now managed via LayerControl UI, no auto-disable on unmount
 });
 
 // Expose for parent components
