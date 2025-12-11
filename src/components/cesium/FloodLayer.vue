@@ -73,15 +73,15 @@ const computeBoundaryColor = (): any => {
 };
 
 /**
- * Convert MultiPolygon GeoJSON to Cesium PolygonHierarchy
- * Uses the union of all polygons' outer rings
+ * Build Cartesian3 positions from MultiPolygon GeoJSON
+ * Returns the exact same positions to be used by both polygon and boundary
  */
-const buildPolygonHierarchy = (multiPolygon: any): any => {
+const buildPositionsFromMultiPolygon = (multiPolygon: any): any => {
 	if (!multiPolygon || multiPolygon.type !== 'MultiPolygon') {
 		return null;
 	}
 
-	// Get the first (usually largest) polygon
+	// Get the first polygon
 	const firstPolygon = multiPolygon.coordinates[0];
 	if (!firstPolygon || !firstPolygon[0]) {
 		return null;
@@ -94,38 +94,22 @@ const buildPolygonHierarchy = (multiPolygon: any): any => {
 		positions.push(coord[0], coord[1]);
 	});
 
-	return new Cesium.PolygonHierarchy(
-		Cesium.Cartesian3.fromDegreesArray(positions)
-	);
+	// Return Cartesian3 array - used by both polygon hierarchy and boundary
+	return Cesium.Cartesian3.fromDegreesArray(positions);
 };
 
 /**
- * Convert MultiPolygon to boundary polyline positions
+ * Build closed boundary positions from shared base positions
+ * Closes the ring by adding first point at the end
  */
-const buildBoundaryPositions = (multiPolygon: any): any => {
-	if (!multiPolygon || multiPolygon.type !== 'MultiPolygon') {
-		return null;
+const buildClosedBoundaryPositions = (positions: any): any => {
+	if (!positions || positions.length === 0) return null;
+	// Clone positions and close the ring
+	const closed = [...positions];
+	if (positions.length > 0) {
+		closed.push(positions[0].clone());
 	}
-
-	// Combine all outer rings
-	const allPositions: number[] = [];
-
-	multiPolygon.coordinates.forEach((polygon: number[][][]) => {
-		const outerRing = polygon[0];
-		if (!outerRing) return;
-
-		outerRing.forEach((coord: number[]) => {
-			allPositions.push(coord[0], coord[1], 0);
-		});
-		// Close the ring
-		if (outerRing.length > 0) {
-			allPositions.push(outerRing[0][0], outerRing[0][1], 0);
-		}
-	});
-
-	if (allPositions.length === 0) return null;
-
-	return Cesium.Cartesian3.fromDegreesArrayHeights(allPositions);
+	return closed;
 };
 
 /**
@@ -193,14 +177,22 @@ const updateStateFromFrame = (frame: FloodFrame | null) => {
 		return;
 	}
 
-	// Update polygon hierarchy
-	currentHierarchy = buildPolygonHierarchy(frame.polygons);
+	// Build shared positions from MultiPolygon
+	const sharedPositions = buildPositionsFromMultiPolygon(frame.polygons);
+	if (!sharedPositions) {
+		currentHierarchy = null;
+		currentBoundaryPositions = null;
+		return;
+	}
+
+	// Update polygon hierarchy using shared positions
+	currentHierarchy = new Cesium.PolygonHierarchy(sharedPositions);
 
 	// Update color based on water level
 	currentColor = computeWaterColor(frame.water_level);
 
-	// Update boundary positions
-	currentBoundaryPositions = buildBoundaryPositions(frame.polygons);
+	// Update boundary positions - use closed version of shared positions
+	currentBoundaryPositions = buildClosedBoundaryPositions(sharedPositions);
 
 	// Sync flood area to simulation store
 	if (frame.area_km2 !== undefined && frame.area_km2 !== null) {
