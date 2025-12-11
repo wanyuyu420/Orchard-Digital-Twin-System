@@ -88,7 +88,7 @@ const loadTileset = async () => {
 		const BIM_POSITION = {
 			lon: 87.57,
 			lat: 43.82,
-			height: 0
+			height: 500  // Raised above ground level
 		};
 		const position = Cesium.Cartesian3.fromDegrees(
 			BIM_POSITION.lon,

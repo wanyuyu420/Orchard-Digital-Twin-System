@@ -558,10 +558,9 @@ function updateFeatureProperty(key: 'name' | 'description', value: string) {
 // Tab state
 const activeTab = ref<'resources' | 'features'>('resources')
 
-// Resource layers (original)
+// Resource layers (original) - BIM now has dedicated toggle above
 const layers = ref<Layer[]>([
 	{ id: 'base', name: '基础地理', icon: 'fa-solid fa-map', active: true },
-	{ id: 'bim', name: 'BIM 模型', icon: 'fa-solid fa-cubes', active: true },
 	{ id: 'cctv', name: '视频点位', icon: 'fa-solid fa-video', active: false },
 	{ id: 'stations', name: '水雨情站', icon: 'fa-solid fa-location-dot', active: true },
 ])
