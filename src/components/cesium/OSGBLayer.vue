@@ -65,12 +65,14 @@ const loadTileset = async () => {
 	}
 
 	isLoading.value = true;
+	cesiumStore.osgbLoading = true;
 	error.value = null;
 
 	try {
 		console.log('[OSGBLayer] Loading 3D Tiles from:', TILESET_URL);
 
 		// Use Cesium3DTileset.fromUrl for async loading
+		// Note: fromUrl returns a ready tileset, no need for readyPromise
 		tileset = await Cesium.Cesium3DTileset.fromUrl(TILESET_URL, {
 			// Performance options
 			maximumScreenSpaceError: 16, // Higher = faster loading, lower quality
@@ -85,14 +87,17 @@ const loadTileset = async () => {
 		// Add to scene
 		viewer.scene.primitives.add(tileset);
 
-		// Wait for tileset to be ready
-		await tileset.readyPromise;
-
 		tilesetReady.value = true;
 		console.log('[OSGBLayer] 3D Tileset loaded successfully');
 
 		// Set initial visibility
 		tileset.show = props.visible !== false;
+
+		// Auto fly to tileset location after loading
+		console.log('[OSGBLayer] Auto flying to tileset...');
+		await viewer.flyTo(tileset, {
+			duration: 2,
+		});
 
 		emit('ready');
 	} catch (e: any) {
@@ -101,6 +106,7 @@ const loadTileset = async () => {
 		emit('error', error.value);
 	} finally {
 		isLoading.value = false;
+		cesiumStore.osgbLoading = false;
 	}
 };
 
@@ -181,15 +187,18 @@ watch(
 
 // Lifecycle
 onMounted(() => {
+	console.log('[OSGBLayer] Component mounted, viewer ready:', !!cesiumStore.viewer);
 	// Wait for viewer to be ready
 	if (cesiumStore.viewer) {
 		loadTileset();
 	} else {
 		// Watch for viewer initialization
+		console.log('[OSGBLayer] Waiting for viewer...');
 		const unwatch = watch(
 			() => cesiumStore.viewer,
 			(viewer) => {
 				if (viewer) {
+					console.log('[OSGBLayer] Viewer now ready, loading tileset');
 					loadTileset();
 					unwatch();
 				}

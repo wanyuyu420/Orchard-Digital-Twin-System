@@ -628,7 +628,9 @@ async function toggleTerrain() {
  * The actual loading is handled by OSGBLayer component
  */
 function toggleOSGB() {
+	console.log('[LayerControl] toggleOSGB called, current:', cesiumStore.osgbEnabled)
 	cesiumStore.osgbEnabled = !cesiumStore.osgbEnabled
+	console.log('[LayerControl] toggleOSGB new value:', cesiumStore.osgbEnabled)
 }
 
 // === GIS Feature Functions (New) ===
