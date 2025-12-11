@@ -9,8 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, desc, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
-from .utils.scanner import scan_data_directory, DATA_ROOT
-from .utils.reader import read_excel_data
 from .utils.stats import calculate_overview_stats, get_warning_data
 from .utils.mock_data import get_mock_flood_events, get_mock_rain_grid_frames, get_mock_iot_devices, get_mock_3d_resources
 from .websocket import manager
@@ -342,40 +340,6 @@ async def root():
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy", "service": "fastapi"}
-
-
-@app.get("/api/stations")
-async def get_stations():
-    """获取监测站点目录结构"""
-    return scan_data_directory()
-
-
-@app.get("/api/data")
-async def get_station_data(path: str = Query(..., description="文件的绝对路径或相对路径")):
-    """读取指定 Excel 文件的数据"""
-    # 安全检查：防止路径遍历攻击
-    # 如果传的是相对路径，拼接 DATA_ROOT
-    target_path = path
-    if not os.path.isabs(path):
-        target_path = os.path.join(DATA_ROOT, path)
-
-    # 规范化路径
-    target_path = os.path.abspath(target_path)
-
-    # 简单校验：确保目标路径在数据根目录下
-    if not target_path.startswith(DATA_ROOT):
-        raise HTTPException(
-            status_code=403, detail="Access denied: Invalid file path")
-
-    if not os.path.exists(target_path):
-        raise HTTPException(status_code=404, detail="File not found")
-
-    result = read_excel_data(target_path)
-
-    if "error" in result:
-        raise HTTPException(status_code=500, detail=result["error"])
-
-    return result
 
 
 async def _latest_by_metric(session: AsyncSession, metric_key: str):

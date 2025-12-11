@@ -58,12 +58,8 @@ data/
 *.xlsx
 *.xls
 
-# 真实数据处理脚本
-backend/scripts/import_excel.py
-backend/scripts/ingest_hydrological.py
-backend/app/utils/excel_importer.py
-backend/app/utils/reader.py
-backend/app/utils/scanner.py
+# 本地数据处理工具（不提交到仓库）
+local/
 
 # AI 助手配置
 .claude/
