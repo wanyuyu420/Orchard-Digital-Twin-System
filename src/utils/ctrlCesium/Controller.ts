@@ -275,19 +275,22 @@ class Controller {
   }
 
   removeJagged(viewer: any): void {
-    // Disable FXAA for performance
-    viewer.scene.postProcessStages.fxaa.enabled = false
-    viewer.scene.fxaa = false
+    // Enable FXAA for better edge smoothing
+    viewer.scene.postProcessStages.fxaa.enabled = true
+    viewer.scene.fxaa = true
 
     // Adjust resolution for high-DPI displays
     const supportsImageRenderingPixelated = viewer.cesiumWidget._supportsImageRenderingPixelated
     if (supportsImageRenderingPixelated) {
+      // Use native device pixel ratio for sharpest rendering on Retina displays
+      // Only limit it if performance is a major concern (e.g. cap at 2.0)
       let dpr = window.devicePixelRatio
-      while (dpr >= 2.0) {
-        dpr /= 2.0
+      if (dpr > 2.0) {
+        dpr = 2.0 // Cap at 2.0 to avoid excessive load on mobile/super-high-res
       }
       viewer.resolutionScale = dpr
     }
+
   }
 
   // Get current view center coordinates
