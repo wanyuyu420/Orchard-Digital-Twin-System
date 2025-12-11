@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { shallowRef, ref } from 'vue'
+import { GController } from '@/utils/ctrlCesium/Controller'
 
 declare const Cesium: any
 
@@ -13,6 +14,8 @@ const DEFAULT_VIEW = {
 export const useCesiumStore = defineStore('cesium', () => {
   const viewer = shallowRef<any>(null)
   const is2D = ref(false)
+  const terrainEnabled = ref(false)
+  const terrainLoading = ref(false)
 
   // Store the last 3D camera position and orientation before switching to 2D
   const savedCameraState = ref<{
@@ -101,9 +104,45 @@ export const useCesiumStore = defineStore('cesium', () => {
     camera.zoomOut(camera.positionCartographic.height * 0.3)
   }
 
+  /**
+   * Enable 3D terrain
+   * Returns a promise that resolves when terrain is loaded
+   */
+  async function enableTerrain(): Promise<void> {
+    if (terrainEnabled.value || terrainLoading.value) return
+    terrainLoading.value = true
+    try {
+      await GController.enableTerrain()
+      terrainEnabled.value = GController.isTerrainEnabled()
+    } finally {
+      terrainLoading.value = false
+    }
+  }
+
+  /**
+   * Disable 3D terrain
+   */
+  function disableTerrain(): void {
+    GController.disableTerrain()
+    terrainEnabled.value = false
+  }
+
+  /**
+   * Toggle terrain state
+   */
+  async function toggleTerrain(): Promise<void> {
+    if (terrainEnabled.value) {
+      disableTerrain()
+    } else {
+      await enableTerrain()
+    }
+  }
+
   return {
     viewer,
     is2D,
+    terrainEnabled,
+    terrainLoading,
     savedCameraState,
     setViewer,
     toggle2D3D,
@@ -111,6 +150,9 @@ export const useCesiumStore = defineStore('cesium', () => {
     flyToDefault,
     zoomIn,
     zoomOut,
+    enableTerrain,
+    disableTerrain,
+    toggleTerrain,
     DEFAULT_VIEW
   }
 })

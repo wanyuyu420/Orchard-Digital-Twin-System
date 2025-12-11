@@ -57,6 +57,8 @@ export interface BaseMapConfig {
 
 class Controller {
   viewer: any = null
+  private terrainEnabled = false
+  private terrainLoading = false
 
   constructor() {
     this.viewer = null
@@ -101,8 +103,9 @@ class Controller {
     // Enable depth testing against terrain
     viewer.scene.globe.depthTestAgainstTerrain = true
 
-    // Load Cesium World Terrain (async)
-    this.loadWorldTerrain(viewer)
+    // NOTE: Terrain is NOT loaded by default
+    // Use enableTerrain() to load terrain when needed (e.g., for 3D analysis)
+    // Vector base maps are incompatible with 3D terrain
 
     // Initialize navigation controls
     this.initCesiumNavigation(viewer)
@@ -118,22 +121,59 @@ class Controller {
   }
 
   /**
-   * Load Cesium World Terrain asynchronously
-   * This enables 3D terrain for volume analysis and other 3D tools
+   * Load Cesium World Terrain asynchronously (internal)
    */
-  async loadWorldTerrain(viewer: any): Promise<void> {
+  private async loadWorldTerrain(): Promise<void> {
+    if (!this.viewer || this.terrainLoading) return
+    
+    this.terrainLoading = true
     try {
-      // Use Cesium.createWorldTerrainAsync for Cesium 1.104+
       const terrainProvider = await Cesium.createWorldTerrainAsync({
-        requestWaterMask: true,      // Enable water effects
-        requestVertexNormals: true   // Enable terrain lighting
+        requestWaterMask: true,
+        requestVertexNormals: true
       })
-      viewer.terrainProvider = terrainProvider
-      console.log('✓ Cesium World Terrain loaded successfully')
+      this.viewer.terrainProvider = terrainProvider
+      this.terrainEnabled = true
+      console.log('✓ Cesium World Terrain loaded')
     } catch (error) {
-      console.warn('Failed to load World Terrain, using ellipsoid terrain:', error)
-      // Fallback: continue with default ellipsoid terrain
+      console.warn('Failed to load World Terrain:', error)
+      this.terrainEnabled = false
+    } finally {
+      this.terrainLoading = false
     }
+  }
+
+  /**
+   * Enable 3D terrain
+   * @returns Promise that resolves when terrain is loaded
+   */
+  async enableTerrain(): Promise<void> {
+    if (this.terrainEnabled || this.terrainLoading) return
+    await this.loadWorldTerrain()
+  }
+
+  /**
+   * Disable 3D terrain, revert to ellipsoid
+   */
+  disableTerrain(): void {
+    if (!this.viewer || !this.terrainEnabled) return
+    this.viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider()
+    this.terrainEnabled = false
+    console.log('✓ Terrain disabled, using ellipsoid')
+  }
+
+  /**
+   * Check if terrain is enabled
+   */
+  isTerrainEnabled(): boolean {
+    return this.terrainEnabled
+  }
+
+  /**
+   * Check if terrain is currently loading
+   */
+  isTerrainLoading(): boolean {
+    return this.terrainLoading
   }
 
   initCesiumNavigation(viewer: any): void {

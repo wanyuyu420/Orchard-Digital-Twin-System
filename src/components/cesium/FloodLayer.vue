@@ -116,9 +116,16 @@ const buildClosedBoundaryPositions = (positions: any): any => {
  * Initialize persistent Cesium entities with CallbackProperty
  * Called once when viewer is ready and we have initial data
  */
-const initializeEntities = () => {
+const initializeEntities = async () => {
 	const viewer = cesiumStore.viewer;
 	if (!viewer || entitiesInitialized) return;
+
+	// Flood visualization requires 3D terrain for proper rendering
+	// classificationType: TERRAIN needs terrain to be enabled
+	if (!cesiumStore.terrainEnabled) {
+		console.log('[FloodLayer] Enabling terrain for flood visualization...');
+		await cesiumStore.enableTerrain();
+	}
 
 	// Initialize default values
 	currentColor = computeWaterColor(5);
