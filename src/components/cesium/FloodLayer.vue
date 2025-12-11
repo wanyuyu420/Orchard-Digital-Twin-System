@@ -240,8 +240,8 @@ const loadScenario = async (id: number) => {
 	try {
 		scenario.value = await getFloodScenarioDetail(id);
 
-		// Initialize entities if not done yet
-		initializeEntities();
+		// Initialize entities if not done yet (await to ensure terrain is loaded first)
+		await initializeEntities();
 
 		// Set initial frame based on current progress
 		const progress = simState.value.progress;
