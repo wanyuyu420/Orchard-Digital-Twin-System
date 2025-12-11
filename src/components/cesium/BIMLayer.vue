@@ -84,7 +84,7 @@ const loadTileset = async () => {
 
 		// BIM tileset doesn't have a built-in transform matrix
 		// Apply modelMatrix to position it at the project's default location
-		// Using the same location as OSGB (~78.42°E, 39.78°N, Xinjiang)
+		// Using the same location as the project default view
 		const BIM_POSITION = {
 			lon: 87.57,
 			lat: 43.82,
@@ -95,8 +95,24 @@ const loadTileset = async () => {
 			BIM_POSITION.lat,
 			BIM_POSITION.height
 		);
-		tileset.modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(position);
-		console.log('[BIMLayer] Applied modelMatrix at:', BIM_POSITION);
+
+		// Create position matrix
+		const positionMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(position);
+
+		// BIM models often use Y-up axis, but Cesium uses Z-up
+		// Apply rotation around X-axis by -90 degrees to fix orientation
+		const rotationAngle = Cesium.Math.toRadians(-90);
+		const rotationMatrix = Cesium.Matrix4.fromRotationTranslation(
+			Cesium.Matrix3.fromRotationX(rotationAngle)
+		);
+
+		// Combine: position * rotation
+		tileset.modelMatrix = Cesium.Matrix4.multiply(
+			positionMatrix,
+			rotationMatrix,
+			new Cesium.Matrix4()
+		);
+		console.log('[BIMLayer] Applied modelMatrix with -90° X rotation at:', BIM_POSITION);
 
 		// Add to scene
 		viewer.scene.primitives.add(tileset);
