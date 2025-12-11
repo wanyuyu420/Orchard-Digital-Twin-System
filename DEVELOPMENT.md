@@ -50,30 +50,25 @@ npm run build
 ```bash
 python3 --version  # 需要 3.10+
 cd backend
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 数据库
+### 快速启动（SQLite 演示模式）
 
-**要求**: PostgreSQL 15+ 和 PostGIS 扩展
+默认使用 SQLite，无需配置数据库：
 
-检查 PostGIS:
-```sql
-CREATE EXTENSION IF NOT EXISTS postgis;
-SELECT postgis_version();
+```bash
+uvicorn app.main:app --reload --port 8000
+# 首次启动自动创建 demo.db 并填充演示数据
 ```
 
-### 环境配置
+### 生产环境（PostgreSQL）
 
 创建 `backend/.env`:
 
 ```env
 DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/dbname
 DATABASE_URL_SYNC=postgresql+psycopg2://user:password@localhost:5432/dbname
-API_PREFIX=/api
-DEBUG=false
 ```
 
 ### 数据库迁移
@@ -94,20 +89,8 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-## 快速启动
-
-同时启动前后端:
-
-```bash
-./dev.sh
-```
-
-脚本会:
-1. 检查环境（Node.js, Python）
-2. 创建 Python venv（如需要）
-3. 启动 npm dev 和 uvicorn
-
 ## 本地忽略规则
+
 
 `.gitignore` 中的规则对所有开发者保持一致。若需额外忽略文件:
 
@@ -180,14 +163,7 @@ ls -la public/Cesium-1.136-epawse/Cesium.js
 - 连接池: `pool_size=10, max_overflow=20`
 - 查询优化: 使用 `joinedload` 减少 N+1 查询
 
-## 数据导入
 
-真实数据处理脚本仅在本地使用，不在仓库中。
-
-按需导入 Excel 监测数据：
-```bash
-python -m scripts.import_excel --root "data_folder"
-```
 
 ## 容器化（可选）
 

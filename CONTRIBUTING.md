@@ -24,14 +24,13 @@ npm run dev
 后端（终端 2）:
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate
 pip install -r requirements.txt
-alembic upgrade head
 uvicorn app.main:app --reload
+# 首次启动自动创建 demo.db
 ```
 
 访问 `http://localhost:5173`
+
 
 ## 代码规范
 

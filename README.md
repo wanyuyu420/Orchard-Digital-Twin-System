@@ -77,20 +77,21 @@ npm run dev
 
 ### 后端
 
+默认使用 SQLite，无需配置数据库：
+
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
-# 编辑 .env，填写数据库信息
-alembic upgrade head
 uvicorn app.main:app --reload --port 8000
+# 首次启动自动创建 demo.db 并填充演示数据
 ```
+
+生产环境 PostgreSQL 配置见 [backend/README.md](backend/README.md)。
 
 ## 环境变量
 
 ### 前端 (.env.local)
+
 ```env
 VITE_TIANDITU_KEY=YOUR_TIANDITU_KEY
 ```
