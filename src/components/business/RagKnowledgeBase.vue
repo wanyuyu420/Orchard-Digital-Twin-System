@@ -1,7 +1,7 @@
 <template>
   <div class="rag-container">
     <h3 class="panel-title">知识库管理 (RAG)</h3>
-    
+
     <!-- Upload Zone -->
     <div class="upload-zone">
       <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
@@ -22,18 +22,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref } from 'vue'
 
 const files = ref([
   { id: 1, name: '2025汉江流域防洪预案.pdf', type: 'pdf' },
   { id: 2, name: '丹江口水库调度规程.docx', type: 'word' },
   { id: 3, name: '大坝安全监测技术规范.pdf', type: 'pdf' },
-]);
+])
 
 function getFileIcon(type: string) {
-  if (type === 'pdf') return 'fa-regular fa-file-pdf text-alert';
-  if (type === 'word') return 'fa-regular fa-file-word text-blue';
-  return 'fa-regular fa-file';
+  if (type === 'pdf') return 'fa-regular fa-file-pdf text-alert'
+  if (type === 'word') return 'fa-regular fa-file-word text-blue'
+  return 'fa-regular fa-file'
 }
 </script>
 
@@ -65,7 +65,7 @@ function getFileIcon(type: string) {
   cursor: pointer;
   transition: all 0.2s;
   margin-bottom: 20px;
-  
+
   &:hover {
     background: rgba(34, 211, 238, 0.1);
   }
@@ -114,6 +114,10 @@ function getFileIcon(type: string) {
   border-radius: 4px;
 }
 
-.text-alert { color: $alert-red; }
-.text-blue { color: $neon-blue; }
+.text-alert {
+  color: $alert-red;
+}
+.text-blue {
+  color: $neon-blue;
+}
 </style>

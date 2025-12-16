@@ -70,50 +70,44 @@
       <div class="chart-section mt-4">
         <div class="chart-header">
           <span>位移趋势</span>
-          <span
-            class="status-badge"
-            :class="displacementStatus"
-          >{{ displacementStatusText }}</span>
+          <span class="status-badge" :class="displacementStatus">{{ displacementStatusText }}</span>
         </div>
-        <DisplacementTrendChart
-          :current-value="store.result.displacement || 0"
-          height="100px"
-        />
+        <DisplacementTrendChart :current-value="store.result.displacement || 0" height="100px" />
       </div>
     </div>
   </GlassPanel>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { storeToRefs } from 'pinia';
-import { useSimulationStore } from '@/stores/simulation';
-import GlassPanel from '@/components/common/GlassPanel.vue';
-import { FloodProgressChart, DisplacementTrendChart } from '@/components/charts';
+import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useSimulationStore } from '@/stores/simulation'
+import GlassPanel from '@/components/common/GlassPanel.vue'
+import { FloodProgressChart, DisplacementTrendChart } from '@/components/charts'
 
-const store = useSimulationStore();
-const { state } = storeToRefs(store);
+const store = useSimulationStore()
+const { state } = storeToRefs(store)
 
 function formatProgress(progress: number): string {
-  const hours = Math.floor((progress / 100) * 24);
-  const mins = Math.floor(((progress / 100) * 24 - hours) * 60);
-  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+  const hours = Math.floor((progress / 100) * 24)
+  const mins = Math.floor(((progress / 100) * 24 - hours) * 60)
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`
 }
 
 // Displacement safety indicators
 const displacementStatus = computed(() => {
-  const d = store.result.displacement || 0;
-  if (d < 3) return 'safe';
-  if (d < 6) return 'warning';
-  return 'danger';
-});
+  const d = store.result.displacement || 0
+  if (d < 3) return 'safe'
+  if (d < 6) return 'warning'
+  return 'danger'
+})
 
 const displacementStatusText = computed(() => {
-  const d = store.result.displacement || 0;
-  if (d < 3) return '正常';
-  if (d < 6) return '注意';
-  return '告警';
-});
+  const d = store.result.displacement || 0
+  if (d < 3) return '正常'
+  if (d < 6) return '注意'
+  return '告警'
+})
 </script>
 
 <style scoped lang="scss">
@@ -153,8 +147,12 @@ const displacementStatusText = computed(() => {
   text-shadow: 0 0 10px rgba($warn-yellow, 0.4);
 }
 
-.mt-3 { margin-top: 12px; }
-.mt-4 { margin-top: 20px; }
+.mt-3 {
+  margin-top: 12px;
+}
+.mt-4 {
+  margin-top: 20px;
+}
 
 // Event Details
 .event-details {

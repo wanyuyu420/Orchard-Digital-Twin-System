@@ -2,9 +2,7 @@
   <GlassPanel>
     <template #default>
       <div class="header-row">
-        <span class="title-text">
-          <i class="fa-solid fa-chart-area"></i> 实时水情
-        </span>
+        <span class="title-text"> <i class="fa-solid fa-chart-area"></i> 实时水情 </span>
         <span class="alert-tag" v-if="hasAlert">
           <i class="fa-solid fa-triangle-exclamation"></i> 洪峰过境
         </span>
@@ -26,11 +24,15 @@
       <div class="data-row">
         <div class="data-item">
           <div class="label">入库流量</div>
-          <div class="value font-mono">{{ inflowRate.toLocaleString() }} <span class="unit">m³/s</span></div>
+          <div class="value font-mono">
+            {{ inflowRate.toLocaleString() }} <span class="unit">m³/s</span>
+          </div>
         </div>
         <div class="data-item">
           <div class="label">坝前水位</div>
-          <div class="value font-mono text-neon">{{ store.reservoirLevel.toFixed(2) }} <span class="unit">m</span></div>
+          <div class="value font-mono text-neon">
+            {{ store.reservoirLevel.toFixed(2) }} <span class="unit">m</span>
+          </div>
         </div>
       </div>
 
@@ -49,9 +51,15 @@
         />
       </div>
       <div class="flow-stats">
-        <div class="stat-item" v-for="station in flowRateStations.slice(0, 3)" :key="station.sensor_id">
+        <div
+          class="stat-item"
+          v-for="station in flowRateStations.slice(0, 3)"
+          :key="station.sensor_id"
+        >
           <span class="station-name">{{ station.station_name }}</span>
-          <span class="flow-value">{{ station.history[station.history.length - 1]?.value?.toFixed(3) ?? '-' }} m³/s</span>
+          <span class="flow-value"
+            >{{ station.history[station.history.length - 1]?.value?.toFixed(3) ?? '-' }} m³/s</span
+          >
         </div>
       </div>
     </template>
@@ -59,44 +67,44 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue';
-import { useDashboardStore } from '@/stores/dashboard';
-import { useRealtimeStore } from '@/stores/realtime';
-import GlassPanel from '@/components/common/GlassPanel.vue';
-import { WaterLevelChart, FlowRateChart } from '@/components/charts';
+import { computed, onMounted, onUnmounted } from 'vue'
+import { useDashboardStore } from '@/stores/dashboard'
+import { useRealtimeStore } from '@/stores/realtime'
+import GlassPanel from '@/components/common/GlassPanel.vue'
+import { WaterLevelChart, FlowRateChart } from '@/components/charts'
 
-const store = useDashboardStore();
-const realtimeStore = useRealtimeStore();
+const store = useDashboardStore()
+const realtimeStore = useRealtimeStore()
 
 // Connect to WebSocket on mount
 onMounted(() => {
-  realtimeStore.connect();
-});
+  realtimeStore.connect()
+})
 
 onUnmounted(() => {
   // Don't disconnect - let other components share the connection
-});
+})
 
 // Chart data from realtime store
-const chartData = computed(() => realtimeStore.waterLevelChartData);
+const chartData = computed(() => realtimeStore.waterLevelChartData)
 
 // Flow rate data from realtime store
-const flowRateChartData = computed(() => realtimeStore.flowRateChartData);
-const flowRateStations = computed(() => realtimeStore.flowRateHistory);
+const flowRateChartData = computed(() => realtimeStore.flowRateChartData)
+const flowRateStations = computed(() => realtimeStore.flowRateHistory)
 
 // Simulated inflow rate (can be enhanced with real data later)
 const inflowRate = computed(() => {
-  const latest = chartData.value[chartData.value.length - 1];
-  if (!latest) return 24500;
+  const latest = chartData.value[chartData.value.length - 1]
+  if (!latest) return 24500
   // Rough calculation based on water level change
-  return Math.round(20000 + latest.value * 100);
-});
+  return Math.round(20000 + latest.value * 100)
+})
 
 // Show alert if water level exceeds threshold
 const hasAlert = computed(() => {
-  const latest = chartData.value[chartData.value.length - 1];
-  return latest && latest.value > 45; // Example threshold
-});
+  const latest = chartData.value[chartData.value.length - 1]
+  return latest && latest.value > 45 // Example threshold
+})
 </script>
 
 <style scoped lang="scss">
@@ -144,8 +152,13 @@ const hasAlert = computed(() => {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .chart-wrapper {

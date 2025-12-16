@@ -40,7 +40,7 @@ const DEFAULT_OPTIONS: SnapOptions = {
   tolerance: 10,
   snapToVertex: true,
   snapToEdge: true,
-  excludeFeatureIds: []
+  excludeFeatureIds: [],
 }
 
 /**
@@ -131,7 +131,7 @@ export class SnapService {
               position: position.clone(),
               featureId,
               screenDistance: distance,
-              vertexIndex
+              vertexIndex,
             }
           }
         })
@@ -140,17 +140,11 @@ export class SnapService {
       // 检测边缘吸附
       if (this.options.snapToEdge && positions.length >= 2) {
         for (let i = 0; i < positions.length - 1; i++) {
-          const edgeResult = this.findEdgeSnapPoint(
-            screenPosition,
-            positions[i],
-            positions[i + 1]
-          )
+          const edgeResult = this.findEdgeSnapPoint(screenPosition, positions[i], positions[i + 1])
 
           if (edgeResult && edgeResult.distance < bestDistance) {
             // 优先顶点吸附，边缘吸附需要更近
-            const edgeThreshold = bestTarget?.type === 'vertex'
-              ? bestDistance * 0.7
-              : bestDistance
+            const edgeThreshold = bestTarget?.type === 'vertex' ? bestDistance * 0.7 : bestDistance
 
             if (edgeResult.distance < edgeThreshold) {
               bestDistance = edgeResult.distance
@@ -159,7 +153,7 @@ export class SnapService {
                 position: edgeResult.position,
                 featureId,
                 screenDistance: edgeResult.distance,
-                edgeIndex: i
+                edgeIndex: i,
               }
             }
           }
@@ -174,10 +168,7 @@ export class SnapService {
    * 世界坐标转屏幕坐标
    */
   private worldToScreen(position: Cesium.Cartesian3): Cesium.Cartesian2 | null {
-    const screenPos = Cesium.SceneTransforms.worldToWindowCoordinates(
-      this.viewer.scene,
-      position
-    )
+    const screenPos = Cesium.SceneTransforms.worldToWindowCoordinates(this.viewer.scene, position)
     return screenPos || null
   }
 
@@ -195,11 +186,7 @@ export class SnapService {
     if (!screenStart || !screenEnd) return null
 
     // 计算点到线段的最近点 (屏幕空间)
-    const projection = this.projectPointToLineSegment(
-      screenPoint,
-      screenStart,
-      screenEnd
-    )
+    const projection = this.projectPointToLineSegment(screenPoint, screenStart, screenEnd)
 
     if (!projection) return null
 
@@ -214,7 +201,7 @@ export class SnapService {
 
     return {
       position: worldPosition,
-      distance: projection.distance
+      distance: projection.distance,
     }
   }
 

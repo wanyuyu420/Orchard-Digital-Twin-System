@@ -12,8 +12,17 @@
 
 import * as Cesium from 'cesium'
 import { BaseTool, type BaseToolOptions, type ToolType } from '../core/BaseTool'
-import { computeCutVolume, formatVolume, formatArea, type VolumeResult } from '../utils/volume'
+import { computeCutVolume, type VolumeResult } from '../utils/volume'
 import type { Coordinate } from '@/types/geometry'
+import {
+  TOOL_COLORS,
+  POINT_STYLES,
+  createGlowLineMaterial,
+  createLabelEntity,
+  createHintLabel,
+  createPointMarker,
+} from '../utils/toolStyles'
+import { useGISStore } from '@/stores/gis'
 
 /**
  * 体积分析结果
@@ -79,11 +88,11 @@ export class VolumeTool extends BaseTool {
 
   /** 默认样式 */
   private static readonly DEFAULT_STYLE = {
-    fillColor: '#FF6B6B',       // 分析区域填充色（红色系）
+    fillColor: TOOL_COLORS.volume.fill,
     fillOpacity: 0.3,
-    strokeColor: '#FF3333',     // 边界线颜色
-    strokeWidth: 3,
-    pointColor: '#FFFF00'       // 顶点颜色（黄色）
+    strokeColor: TOOL_COLORS.volume.stroke,
+    strokeWidth: 4,
+    pointColor: POINT_STYLES.vertex.color,
   }
 
   /** 当前绘制的顶点（Coordinate格式） */
@@ -259,8 +268,10 @@ export class VolumeTool extends BaseTool {
             if (!this.cursorPosition) return new Cesium.PolygonHierarchy(staticPositions)
             return new Cesium.PolygonHierarchy([...staticPositions, this.cursorPosition])
           }, false),
-          material: Cesium.Color.fromCssColorString(this.style.fillColor).withAlpha(this.style.fillOpacity),
-          classificationType: Cesium.ClassificationType.TERRAIN
+          material: Cesium.Color.fromCssColorString(this.style.fillColor).withAlpha(
+            this.style.fillOpacity
+          ),
+          classificationType: Cesium.ClassificationType.TERRAIN,
         },
         polyline: {
           positions: new Cesium.CallbackProperty(() => {
@@ -268,35 +279,30 @@ export class VolumeTool extends BaseTool {
             return [...staticPositions, this.cursorPosition, staticPositions[0]]
           }, false),
           width: this.style.strokeWidth,
-          material: Cesium.Color.fromCssColorString(this.style.strokeColor),
-          clampToGround: true
-        }
+          material: createGlowLineMaterial(this.style.strokeColor, 0.25),
+          clampToGround: true,
+        },
       })
       this.previewEntities.push(previewPolygon)
     }
 
-    // 顶点数量和提示标签
-    const infoLabel = this.viewer.entities.add({
-      position: new Cesium.CallbackProperty(() => this.cursorPosition || this.positions[this.positions.length - 1], false) as unknown as Cesium.PositionProperty,
-      label: {
-        text: new Cesium.CallbackProperty(() => {
+    // 提示标签
+    const infoLabel = this.viewer.entities.add(
+      createLabelEntity(
+        new Cesium.CallbackProperty(() => {
           const count = this.positions.length
           if (count < 3) {
-            return `点击添加顶点 (${count}/3+)\n双击完成`
+            return createHintLabel('点击添加顶点', count) + '\n(需要至少3个点)'
           }
-          return `${count} 个顶点\n双击完成分析`
+          return createHintLabel('方量分析区域', count)
         }, false),
-        font: '14px sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        pixelOffset: new Cesium.Cartesian2(20, -20),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.7)')
-      }
-    })
+        new Cesium.CallbackProperty(
+          () => this.cursorPosition || this.positions[this.positions.length - 1],
+          false
+        ),
+        'hint'
+      )
+    )
     this.previewEntities.push(infoLabel)
   }
 
@@ -311,17 +317,13 @@ export class VolumeTool extends BaseTool {
 
     try {
       // 计算体积
-      const volumeResult = computeCutVolume(
-        this.viewer,
-        this.positions,
-        this.baseHeight
-      )
+      const volumeResult = computeCutVolume(this.viewer, this.positions, this.baseHeight)
 
       const result: VolumeAnalysisResult = {
         ...volumeResult,
         baseHeight: this.baseHeight,
         positions: [...this.positions],
-        calculatedAt: new Date()
+        calculatedAt: new Date(),
       }
 
       this.lastResult = result
@@ -331,7 +333,6 @@ export class VolumeTool extends BaseTool {
 
       // 回调
       this.onComplete?.(result)
-
     } catch (error) {
       console.error('Volume calculation failed:', error)
       // 可以添加错误提示UI
@@ -353,8 +354,8 @@ export class VolumeTool extends BaseTool {
         outline: true,
         outlineColor: Cesium.Color.fromCssColorString(this.style.strokeColor),
         outlineWidth: 2,
-        classificationType: Cesium.ClassificationType.TERRAIN
-      }
+        classificationType: Cesium.ClassificationType.TERRAIN,
+      },
     })
     this.resultEntities.push(analysisPolygon)
 
@@ -366,47 +367,20 @@ export class VolumeTool extends BaseTool {
         material: Cesium.Color.BLUE.withAlpha(0.2),
         outline: true,
         outlineColor: Cesium.Color.BLUE.withAlpha(0.5),
-        outlineWidth: 1
-      }
+        outlineWidth: 1,
+      },
     })
     this.resultEntities.push(basePolygon)
 
-    // 计算质心位置用于标签
+    // 添加分析结果到store（面板式管理）
+    const gisStore = useGISStore()
     const centroid = this.calculateCentroid(result.positions)
-
-    // 结果标签
-    const resultLabel = this.viewer.entities.add({
+    gisStore.addAnalysisResult({
+      type: 'volume',
+      name: `方量分析 #${gisStore.analysisResults.length + 1}`,
+      data: result,
       position: centroid,
-      label: {
-        text: this.formatResultText(result),
-        font: '16px sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 3,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.8)'),
-        backgroundPadding: new Cesium.Cartesian2(10, 8)
-      }
     })
-    this.resultEntities.push(resultLabel)
-  }
-
-  /**
-   * 格式化结果文本
-   */
-  private formatResultText(result: VolumeAnalysisResult): string {
-    return [
-      `📊 体积分析结果`,
-      `━━━━━━━━━━━━━━`,
-      `体积: ${formatVolume(result.volume)}`,
-      `面积: ${formatArea(result.area)}`,
-      `最高点: ${result.maxHeight.toFixed(1)} m`,
-      `最低点: ${result.minHeight.toFixed(1)} m`,
-      `基准面: ${result.baseHeight.toFixed(1)} m`,
-      `三角形: ${result.triangleCount} 个`
-    ].join('\n')
   }
 
   /**
@@ -415,7 +389,9 @@ export class VolumeTool extends BaseTool {
   private calculateCentroid(positions: Cesium.Cartesian3[]): Cesium.Cartesian3 {
     if (positions.length === 0) return Cesium.Cartesian3.ZERO
 
-    let x = 0, y = 0, z = 0
+    let x = 0,
+      y = 0,
+      z = 0
     for (const pos of positions) {
       x += pos.x
       y += pos.y
@@ -428,16 +404,7 @@ export class VolumeTool extends BaseTool {
    * 添加顶点标记
    */
   private addMarker(position: Cesium.Cartesian3): void {
-    const marker = this.viewer.entities.add({
-      position,
-      point: {
-        pixelSize: 10,
-        color: Cesium.Color.fromCssColorString(this.style.pointColor),
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 2,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
-    })
+    const marker = this.viewer.entities.add(createPointMarker(position, 'vertex'))
     this.markerEntities.push(marker)
   }
 
@@ -459,7 +426,7 @@ export class VolumeTool extends BaseTool {
     this.cursorPosition = null
     this.lastPreviewVerticesCount = 0
     // 清除标记但保留结果可视化
-    this.markerEntities.forEach(entity => this.viewer.entities.remove(entity))
+    this.markerEntities.forEach((entity) => this.viewer.entities.remove(entity))
     this.markerEntities = []
   }
 
@@ -467,7 +434,7 @@ export class VolumeTool extends BaseTool {
    * 清除预览实体
    */
   private clearPreviewEntities(): void {
-    this.previewEntities.forEach(entity => this.viewer.entities.remove(entity))
+    this.previewEntities.forEach((entity) => this.viewer.entities.remove(entity))
     this.previewEntities = []
   }
 
@@ -476,7 +443,7 @@ export class VolumeTool extends BaseTool {
    */
   private clearPreview(): void {
     this.clearPreviewEntities()
-    this.markerEntities.forEach(entity => this.viewer.entities.remove(entity))
+    this.markerEntities.forEach((entity) => this.viewer.entities.remove(entity))
     this.markerEntities = []
   }
 
@@ -484,7 +451,7 @@ export class VolumeTool extends BaseTool {
    * 清除结果可视化
    */
   public clearResult(): void {
-    this.resultEntities.forEach(entity => this.viewer.entities.remove(entity))
+    this.resultEntities.forEach((entity) => this.viewer.entities.remove(entity))
     this.resultEntities = []
     this.lastResult = null
   }
@@ -518,7 +485,7 @@ export class VolumeTool extends BaseTool {
     return {
       longitude: Cesium.Math.toDegrees(cartographic.longitude),
       latitude: Cesium.Math.toDegrees(cartographic.latitude),
-      height: cartographic.height
+      height: cartographic.height,
     }
   }
 

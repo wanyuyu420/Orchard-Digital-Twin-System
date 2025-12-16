@@ -8,7 +8,7 @@ declare const Cesium: any
 const DEFAULT_VIEW = {
   lon: 87.57,
   lat: 43.82,
-  height: 80000
+  height: 80000,
 }
 
 export const useCesiumStore = defineStore('cesium', () => {
@@ -51,7 +51,7 @@ export const useCesiumStore = defineStore('cesium', () => {
           height: cartographic.height,
           heading: camera.heading,
           pitch: camera.pitch,
-          roll: camera.roll
+          roll: camera.roll,
         }
       } catch (e) {
         console.warn('Failed to save camera state:', e)
@@ -68,7 +68,7 @@ export const useCesiumStore = defineStore('cesium', () => {
           viewer.value.camera.flyTo({
             destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
             orientation: { heading, pitch, roll },
-            duration: 1
+            duration: 1,
           })
         }
       }, 1200)
@@ -81,20 +81,24 @@ export const useCesiumStore = defineStore('cesium', () => {
     if (!viewer.value) return
     viewer.value.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
-      duration
+      duration,
     })
   }
 
   function flyToDefault(duration = 2) {
     if (!viewer.value) return
     viewer.value.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(DEFAULT_VIEW.lon, DEFAULT_VIEW.lat, DEFAULT_VIEW.height),
+      destination: Cesium.Cartesian3.fromDegrees(
+        DEFAULT_VIEW.lon,
+        DEFAULT_VIEW.lat,
+        DEFAULT_VIEW.height
+      ),
       orientation: {
         heading: 0,
         pitch: Cesium.Math.toRadians(-60),
-        roll: 0
+        roll: 0,
       },
-      duration
+      duration,
     })
   }
 
@@ -165,6 +169,6 @@ export const useCesiumStore = defineStore('cesium', () => {
     enableTerrain,
     disableTerrain,
     toggleTerrain,
-    DEFAULT_VIEW
+    DEFAULT_VIEW,
   }
 })

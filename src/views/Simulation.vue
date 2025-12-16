@@ -17,6 +17,34 @@
       </aside>
     </transition>
 
+    <!-- Analysis Result Panel (3D Tools) -->
+    <AnalysisResultPanel />
+
+    <!-- Cesium HTML Overlay (Modern) -->
+    <CesiumInfoOverlay
+      :visible="overlayStore.visible"
+      :tool-type="overlayStore.toolType"
+      :screen-position="overlayStore.screenPosition"
+      @close="overlayStore.hideOverlay()"
+    >
+      <VolumeResultContent
+        v-if="overlayStore.toolType === 'volume' && overlayStore.data"
+        :data="overlayStore.data"
+      />
+      <Measure3DResultContent
+        v-else-if="overlayStore.toolType === 'measure3d' && overlayStore.data"
+        :data="overlayStore.data"
+      />
+      <ProfileResultContent
+        v-else-if="overlayStore.toolType === 'profile' && overlayStore.data"
+        :data="overlayStore.data"
+      />
+      <FloodResultContent
+        v-else-if="overlayStore.toolType === 'flood' && overlayStore.data"
+        :data="overlayStore.data"
+      />
+    </CesiumInfoOverlay>
+
     <!-- Bottom Dock: Timeline -->
     <transition name="slide-up">
       <div v-show="!isUiHidden" class="bottom-timeline-container">
@@ -27,27 +55,35 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
-import { useAppStore } from '@/stores/app';
-import { useSimulationStore } from '@/stores/simulation';
-import SimConfig from '@/components/business/SimConfig.vue';
-import SimResult from '@/components/business/SimResult.vue';
-import TimelineControl from '@/components/common/TimelineControl.vue';
-import FloodLayer from '@/components/cesium/FloodLayer.vue';
+import { computed, onMounted } from 'vue'
+import { useAppStore } from '@/stores/app'
+import { useSimulationStore } from '@/stores/simulation'
+import { useOverlayStore } from '@/stores/overlay'
+import SimConfig from '@/components/business/SimConfig.vue'
+import SimResult from '@/components/business/SimResult.vue'
+import TimelineControl from '@/components/common/TimelineControl.vue'
+import FloodLayer from '@/components/cesium/FloodLayer.vue'
+import AnalysisResultPanel from '@/components/business/AnalysisResultPanel.vue'
+import CesiumInfoOverlay from '@/components/cesium/CesiumInfoOverlay.vue'
+import VolumeResultContent from '@/components/cesium/results/VolumeResultContent.vue'
+import Measure3DResultContent from '@/components/cesium/results/Measure3DResultContent.vue'
+import ProfileResultContent from '@/components/cesium/results/ProfileResultContent.vue'
+import FloodResultContent from '@/components/cesium/results/FloodResultContent.vue'
 
-const appStore = useAppStore();
-const simulationStore = useSimulationStore();
-const isUiHidden = computed(() => appStore.isUiHidden);
+const appStore = useAppStore()
+const simulationStore = useSimulationStore()
+const overlayStore = useOverlayStore()
+const isUiHidden = computed(() => appStore.isUiHidden)
 
 // Show flood layer when engine is flood or hydro
 const isFloodEngine = computed(() => {
-  const engine = simulationStore.state.engine;
-  return engine === 'flood' || engine === 'hydro';
-});
+  const engine = simulationStore.state.engine
+  return engine === 'flood' || engine === 'hydro'
+})
 
 onMounted(() => {
-  simulationStore.fetchData();
-});
+  simulationStore.fetchData()
+})
 </script>
 
 <style scoped lang="scss">
@@ -70,8 +106,8 @@ onMounted(() => {
 .bottom-timeline-container {
   position: absolute;
   bottom: 100px; /* Above dock */
-  left: 380px;   /* Clear left sidebar */
-  right: 380px;  /* Clear right sidebar */
+  left: 380px; /* Clear left sidebar */
+  right: 380px; /* Clear right sidebar */
   pointer-events: auto;
 }
 

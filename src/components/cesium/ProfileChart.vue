@@ -30,7 +30,9 @@
       </div>
       <div class="stat-item">
         <span class="stat-label">高差</span>
-        <span class="stat-value">{{ ((result?.maxElevation || 0) - (result?.minElevation || 0)).toFixed(1) }} m</span>
+        <span class="stat-value"
+          >{{ ((result?.maxElevation || 0) - (result?.minElevation || 0)).toFixed(1) }} m</span
+        >
       </div>
     </div>
 
@@ -47,7 +49,7 @@ import {
   TooltipComponent,
   GridComponent,
   ToolboxComponent,
-  DataZoomComponent
+  DataZoomComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { ProfileAnalysisResult } from '@/cesium/gis/tools/ProfileTool'
@@ -60,7 +62,7 @@ echarts.use([
   ToolboxComponent,
   DataZoomComponent,
   LineChart,
-  CanvasRenderer
+  CanvasRenderer,
 ])
 
 interface Props {
@@ -69,13 +71,16 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  visible: true
+  visible: true,
 })
 
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'export-csv'): void
-  (e: 'hover', sample: { distance: number; elevation: number; longitude: number; latitude: number } | null): void
+  (
+    e: 'hover',
+    sample: { distance: number; elevation: number; longitude: number; latitude: number } | null
+  ): void
 }>()
 
 const chartRef = ref<HTMLElement>()
@@ -92,23 +97,30 @@ onUnmounted(() => {
   }
 })
 
-watch(() => props.result, (newResult) => {
-  if (newResult && chartInstance.value) {
-    updateChart(newResult)
-  }
-}, { deep: true })
+watch(
+  () => props.result,
+  (newResult) => {
+    if (newResult && chartInstance.value) {
+      updateChart(newResult)
+    }
+  },
+  { deep: true }
+)
 
-watch(() => props.visible, (visible) => {
-  if (visible && props.result) {
-    // Wait for DOM update then resize
-    setTimeout(() => {
-      chartInstance.value?.resize()
-      if (props.result) {
-        updateChart(props.result)
-      }
-    }, 100)
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible && props.result) {
+      // Wait for DOM update then resize
+      setTimeout(() => {
+        chartInstance.value?.resize()
+        if (props.result) {
+          updateChart(props.result)
+        }
+      }, 100)
+    }
   }
-})
+)
 
 function initChart() {
   if (!chartRef.value) return
@@ -128,14 +140,14 @@ function initChart() {
       left: 60,
       right: 30,
       top: 20,
-      bottom: 60
+      bottom: 60,
     },
     tooltip: {
       trigger: 'axis',
       backgroundColor: 'rgba(0, 0, 0, 0.85)',
       borderColor: 'var(--accent-primary)',
       textStyle: {
-        color: '#fff'
+        color: '#fff',
       },
       formatter: (params: any) => {
         const data = params[0]
@@ -151,7 +163,7 @@ function initChart() {
             </div>
           </div>
         `
-      }
+      },
     },
     xAxis: {
       type: 'value',
@@ -159,18 +171,18 @@ function initChart() {
       nameLocation: 'middle',
       nameGap: 30,
       nameTextStyle: {
-        color: '#aaa'
+        color: '#aaa',
       },
       axisLabel: {
         formatter: (value: number) => formatDistance(value),
-        color: '#aaa'
+        color: '#aaa',
       },
       axisLine: {
-        lineStyle: { color: '#555' }
+        lineStyle: { color: '#555' },
       },
       splitLine: {
-        lineStyle: { color: '#333' }
-      }
+        lineStyle: { color: '#333' },
+      },
     },
     yAxis: {
       type: 'value',
@@ -178,23 +190,23 @@ function initChart() {
       nameLocation: 'middle',
       nameGap: 45,
       nameTextStyle: {
-        color: '#aaa'
+        color: '#aaa',
       },
       axisLabel: {
-        color: '#aaa'
+        color: '#aaa',
       },
       axisLine: {
-        lineStyle: { color: '#555' }
+        lineStyle: { color: '#555' },
       },
       splitLine: {
-        lineStyle: { color: '#333' }
-      }
+        lineStyle: { color: '#333' },
+      },
     },
     dataZoom: [
       {
         type: 'inside',
         xAxisIndex: 0,
-        filterMode: 'none'
+        filterMode: 'none',
       },
       {
         type: 'slider',
@@ -205,26 +217,28 @@ function initChart() {
         backgroundColor: 'rgba(255,255,255,0.05)',
         fillerColor: 'rgba(0, 255, 255, 0.2)',
         handleStyle: {
-          color: 'var(--accent-primary)'
-        }
-      }
+          color: 'var(--accent-primary)',
+        },
+      },
     ],
-    series: [{
-      type: 'line',
-      smooth: true,
-      symbol: 'none',
-      lineStyle: {
-        color: '#00FFFF',
-        width: 2
+    series: [
+      {
+        type: 'line',
+        smooth: true,
+        symbol: 'none',
+        lineStyle: {
+          color: '#00FFFF',
+          width: 2,
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(0, 255, 255, 0.4)' },
+            { offset: 1, color: 'rgba(0, 255, 255, 0.05)' },
+          ]),
+        },
+        data: [],
       },
-      areaStyle: {
-        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: 'rgba(0, 255, 255, 0.4)' },
-          { offset: 1, color: 'rgba(0, 255, 255, 0.05)' }
-        ])
-      },
-      data: []
-    }]
+    ],
   })
 
   // Hover event
@@ -236,7 +250,7 @@ function initChart() {
           distance: sample.distance,
           elevation: sample.elevation,
           longitude: sample.longitude,
-          latitude: sample.latitude
+          latitude: sample.latitude,
         })
       }
     }
@@ -255,12 +269,14 @@ function initChart() {
 function updateChart(result: ProfileAnalysisResult) {
   if (!chartInstance.value) return
 
-  const data = result.samples.map(s => [s.distance, s.elevation])
+  const data = result.samples.map((s) => [s.distance, s.elevation])
 
   chartInstance.value.setOption({
-    series: [{
-      data: data
-    }]
+    series: [
+      {
+        data: data,
+      },
+    ],
   })
 }
 
@@ -277,7 +293,7 @@ function exportImage() {
   const url = chartInstance.value.getDataURL({
     type: 'png',
     pixelRatio: 2,
-    backgroundColor: '#1a1a2e'
+    backgroundColor: '#1a1a2e',
   })
 
   const link = document.createElement('a')

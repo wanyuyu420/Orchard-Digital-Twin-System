@@ -1,20 +1,11 @@
 <template>
   <GlassPanel title="反演参数" icon="fa-solid fa-calculator">
-    <div class="formula-box">
-      Z = a * R ^ b
-    </div>
-    
+    <div class="formula-box">Z = a * R ^ b</div>
+
     <div class="form-group">
       <label class="form-label">参数 a (系数)</label>
       <div class="range-wrapper">
-        <input 
-          type="range" 
-          min="10" 
-          max="500" 
-          step="10" 
-          v-model.number="a"
-          class="form-range"
-        />
+        <input type="range" min="10" max="500" step="10" v-model.number="a" class="form-range" />
         <span class="value-display font-mono text-neon">{{ a }}</span>
       </div>
     </div>
@@ -22,30 +13,21 @@
     <div class="form-group">
       <label class="form-label">参数 b (指数)</label>
       <div class="range-wrapper">
-        <input 
-          type="range" 
-          min="1.0" 
-          max="3.0" 
-          step="0.1" 
-          v-model.number="b"
-          class="form-range"
-        />
+        <input type="range" min="1.0" max="3.0" step="0.1" v-model.number="b" class="form-range" />
         <span class="value-display font-mono text-neon">{{ b }}</span>
       </div>
     </div>
 
-    <button class="btn-primary mt-4">
-      <i class="fa-solid fa-rotate"></i> 更新全屏场
-    </button>
+    <button class="btn-primary mt-4"><i class="fa-solid fa-rotate"></i> 更新全屏场</button>
   </GlassPanel>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import GlassPanel from '@/components/common/GlassPanel.vue';
+import { ref } from 'vue'
+import GlassPanel from '@/components/common/GlassPanel.vue'
 
-const a = ref(200);
-const b = ref(1.6);
+const a = ref(200)
+const b = ref(1.6)
 </script>
 
 <style scoped lang="scss">
@@ -108,7 +90,7 @@ const b = ref(1.6);
   gap: 8px;
   transition: all 0.2s;
   font-weight: 600;
-  
+
   &:hover {
     background: $neon-cyan;
     color: #000;
@@ -116,5 +98,7 @@ const b = ref(1.6);
   }
 }
 
-.mt-4 { margin-top: 20px; }
+.mt-4 {
+  margin-top: 20px;
+}
 </style>

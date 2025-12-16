@@ -3,91 +3,89 @@
     <button class="play-btn" @click="togglePlay">
       <i class="fa-solid" :class="state.isPlaying ? 'fa-pause' : 'fa-play'"></i>
     </button>
-    
+
     <div class="progress-track" ref="trackRef" @click="seek">
       <div class="progress-bar" :style="{ width: state.progress + '%' }"></div>
-      <div 
-        class="progress-handle" 
+      <div
+        class="progress-handle"
         :style="{ left: state.progress + '%' }"
         @mousedown="startDrag"
       ></div>
     </div>
-    
-    <div class="time-label font-mono text-neon">
-      +{{ formatTime(state.progress) }}h
-    </div>
+
+    <div class="time-label font-mono text-neon">+{{ formatTime(state.progress) }}h</div>
   </GlassPanel>
 </template>
 
 <script setup lang="ts">
-import { ref, onUnmounted } from 'vue';
-import { storeToRefs } from 'pinia';
-import { useSimulationStore } from '@/stores/simulation';
-import GlassPanel from '@/components/common/GlassPanel.vue';
+import { ref, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useSimulationStore } from '@/stores/simulation'
+import GlassPanel from '@/components/common/GlassPanel.vue'
 
-const store = useSimulationStore();
-const { state } = storeToRefs(store);
-const trackRef = ref<HTMLElement | null>(null);
-const isDragging = ref(false);
+const store = useSimulationStore()
+const { state } = storeToRefs(store)
+const trackRef = ref<HTMLElement | null>(null)
+const isDragging = ref(false)
 
 function togglePlay() {
-  store.togglePlay();
+  store.togglePlay()
 }
 
 function formatTime(progress: number) {
   // Mock time calculation: 0-100% -> 0-24h
-  const totalHours = 24;
-  const current = (progress / 100) * totalHours;
-  const h = Math.floor(current);
-  const m = Math.floor((current - h) * 60);
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  const totalHours = 24
+  const current = (progress / 100) * totalHours
+  const h = Math.floor(current)
+  const m = Math.floor((current - h) * 60)
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
 }
 
 // Calculate progress from mouse position
 function getProgressFromEvent(e: MouseEvent): number {
-  if (!trackRef.value) return state.value.progress;
-  const rect = trackRef.value.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  return Math.max(0, Math.min(100, (x / rect.width) * 100));
+  if (!trackRef.value) return state.value.progress
+  const rect = trackRef.value.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  return Math.max(0, Math.min(100, (x / rect.width) * 100))
 }
 
 // Click to seek
 function seek(e: MouseEvent) {
-  const pct = getProgressFromEvent(e);
-  store.setProgress(pct);
+  const pct = getProgressFromEvent(e)
+  store.setProgress(pct)
 }
 
 // Drag handlers
 function startDrag(e: MouseEvent) {
-  e.preventDefault();
-  isDragging.value = true;
-  
+  e.preventDefault()
+  isDragging.value = true
+
   // Pause playback during drag
   if (state.value.isPlaying) {
-    store.togglePlay();
+    store.togglePlay()
   }
 
-  window.addEventListener('mousemove', onDrag);
-  window.addEventListener('mouseup', stopDrag);
+  window.addEventListener('mousemove', onDrag)
+  window.addEventListener('mouseup', stopDrag)
 }
 
 function onDrag(e: MouseEvent) {
-  if (!isDragging.value) return;
-  const pct = getProgressFromEvent(e);
-  store.setProgress(pct);
+  if (!isDragging.value) return
+  const pct = getProgressFromEvent(e)
+  store.setProgress(pct)
 }
 
 function stopDrag() {
-  isDragging.value = false;
-  window.removeEventListener('mousemove', onDrag);
-  window.removeEventListener('mouseup', stopDrag);
+  isDragging.value = false
+  window.removeEventListener('mousemove', onDrag)
+  window.removeEventListener('mouseup', stopDrag)
 }
 
 // Cleanup on unmount
 onUnmounted(() => {
-  window.removeEventListener('mousemove', onDrag);
-  window.removeEventListener('mouseup', stopDrag);
-});
+  window.removeEventListener('mousemove', onDrag)
+  window.removeEventListener('mouseup', stopDrag)
+})
 </script>
 
 <style scoped lang="scss">
@@ -97,7 +95,7 @@ onUnmounted(() => {
   align-items: center;
   padding: 0 20px;
   gap: 20px;
-  
+
   // Override GlassPanel defaults
   :deep(.panel-content) {
     padding: 0;
@@ -121,7 +119,7 @@ onUnmounted(() => {
   justify-content: center;
   transition: transform 0.1s;
   @include box-glow($neon-cyan);
-  
+
   &:active {
     transform: scale(0.95);
   }
@@ -151,8 +149,8 @@ onUnmounted(() => {
   border-radius: 50%;
   transform: translate(-50%, -50%);
   cursor: grab;
-  box-shadow: 0 0 5px rgba(0,0,0,0.5);
-  
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+
   &:hover {
     transform: translate(-50%, -50%) scale(1.2);
   }

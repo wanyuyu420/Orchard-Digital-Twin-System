@@ -13,14 +13,16 @@
 import * as Cesium from 'cesium'
 import { BaseTool, type BaseToolOptions, type ToolType } from '../core/BaseTool'
 import { TilesetService } from '../services/TilesetService'
+import { TOOL_COLORS, POINT_STYLES } from '../utils/toolStyles'
+import { useGISStore } from '@/stores/gis'
 
 /**
  * 淹没分析模式
  */
 export type FloodMode =
-  | 'polygon'    // 手动绘制多边形区域
-  | 'tileset'    // 加载预设 3D Tiles 水面
-  | 'terrain'    // 基于地形的简单淹没
+  | 'polygon' // 手动绘制多边形区域
+  | 'tileset' // 加载预设 3D Tiles 水面
+  | 'terrain' // 基于地形的简单淹没
 
 /**
  * 洪水数据源配置
@@ -171,10 +173,10 @@ export class FloodTool extends BaseTool {
     mode: 'terrain' as FloodMode,
     initialWaterLevel: 0,
     waterLevelStep: 1,
-    waterColor: '#1E90FF',     // 道奇蓝
+    waterColor: TOOL_COLORS.flood.fill,
     waterOpacity: 0.6,
     enableAnimation: false,
-    animationSpeed: 100
+    animationSpeed: 100,
   }
 
   constructor(viewer: Cesium.Viewer, options: FloodToolOptions = {}) {
@@ -258,19 +260,17 @@ export class FloodTool extends BaseTool {
 
     try {
       const style = new Cesium.Cesium3DTileStyle({
-        color: `color('${this.waterColor}', ${this.waterOpacity})`
+        color: `color('${this.waterColor}', ${this.waterOpacity})`,
       })
 
-      this.waterTileset = await this.tilesetService.loadFromUrl(
-        this.dataSource.tilesetUrl,
-        { style }
-      )
+      this.waterTileset = await this.tilesetService.loadFromUrl(this.dataSource.tilesetUrl, {
+        style,
+      })
 
       // 飞行到 tileset
       await this.tilesetService.flyTo(this.waterTileset)
 
       console.log('Water tileset loaded')
-
     } catch (error) {
       console.error('Failed to load water tileset:', error)
     }
@@ -282,16 +282,16 @@ export class FloodTool extends BaseTool {
   private createTerrainFlood(positions: Cesium.Cartesian3[]): void {
     if (positions.length < 3) return
 
-    // 创建水面多边形
+    // 创建水面多边形（带现代化样式）
     this.waterEntity = this.viewer.entities.add({
       polygon: {
         hierarchy: new Cesium.PolygonHierarchy(positions),
         height: this.currentWaterLevel,
         material: Cesium.Color.fromCssColorString(this.waterColor).withAlpha(this.waterOpacity),
         outline: true,
-        outlineColor: Cesium.Color.fromCssColorString(this.waterColor),
-        outlineWidth: 2
-      }
+        outlineColor: Cesium.Color.fromCssColorString(TOOL_COLORS.flood.stroke),
+        outlineWidth: 3,
+      },
     })
   }
 
@@ -337,30 +337,24 @@ export class FloodTool extends BaseTool {
 
     if (this.polygonPositions.length < 2) return
 
-    // 绘制预览多边形
+    // 绘制预览多边形（带现代化样式）
     const previewPolygon = this.viewer.entities.add({
       polygon: {
         hierarchy: new Cesium.PolygonHierarchy(this.polygonPositions),
         height: this.currentWaterLevel,
-        material: Cesium.Color.fromCssColorString(this.waterColor).withAlpha(this.waterOpacity * 0.5),
+        material: Cesium.Color.fromCssColorString(this.waterColor).withAlpha(
+          this.waterOpacity * 0.5
+        ),
         outline: true,
-        outlineColor: Cesium.Color.fromCssColorString(this.waterColor).withAlpha(0.8),
-        outlineWidth: 2
-      }
+        outlineColor: Cesium.Color.fromCssColorString(TOOL_COLORS.flood.accent).withAlpha(0.9),
+        outlineWidth: 3,
+      },
     })
     this.previewEntities.push(previewPolygon)
 
     // 绘制顶点标记
-    this.polygonPositions.forEach(pos => {
-      const marker = this.viewer.entities.add({
-        position: pos,
-        point: {
-          pixelSize: 8,
-          color: Cesium.Color.YELLOW,
-          outlineColor: Cesium.Color.WHITE,
-          outlineWidth: 2
-        }
-      })
+    this.polygonPositions.forEach((pos) => {
+      const marker = this.viewer.entities.add(createPointMarker(pos, 'vertex'))
       this.previewEntities.push(marker)
     })
   }
@@ -380,7 +374,7 @@ export class FloodTool extends BaseTool {
    * 清除预览
    */
   private clearPreview(): void {
-    this.previewEntities.forEach(entity => {
+    this.previewEntities.forEach((entity) => {
       this.viewer.entities.remove(entity)
     })
     this.previewEntities = []
@@ -394,19 +388,50 @@ export class FloodTool extends BaseTool {
 
     // 更新水面高度
     if (this.waterEntity?.polygon) {
-      (this.waterEntity.polygon.height as any) = level
+      ;(this.waterEntity.polygon.height as any) = level
     }
 
     // 更新 Tileset 样式（如果使用 tileset 模式）
     if (this.waterTileset) {
       this.tilesetService.applyStyle(this.waterTileset, {
         color: `color('${this.waterColor}', ${this.waterOpacity})`,
-        show: `\${waterLevel} <= ${level}`
+        show: `\${waterLevel} <= ${level}`,
       })
     }
 
     const result = this.calculateFloodResult()
     this.onWaterLevelChange?.(level, result)
+
+    // 添加/更新分析结果到store
+    if (this.dataSource?.positions && this.dataSource.positions.length > 0) {
+      const gisStore = useGISStore()
+      // 计算中心点
+      const positions = this.dataSource.positions
+      let totalX = 0,
+        totalY = 0,
+        totalZ = 0
+      for (const pos of positions) {
+        totalX += pos.x
+        totalY += pos.y
+        totalZ += pos.z
+      }
+      const centroid = new Cesium.Cartesian3(
+        totalX / positions.length,
+        totalY / positions.length,
+        totalZ / positions.length
+      )
+
+      gisStore.addAnalysisResult({
+        type: 'flood',
+        name: `淹没分析 #${gisStore.analysisResults.length + 1}`,
+        data: {
+          waterLevel: level,
+          floodedArea: 0, // TODO: 计算淹没面积
+          floodedVolume: 0, // TODO: 计算淹没体积
+        },
+        position: centroid,
+      })
+    }
   }
 
   /**
@@ -499,7 +524,7 @@ export class FloodTool extends BaseTool {
       waterLevel: this.currentWaterLevel,
       floodedArea,
       floodedVolume,
-      analyzedAt: new Date()
+      analyzedAt: new Date(),
     }
   }
 
@@ -510,7 +535,7 @@ export class FloodTool extends BaseTool {
     if (positions.length < 3) return 0
 
     // 使用球面多边形面积公式
-    const coordinates = positions.map(pos => {
+    const coordinates = positions.map((pos) => {
       const carto = Cesium.Cartographic.fromCartesian(pos)
       return { lon: carto.longitude, lat: carto.latitude }
     })
@@ -520,11 +545,12 @@ export class FloodTool extends BaseTool {
 
     for (let i = 0; i < coordinates.length; i++) {
       const j = (i + 1) % coordinates.length
-      area += (coordinates[j].lon - coordinates[i].lon) *
-              (2 + Math.sin(coordinates[i].lat) + Math.sin(coordinates[j].lat))
+      area +=
+        (coordinates[j].lon - coordinates[i].lon) *
+        (2 + Math.sin(coordinates[i].lat) + Math.sin(coordinates[j].lat))
     }
 
-    return Math.abs(area * earthRadius * earthRadius / 2)
+    return Math.abs((area * earthRadius * earthRadius) / 2)
   }
 
   /**

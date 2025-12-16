@@ -49,7 +49,13 @@
   font-weight: bold;
 }
 
-.text-alert { color: $alert-red; }
-.text-warn { color: $warn-yellow; }
-.text-success { color: $success-green; }
+.text-alert {
+  color: $alert-red;
+}
+.text-warn {
+  color: $warn-yellow;
+}
+.text-success {
+  color: $success-green;
+}
 </style>

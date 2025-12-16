@@ -18,9 +18,9 @@
 </template>
 
 <script setup lang="ts">
-import ModalBox from '@/components/common/ModalBox.vue';
-import RagKnowledgeBase from '@/components/business/RagKnowledgeBase.vue';
-import PromptDebugger from '@/components/business/PromptDebugger.vue';
+import ModalBox from '@/components/common/ModalBox.vue'
+import RagKnowledgeBase from '@/components/business/RagKnowledgeBase.vue'
+import PromptDebugger from '@/components/business/PromptDebugger.vue'
 </script>
 
 <style scoped lang="scss">

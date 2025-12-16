@@ -5,12 +5,7 @@
       <div class="toolbar-left">
         <div class="search-box">
           <i class="fa-solid fa-search"></i>
-          <input
-            type="text"
-            v-model="searchQuery"
-            placeholder="搜索..."
-            @input="onSearchInput"
-          />
+          <input type="text" v-model="searchQuery" placeholder="搜索..." @input="onSearchInput" />
           <button v-if="searchQuery" class="clear-btn" @click="clearSearch">
             <i class="fa-solid fa-times"></i>
           </button>
@@ -43,10 +38,7 @@
               @click="col.sortable && toggleSort(col.key)"
             >
               {{ col.label }}
-              <i
-                v-if="col.sortable"
-                :class="getSortIcon(col.key)"
-              ></i>
+              <i v-if="col.sortable" :class="getSortIcon(col.key)"></i>
             </th>
             <th class="actions-col">操作</th>
           </tr>
@@ -108,11 +100,7 @@
       </div>
 
       <div class="page-controls">
-        <button
-          class="page-btn"
-          :disabled="page <= 1"
-          @click="goToPage(page - 1)"
-        >
+        <button class="page-btn" :disabled="page <= 1" @click="goToPage(page - 1)">
           <i class="fa-solid fa-chevron-left"></i>
         </button>
 
@@ -128,135 +116,132 @@
           </button>
         </template>
 
-        <button
-          class="page-btn"
-          :disabled="page >= totalPages"
-          @click="goToPage(page + 1)"
-        >
+        <button class="page-btn" :disabled="page >= totalPages" @click="goToPage(page + 1)">
           <i class="fa-solid fa-chevron-right"></i>
         </button>
       </div>
 
-      <div class="page-info">
-        第 {{ page }} / {{ totalPages }} 页
-      </div>
+      <div class="page-info">第 {{ page }} / {{ totalPages }} 页</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch } from 'vue'
 
 export interface Column {
-  key: string;
-  label: string;
-  sortable?: boolean;
-  width?: string;
-  type?: 'text' | 'boolean' | 'status' | 'datetime' | 'number';
-  render?: any;
+  key: string
+  label: string
+  sortable?: boolean
+  width?: string
+  type?: 'text' | 'boolean' | 'status' | 'datetime' | 'number'
+  render?: any
 }
 
 const props = defineProps<{
-  columns: Column[];
-  items: any[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-  loading?: boolean;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-}>();
+  columns: Column[]
+  items: any[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+  loading?: boolean
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
+}>()
 
 const emit = defineEmits<{
-  (e: 'update:page', page: number): void;
-  (e: 'update:pageSize', size: number): void;
-  (e: 'update:sortBy', key: string): void;
-  (e: 'update:sortOrder', order: 'asc' | 'desc'): void;
-  (e: 'search', query: string): void;
-  (e: 'create'): void;
-  (e: 'edit', item: any): void;
-  (e: 'delete', item: any): void;
-  (e: 'export'): void;
-}>();
+  (e: 'update:page', page: number): void
+  (e: 'update:pageSize', size: number): void
+  (e: 'update:sortBy', key: string): void
+  (e: 'update:sortOrder', order: 'asc' | 'desc'): void
+  (e: 'search', query: string): void
+  (e: 'create'): void
+  (e: 'edit', item: any): void
+  (e: 'delete', item: any): void
+  (e: 'export'): void
+}>()
 
-const searchQuery = ref('');
-const localPageSize = ref(props.pageSize);
-let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+const searchQuery = ref('')
+const localPageSize = ref(props.pageSize)
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
-watch(() => props.pageSize, (val) => {
-  localPageSize.value = val;
-});
+watch(
+  () => props.pageSize,
+  (val) => {
+    localPageSize.value = val
+  }
+)
 
 function onSearchInput() {
-  if (searchTimeout) clearTimeout(searchTimeout);
+  if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
-    emit('search', searchQuery.value);
-  }, 300);
+    emit('search', searchQuery.value)
+  }, 300)
 }
 
 function clearSearch() {
-  searchQuery.value = '';
-  emit('search', '');
+  searchQuery.value = ''
+  emit('search', '')
 }
 
 function toggleSort(key: string) {
   if (props.sortBy === key) {
-    emit('update:sortOrder', props.sortOrder === 'asc' ? 'desc' : 'asc');
+    emit('update:sortOrder', props.sortOrder === 'asc' ? 'desc' : 'asc')
   } else {
-    emit('update:sortBy', key);
-    emit('update:sortOrder', 'desc');
+    emit('update:sortBy', key)
+    emit('update:sortOrder', 'desc')
   }
 }
 
 function getSortIcon(key: string): string {
-  if (props.sortBy !== key) return 'fa-solid fa-sort';
-  return props.sortOrder === 'asc' ? 'fa-solid fa-sort-up' : 'fa-solid fa-sort-down';
+  if (props.sortBy !== key) return 'fa-solid fa-sort'
+  return props.sortOrder === 'asc' ? 'fa-solid fa-sort-up' : 'fa-solid fa-sort-down'
 }
 
 function goToPage(p: number) {
   if (p >= 1 && p <= props.totalPages) {
-    emit('update:page', p);
+    emit('update:page', p)
   }
 }
 
 function onPageSizeChange() {
-  emit('update:pageSize', localPageSize.value);
-  emit('update:page', 1);
+  emit('update:pageSize', localPageSize.value)
+  emit('update:page', 1)
 }
 
 const visiblePages = computed(() => {
-  const pages: (number | string)[] = [];
-  const total = props.totalPages;
-  const current = props.page;
+  const pages: (number | string)[] = []
+  const total = props.totalPages
+  const current = props.page
 
   if (total <= 7) {
-    for (let i = 1; i <= total; i++) pages.push(i);
+    for (let i = 1; i <= total; i++) pages.push(i)
   } else {
-    pages.push(1);
-    if (current > 3) pages.push('...');
+    pages.push(1)
+    if (current > 3) pages.push('...')
 
-    const start = Math.max(2, current - 1);
-    const end = Math.min(total - 1, current + 1);
-    for (let i = start; i <= end; i++) pages.push(i);
+    const start = Math.max(2, current - 1)
+    const end = Math.min(total - 1, current + 1)
+    for (let i = start; i <= end; i++) pages.push(i)
 
-    if (current < total - 2) pages.push('...');
-    pages.push(total);
+    if (current < total - 2) pages.push('...')
+    pages.push(total)
   }
 
-  return pages;
-});
+  return pages
+})
 
 function formatDateTime(value: string | null): string {
-  if (!value) return '-';
-  const d = new Date(value);
+  if (!value) return '-'
+  const d = new Date(value)
   return d.toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-  });
+  })
 }
 </script>
 

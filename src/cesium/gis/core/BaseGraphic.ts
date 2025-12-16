@@ -229,7 +229,7 @@ export abstract class BaseGraphic {
    * 从场景中删除所有相关实体
    */
   public remove(): void {
-    this.entities.forEach(entity => {
+    this.entities.forEach((entity) => {
       this.viewer.entities.remove(entity)
     })
     this.entities = []
@@ -240,7 +240,7 @@ export abstract class BaseGraphic {
    */
   public show(): void {
     this.visible = true
-    this.entities.forEach(entity => {
+    this.entities.forEach((entity) => {
       entity.show = true
     })
   }
@@ -250,7 +250,7 @@ export abstract class BaseGraphic {
    */
   public hide(): void {
     this.visible = false
-    this.entities.forEach(entity => {
+    this.entities.forEach((entity) => {
       entity.show = false
     })
   }
@@ -262,7 +262,7 @@ export abstract class BaseGraphic {
   public updateStyle(newStyle: Partial<GraphicStyle>): void {
     this.style = {
       ...this.style,
-      ...newStyle
+      ...newStyle,
     }
     this.applyStyle()
   }
@@ -315,7 +315,7 @@ export abstract class BaseGraphic {
         strokeWidth: (this.style.strokeWidth || 2) + 2,
         fillOpacity: Math.min((this.style.fillOpacity || 0.3) + 0.2, 0.8),
         pointColor: '#FFD700',
-        pointSize: (this.style.pointSize || 8) + 4
+        pointSize: (this.style.pointSize || 8) + 4,
       }
       this.highlighted = true
     } else {
@@ -337,7 +337,7 @@ export abstract class BaseGraphic {
    */
   public bindFeatureId(featureId: string): void {
     this.featureId = featureId
-    this.entities.forEach(entity => {
+    this.entities.forEach((entity) => {
       if (!entity.properties) {
         entity.properties = new Cesium.PropertyBag()
       }
@@ -378,7 +378,7 @@ export abstract class BaseGraphic {
       pointSize: style.pointSize || 8,
       pointColor: style.pointColor || '#22D3EE',
       opacity: style.opacity ?? 1.0,
-      ...style
+      ...style,
     }
   }
 

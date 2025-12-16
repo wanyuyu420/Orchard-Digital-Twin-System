@@ -80,7 +80,10 @@ export class TilesetService {
    * })
    * ```
    */
-  async loadFromUrl(url: string, options: TilesetLoadOptions = {}): Promise<Cesium.Cesium3DTileset> {
+  async loadFromUrl(
+    url: string,
+    options: TilesetLoadOptions = {}
+  ): Promise<Cesium.Cesium3DTileset> {
     const id = this.generateId(url)
 
     // 检查是否已加载
@@ -100,7 +103,7 @@ export class TilesetService {
         skipScreenSpaceErrorFactor: 16,
         skipLevels: 1,
         immediatelyLoadDesiredLevelOfDetail: false,
-        loadSiblings: false
+        loadSiblings: false,
       })
 
       // 应用模型矩阵
@@ -126,12 +129,11 @@ export class TilesetService {
         id,
         tileset,
         url,
-        loadedAt: new Date()
+        loadedAt: new Date(),
       })
 
       console.log(`✓ Tileset loaded: ${url}`)
       return tileset
-
     } catch (error) {
       console.error(`Failed to load tileset from ${url}:`, error)
       throw error
@@ -144,7 +146,10 @@ export class TilesetService {
    * @param assetId - Ion 资产 ID
    * @param options - 加载选项
    */
-  async loadFromIon(assetId: number, options: TilesetLoadOptions = {}): Promise<Cesium.Cesium3DTileset> {
+  async loadFromIon(
+    assetId: number,
+    options: TilesetLoadOptions = {}
+  ): Promise<Cesium.Cesium3DTileset> {
     const id = `ion_${assetId}`
 
     const existing = this.loadedTilesets.get(id)
@@ -154,7 +159,7 @@ export class TilesetService {
 
     try {
       const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(assetId, {
-        maximumScreenSpaceError: options.maximumScreenSpaceError ?? 16
+        maximumScreenSpaceError: options.maximumScreenSpaceError ?? 16,
       })
 
       if (options.modelMatrix) {
@@ -171,12 +176,11 @@ export class TilesetService {
         id,
         tileset,
         url: `ion://${assetId}`,
-        loadedAt: new Date()
+        loadedAt: new Date(),
       })
 
       console.log(`✓ Ion tileset loaded: ${assetId}`)
       return tileset
-
     } catch (error) {
       console.error(`Failed to load Ion asset ${assetId}:`, error)
       throw error
@@ -212,20 +216,23 @@ export class TilesetService {
    */
   createFloodStyle(waterLevel: number, opacity: number = 0.6): Cesium.Cesium3DTileStyle {
     return new Cesium.Cesium3DTileStyle({
-      color: `color('rgba(30, 144, 255, ${opacity})')`,  // 道奇蓝
-      show: `\${waterLevel} <= ${waterLevel}`
+      color: `color('rgba(30, 144, 255, ${opacity})')`, // 道奇蓝
+      show: `\${waterLevel} <= ${waterLevel}`,
     })
   }
 
   /**
    * 飞行到 Tileset
    */
-  async flyTo(tileset: Cesium.Cesium3DTileset, options?: {
-    duration?: number
-    heading?: number
-    pitch?: number
-    range?: number
-  }): Promise<void> {
+  async flyTo(
+    tileset: Cesium.Cesium3DTileset,
+    options?: {
+      duration?: number
+      heading?: number
+      pitch?: number
+      range?: number
+    }
+  ): Promise<void> {
     const boundingSphere = tileset.boundingSphere
     const radius = boundingSphere.radius
 
@@ -235,7 +242,7 @@ export class TilesetService {
         options?.heading ?? 0,
         options?.pitch ?? -0.5,
         options?.range ?? radius * 2.5
-      )
+      ),
     })
   }
 
@@ -246,9 +253,7 @@ export class TilesetService {
    * @param heightOffset - 高度偏移（米）
    */
   adjustHeight(tileset: Cesium.Cesium3DTileset, heightOffset: number): void {
-    const cartographic = Cesium.Cartographic.fromCartesian(
-      tileset.boundingSphere.center
-    )
+    const cartographic = Cesium.Cartographic.fromCartesian(tileset.boundingSphere.center)
 
     const surface = Cesium.Cartesian3.fromRadians(
       cartographic.longitude,
@@ -262,11 +267,7 @@ export class TilesetService {
       heightOffset
     )
 
-    const translation = Cesium.Cartesian3.subtract(
-      offset,
-      surface,
-      new Cesium.Cartesian3()
-    )
+    const translation = Cesium.Cartesian3.subtract(offset, surface, new Cesium.Cartesian3())
 
     tileset.modelMatrix = Cesium.Matrix4.fromTranslation(translation)
   }
@@ -275,9 +276,8 @@ export class TilesetService {
    * 设置 Tileset 显示/隐藏
    */
   setVisible(tilesetOrId: Cesium.Cesium3DTileset | string, visible: boolean): void {
-    const tileset = typeof tilesetOrId === 'string'
-      ? this.loadedTilesets.get(tilesetOrId)?.tileset
-      : tilesetOrId
+    const tileset =
+      typeof tilesetOrId === 'string' ? this.loadedTilesets.get(tilesetOrId)?.tileset : tilesetOrId
 
     if (tileset) {
       tileset.show = visible

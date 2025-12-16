@@ -18,10 +18,18 @@ vi.mock('cesium', () => {
       vi.fn((x: number, y: number, z: number) => ({ x, y, z })),
       {
         distance: vi.fn(() => 1000),
-        midpoint: vi.fn((a: any, b: any, result: any) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 })),
-        fromDegrees: vi.fn((lon: number, lat: number, height?: number) => mockCartesian3(lon, lat, height || 0)),
-        fromRadians: vi.fn((lon: number, lat: number, height?: number) => mockCartesian3(lon, lat, height || 0)),
-        clone: vi.fn((c: any) => ({ ...c }))
+        midpoint: vi.fn((a: any, b: any, result: any) => ({
+          x: (a.x + b.x) / 2,
+          y: (a.y + b.y) / 2,
+          z: (a.z + b.z) / 2,
+        })),
+        fromDegrees: vi.fn((lon: number, lat: number, height?: number) =>
+          mockCartesian3(lon, lat, height || 0)
+        ),
+        fromRadians: vi.fn((lon: number, lat: number, height?: number) =>
+          mockCartesian3(lon, lat, height || 0)
+        ),
+        clone: vi.fn((c: any) => ({ ...c })),
       }
     ),
     Cartesian2: vi.fn((x: number, y: number) => ({ x, y })),
@@ -29,36 +37,36 @@ vi.mock('cesium', () => {
       vi.fn((lon: number, lat: number, height?: number) => ({
         longitude: lon,
         latitude: lat,
-        height: height || 100
+        height: height || 100,
       })),
       {
         fromCartesian: vi.fn((cartesian: any) => ({
           longitude: 2.0,
           latitude: 0.5,
-          height: 100
+          height: 100,
         })),
         fromDegrees: vi.fn((lon: number, lat: number, height?: number) => ({
-          longitude: lon * Math.PI / 180,
-          latitude: lat * Math.PI / 180,
-          height: height || 0
-        }))
+          longitude: (lon * Math.PI) / 180,
+          latitude: (lat * Math.PI) / 180,
+          height: height || 0,
+        })),
       }
     ),
     Color: {
       fromCssColorString: vi.fn((color: string) => ({
-        withAlpha: vi.fn((alpha: number) => ({ r: 1, g: 0.8, b: 0.2, a: alpha }))
+        withAlpha: vi.fn((alpha: number) => ({ r: 1, g: 0.8, b: 0.2, a: alpha })),
       })),
       WHITE: { r: 1, g: 1, b: 1, a: 1 },
       CYAN: { r: 0, g: 1, b: 1, a: 1 },
       GREEN: { r: 0, g: 1, b: 0, a: 1 },
       RED: { r: 1, g: 0, b: 0, a: 1 },
-      YELLOW: { r: 1, g: 1, b: 0, a: 1 }
+      YELLOW: { r: 1, g: 1, b: 0, a: 1 },
     },
     ColorMaterialProperty: vi.fn((color: any) => ({ color })),
     ConstantProperty: vi.fn((value: any) => ({ getValue: () => value })),
     CallbackProperty: vi.fn((callback: any, isConstant: boolean) => ({
       getValue: callback,
-      isConstant
+      isConstant,
     })),
     PolylineDashMaterialProperty: vi.fn((options: any) => options),
     LabelStyle: { FILL_AND_OUTLINE: 0 },
@@ -67,7 +75,7 @@ vi.mock('cesium', () => {
       LEFT_CLICK: 0,
       RIGHT_CLICK: 1,
       LEFT_DOUBLE_CLICK: 2,
-      MOUSE_MOVE: 3
+      MOUSE_MOVE: 3,
     },
     ScreenSpaceEventHandler: class {
       setInputAction = vi.fn()
@@ -75,8 +83,8 @@ vi.mock('cesium', () => {
       destroy = vi.fn()
     },
     Math: {
-      toDegrees: vi.fn((radians: number) => radians * 180 / Math.PI),
-      toRadians: vi.fn((degrees: number) => degrees * Math.PI / 180)
+      toDegrees: vi.fn((radians: number) => (radians * 180) / Math.PI),
+      toRadians: vi.fn((degrees: number) => (degrees * Math.PI) / 180),
     },
     defined: vi.fn((value: any) => value !== undefined && value !== null),
     Entity: vi.fn(),
@@ -85,9 +93,9 @@ vi.mock('cesium', () => {
       return Promise.resolve([
         { longitude: 2.0, latitude: 0.5, height: 100 },
         { longitude: 2.01, latitude: 0.51, height: 150 },
-        { longitude: 2.02, latitude: 0.52, height: 120 }
+        { longitude: 2.02, latitude: 0.52, height: 120 },
       ])
-    })
+    }),
   }
 })
 
@@ -103,31 +111,31 @@ function createMockViewer() {
         ellipsoid: {
           maximumRadius: 6378137,
           cartesianToCartographic: vi.fn(() => ({ longitude: 2.0, latitude: 0.5, height: 100 })),
-          cartographicToCartesian: vi.fn(() => ({ x: 100, y: 200, z: 300 }))
-        }
+          cartographicToCartesian: vi.fn(() => ({ x: 100, y: 200, z: 300 })),
+        },
       },
-      pick: vi.fn(() => undefined)
+      pick: vi.fn(() => undefined),
     },
     camera: {
       getPickRay: vi.fn(() => ({ origin: {}, direction: {} })),
-      pickEllipsoid: vi.fn(() => ({ x: 100, y: 200, z: 300 }))
+      pickEllipsoid: vi.fn(() => ({ x: 100, y: 200, z: 300 })),
     },
     canvas: {
-      style: { cursor: 'default' }
+      style: { cursor: 'default' },
     },
     entities: {
       add: vi.fn((options) => ({
         id: options.id || 'test-entity',
         ...options,
-        show: true
+        show: true,
       })),
       remove: vi.fn(),
-      removeById: vi.fn()
+      removeById: vi.fn(),
     },
     terrainProvider: {
       ready: true,
-      availability: { computeMaximumLevelAtPosition: vi.fn(() => 15) }
-    }
+      availability: { computeMaximumLevelAtPosition: vi.fn(() => 15) },
+    },
   } as any
 }
 
@@ -154,14 +162,14 @@ describe('ProfileTool', () => {
 
     it('应该支持自定义采样间隔', () => {
       profileTool = new ProfileTool(mockViewer, {
-        sampleInterval: 50
+        sampleInterval: 50,
       })
       expect(profileTool).toBeDefined()
     })
 
     it('应该支持最大采样点数限制', () => {
       profileTool = new ProfileTool(mockViewer, {
-        maxSamples: 200
+        maxSamples: 200,
       })
       expect(profileTool).toBeDefined()
     })
@@ -232,14 +240,14 @@ describe('ProfileTool', () => {
         samples: [
           { distance: 0, elevation: 100, longitude: 120, latitude: 30 },
           { distance: 500, elevation: 150, longitude: 120.5, latitude: 30.5 },
-          { distance: 1000, elevation: 200, longitude: 121, latitude: 31 }
+          { distance: 1000, elevation: 200, longitude: 121, latitude: 31 },
         ],
         maxElevation: 200,
         minElevation: 100,
         avgElevation: 150,
         elevationGain: 100,
         elevationLoss: 0,
-        createdAt: new Date()
+        createdAt: new Date(),
       }
 
       // 验证 exportCSV 方法存在

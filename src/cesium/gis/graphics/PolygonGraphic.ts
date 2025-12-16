@@ -101,8 +101,8 @@ export class PolygonGraphic extends BaseGraphic {
         material: this.getMaterial(),
         classificationType: Cesium.ClassificationType.TERRAIN, // Classify on terrain to avoid Z-fighting
         // 不使用 Cesium 自带的 outline（classificationType 模式不支持）
-        outline: false
-      }
+        outline: false,
+      },
     })
 
     this.entities.push(this.polygonEntity)
@@ -123,8 +123,8 @@ export class PolygonGraphic extends BaseGraphic {
         positions: outlinePositions,
         width: this.style.strokeWidth || 2,
         material: Cesium.Color.fromCssColorString(this.style.strokeColor || '#ffcc33'),
-        clampToGround: true // Always clamp outline to ground for terrain-classified polygons
-      }
+        clampToGround: true, // Always clamp outline to ground for terrain-classified polygons
+      },
     })
 
     this.entities.push(this.outlineEntity)
@@ -134,8 +134,9 @@ export class PolygonGraphic extends BaseGraphic {
    * 获取填充材质
    */
   private getMaterial(): Cesium.MaterialProperty {
-    const color = Cesium.Color.fromCssColorString(this.style.fillColor || '#ffcc33')
-      .withAlpha(this.style.opacity ?? 0.5)
+    const color = Cesium.Color.fromCssColorString(this.style.fillColor || '#ffcc33').withAlpha(
+      this.style.opacity ?? 0.5
+    )
     return new Cesium.ColorMaterialProperty(color)
   }
 
@@ -159,8 +160,8 @@ export class PolygonGraphic extends BaseGraphic {
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, 0),
         heightReference: this.heightReference,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     })
 
     this.entities.push(this.areaLabelEntity)
@@ -174,7 +175,7 @@ export class PolygonGraphic extends BaseGraphic {
     if (positions.length < 3) return 0
 
     const ellipsoid = this.viewer.scene.globe.ellipsoid
-    const cartographics = positions.map(pos => ellipsoid.cartesianToCartographic(pos))
+    const cartographics = positions.map((pos) => ellipsoid.cartesianToCartographic(pos))
 
     // 使用 Shoelace 公式计算近似面积
     let area = 0
@@ -210,14 +211,14 @@ export class PolygonGraphic extends BaseGraphic {
     }
 
     const ellipsoid = this.viewer.scene.globe.ellipsoid
-    const cartographics = positions.map(pos => ellipsoid.cartesianToCartographic(pos))
+    const cartographics = positions.map((pos) => ellipsoid.cartesianToCartographic(pos))
 
     // 计算平均经纬度
     let lonSum = 0
     let latSum = 0
     let heightSum = 0
 
-    cartographics.forEach(c => {
+    cartographics.forEach((c) => {
       lonSum += c.longitude
       latSum += c.latitude
       heightSum += c.height
@@ -227,9 +228,7 @@ export class PolygonGraphic extends BaseGraphic {
     const avgLat = latSum / cartographics.length
     const avgHeight = heightSum / cartographics.length
 
-    return ellipsoid.cartographicToCartesian(
-      new Cesium.Cartographic(avgLon, avgLat, avgHeight)
-    )
+    return ellipsoid.cartographicToCartesian(new Cesium.Cartographic(avgLon, avgLat, avgHeight))
   }
 
   /**
@@ -272,7 +271,7 @@ export class PolygonGraphic extends BaseGraphic {
     if (this.positions.length === 0) return
 
     // Apply offset to all vertices
-    const newPositions = this.positions.map(pos =>
+    const newPositions = this.positions.map((pos) =>
       Cesium.Cartesian3.add(pos, offset, new Cesium.Cartesian3())
     )
 
@@ -359,12 +358,12 @@ export class PolygonGraphic extends BaseGraphic {
           color: Cesium.Color.RED,
           outlineColor: Cesium.Color.WHITE,
           outlineWidth: 2,
-          heightReference: this.heightReference
+          heightReference: this.heightReference,
         },
         // 存储顶点索引，便于拖拽时识别
         properties: {
-          vertexIndex: index
-        }
+          vertexIndex: index,
+        },
       })
       this.vertexMarkers.push(marker)
       this.entities.push(marker)
@@ -378,7 +377,7 @@ export class PolygonGraphic extends BaseGraphic {
     this.editing = false
 
     // 移除顶点标记
-    this.vertexMarkers.forEach(marker => {
+    this.vertexMarkers.forEach((marker) => {
       this.viewer.entities.remove(marker)
     })
     this.vertexMarkers = []
@@ -388,7 +387,7 @@ export class PolygonGraphic extends BaseGraphic {
    * 移除多边形
    */
   remove(): void {
-    this.entities.forEach(entity => {
+    this.entities.forEach((entity) => {
       this.viewer.entities.remove(entity)
     })
     this.entities = []
@@ -406,7 +405,11 @@ export class PolygonGraphic extends BaseGraphic {
    * 获取图形中心点（多边形重心）
    */
   public getCenter(): Cesium.Cartesian3 {
-    if (!this.polygonEntity || !this.polygonEntity.polygon || !this.polygonEntity.polygon.hierarchy) {
+    if (
+      !this.polygonEntity ||
+      !this.polygonEntity.polygon ||
+      !this.polygonEntity.polygon.hierarchy
+    ) {
       throw new Error('PolygonGraphic has no polygon hierarchy')
     }
 
@@ -418,7 +421,9 @@ export class PolygonGraphic extends BaseGraphic {
     }
 
     // Calculate centroid (simple average of all vertices)
-    let sumX = 0, sumY = 0, sumZ = 0
+    let sumX = 0,
+      sumY = 0,
+      sumZ = 0
     positions.forEach((pos: Cesium.Cartesian3) => {
       sumX += pos.x
       sumY += pos.y
@@ -439,8 +444,9 @@ export class PolygonGraphic extends BaseGraphic {
   protected applyStyle(): void {
     // Update polygon fill
     if (this.polygonEntity && this.polygonEntity.polygon) {
-      const fillColor = Cesium.Color.fromCssColorString(this.style.fillColor || '#ffcc33')
-        .withAlpha(this.style.fillOpacity ?? this.style.opacity ?? 0.5)
+      const fillColor = Cesium.Color.fromCssColorString(
+        this.style.fillColor || '#ffcc33'
+      ).withAlpha(this.style.fillOpacity ?? this.style.opacity ?? 0.5)
       this.polygonEntity.polygon.material = new Cesium.ColorMaterialProperty(fillColor)
     }
 
@@ -458,11 +464,11 @@ export class PolygonGraphic extends BaseGraphic {
     }
 
     const ellipsoid = this.viewer.scene.globe.ellipsoid
-    const coordinates: number[][] = this.positions.map(pos => {
+    const coordinates: number[][] = this.positions.map((pos) => {
       const cartographic = ellipsoid.cartesianToCartographic(pos)
       return [
         Cesium.Math.toDegrees(cartographic.longitude),
-        Cesium.Math.toDegrees(cartographic.latitude)
+        Cesium.Math.toDegrees(cartographic.latitude),
       ]
     })
 
@@ -473,7 +479,7 @@ export class PolygonGraphic extends BaseGraphic {
       type: 'Feature',
       geometry: {
         type: 'Polygon',
-        coordinates: [coordinates]
+        coordinates: [coordinates],
       },
       properties: {
         id: this.id,
@@ -483,8 +489,8 @@ export class PolygonGraphic extends BaseGraphic {
         areaFormatted: this.formatArea(this.area),
         vertexCount: this.positions.length,
         style: this.style,
-        createdAt: new Date().toISOString()
-      }
+        createdAt: new Date().toISOString(),
+      },
     }
   }
 }

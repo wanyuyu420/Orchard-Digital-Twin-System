@@ -38,7 +38,7 @@ export interface PointFeature extends BaseFeature {
 export interface LineFeature extends BaseFeature {
   type: 'line'
   vertices: Coordinate[]
-  length: number  // 米
+  length: number // 米
   lineType: LineType
 }
 
@@ -48,8 +48,8 @@ export interface LineFeature extends BaseFeature {
 export interface PolygonFeature extends BaseFeature {
   type: 'polygon'
   vertices: Coordinate[]
-  area: number  // 平方米
-  perimeter?: number  // 周长（米）
+  area: number // 平方米
+  perimeter?: number // 周长（米）
 }
 
 /**
@@ -58,8 +58,8 @@ export interface PolygonFeature extends BaseFeature {
 export interface CircleFeature extends BaseFeature {
   type: 'circle'
   center: Coordinate
-  radius: number  // 米
-  area: number    // 平方米
+  radius: number // 米
+  area: number // 平方米
 }
 
 /**
@@ -67,11 +67,11 @@ export interface CircleFeature extends BaseFeature {
  */
 export interface RectangleFeature extends BaseFeature {
   type: 'rectangle'
-  southwest: Coordinate  // 西南角
-  northeast: Coordinate  // 东北角
-  width: number          // 宽度（米）
-  height: number         // 高度（米）
-  area: number           // 平方米
+  southwest: Coordinate // 西南角
+  northeast: Coordinate // 东北角
+  width: number // 宽度（米）
+  height: number // 高度（米）
+  area: number // 平方米
 }
 
 /**
@@ -81,7 +81,7 @@ export interface DistanceFeature extends BaseFeature {
   type: 'distance'
   startPoint: Coordinate
   endPoint: Coordinate
-  distance: number  // 米
+  distance: number // 米
 }
 
 /**
@@ -90,7 +90,7 @@ export interface DistanceFeature extends BaseFeature {
 export interface AreaFeature extends BaseFeature {
   type: 'area'
   vertices: Coordinate[]
-  area: number  // 平方米
+  area: number // 平方米
 }
 
 /**

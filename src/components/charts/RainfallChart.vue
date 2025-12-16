@@ -3,36 +3,36 @@
  * RainfallChart - Bar chart showing rainfall by station.
  * Color-coded by severity: blue < 10mm, yellow 10-25mm, red > 25mm.
  */
-import { computed } from 'vue';
-import type { EChartsOption } from 'echarts';
-import BaseChart from './BaseChart.vue';
-import { NEON_BLUE, NEON_YELLOW, NEON_RED, TEXT_SECONDARY } from './theme';
+import { computed } from 'vue'
+import type { EChartsOption } from 'echarts'
+import BaseChart from './BaseChart.vue'
+import { NEON_BLUE, NEON_YELLOW, NEON_RED, TEXT_SECONDARY } from './theme'
 
 const props = withDefaults(
   defineProps<{
-    data: Array<{ station: string; value: number; unit?: string | null }>;
-    height?: string;
-    loading?: boolean;
-    title?: string;
+    data: Array<{ station: string; value: number; unit?: string | null }>
+    height?: string
+    loading?: boolean
+    title?: string
   }>(),
   {
     height: '200px',
     loading: false,
     title: '站点降雨量',
   }
-);
+)
 
 // Get color based on rainfall value
 function getRainfallColor(value: number): string {
-  if (value < 10) return NEON_BLUE;
-  if (value < 25) return NEON_YELLOW;
-  return NEON_RED;
+  if (value < 10) return NEON_BLUE
+  if (value < 25) return NEON_YELLOW
+  return NEON_RED
 }
 
 const chartOptions = computed<EChartsOption>(() => {
-  const stations = props.data.map((d) => d.station);
-  const values = props.data.map((d) => d.value);
-  const colors = props.data.map((d) => getRainfallColor(d.value));
+  const stations = props.data.map((d) => d.station)
+  const values = props.data.map((d) => d.value)
+  const colors = props.data.map((d) => getRainfallColor(d.value))
 
   return {
     title: {
@@ -46,11 +46,11 @@ const chartOptions = computed<EChartsOption>(() => {
         type: 'shadow',
       },
       formatter: (params: unknown) => {
-        const p = Array.isArray(params) ? params[0] : params;
-        const item = p as { name: string; value: number };
-        const dataItem = props.data.find((d) => d.station === item.name);
-        const unit = dataItem?.unit || 'mm';
-        return `${item.name}<br/>降雨量: <b>${item.value}</b> ${unit}`;
+        const p = Array.isArray(params) ? params[0] : params
+        const item = p as { name: string; value: number }
+        const dataItem = props.data.find((d) => d.station === item.name)
+        const unit = dataItem?.unit || 'mm'
+        return `${item.name}<br/>降雨量: <b>${item.value}</b> ${unit}`
       },
     },
     grid: {
@@ -94,8 +94,8 @@ const chartOptions = computed<EChartsOption>(() => {
         animationDuration: 500,
       },
     ],
-  };
-});
+  }
+})
 </script>
 
 <template>

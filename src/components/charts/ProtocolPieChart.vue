@@ -2,24 +2,24 @@
 /**
  * ProtocolPieChart - Pie chart showing device distribution by protocol.
  */
-import { computed } from 'vue';
-import type { EChartsOption } from 'echarts';
-import BaseChart from './BaseChart.vue';
-import { CHART_COLORS, TEXT_SECONDARY } from './theme';
+import { computed } from 'vue'
+import type { EChartsOption } from 'echarts'
+import BaseChart from './BaseChart.vue'
+import { CHART_COLORS, TEXT_SECONDARY } from './theme'
 
 const props = withDefaults(
   defineProps<{
-    data: Array<{ name: string; value: number }>;
-    height?: string;
-    loading?: boolean;
-    title?: string;
+    data: Array<{ name: string; value: number }>
+    height?: string
+    loading?: boolean
+    title?: string
   }>(),
   {
     height: '180px',
     loading: false,
     title: '协议分布',
   }
-);
+)
 
 const chartOptions = computed<EChartsOption>(() => ({
   title: {
@@ -77,7 +77,7 @@ const chartOptions = computed<EChartsOption>(() => ({
       })),
     },
   ],
-}));
+}))
 </script>
 
 <template>

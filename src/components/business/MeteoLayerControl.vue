@@ -32,13 +32,19 @@
           <span class="label radar-color">
             <i class="fa-solid fa-satellite-dish"></i> 雷达回波
           </span>
-          <i class="fa-solid" :class="isRadarActive ? 'fa-toggle-on active-icon' : 'fa-toggle-off inactive-icon'"></i>
+          <i
+            class="fa-solid"
+            :class="isRadarActive ? 'fa-toggle-on active-icon' : 'fa-toggle-off inactive-icon'"
+          ></i>
         </div>
         <div class="toggle-row" @click="toggleRainfall">
           <span class="label rainfall-color">
             <i class="fa-solid fa-cloud-showers-heavy"></i> 反演降雨
           </span>
-          <i class="fa-solid" :class="isRainfallActive ? 'fa-toggle-on active-icon' : 'fa-toggle-off inactive-icon'"></i>
+          <i
+            class="fa-solid"
+            :class="isRainfallActive ? 'fa-toggle-on active-icon' : 'fa-toggle-off inactive-icon'"
+          ></i>
         </div>
       </div>
     </div>

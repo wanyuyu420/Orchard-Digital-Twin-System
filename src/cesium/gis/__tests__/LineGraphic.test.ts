@@ -9,7 +9,7 @@ import { LineGraphic } from '../graphics/LineGraphic'
 const mockPositions = [
   { x: 100, y: 200, z: 300 },
   { x: 200, y: 300, z: 400 },
-  { x: 300, y: 400, z: 500 }
+  { x: 300, y: 400, z: 500 },
 ]
 
 const mockViewer = {
@@ -17,17 +17,19 @@ const mockViewer = {
     add: vi.fn((options) => ({
       id: options.id,
       position: options.position,
-      polyline: options.polyline ? {
-        ...options.polyline,
-        positions: {
-          getValue: vi.fn(() => options.polyline.positions)
-        }
-      } : undefined,
+      polyline: options.polyline
+        ? {
+            ...options.polyline,
+            positions: {
+              getValue: vi.fn(() => options.polyline.positions),
+            },
+          }
+        : undefined,
       point: options.point,
       label: options.label,
-      show: options.show
+      show: options.show,
     })),
-    remove: vi.fn()
+    remove: vi.fn(),
   },
   scene: {
     globe: {
@@ -35,50 +37,50 @@ const mockViewer = {
         cartesianToCartographic: vi.fn(() => ({
           longitude: 1.9949,
           latitude: 0.5323,
-          height: 100
-        }))
-      }
-    }
-  }
+          height: 100,
+        })),
+      },
+    },
+  },
 } as any
 
 // Mock Cesium static methods
 const mockCesium = {
   Color: {
     fromCssColorString: vi.fn(() => ({
-      withAlpha: vi.fn((alpha) => ({ alpha }))
+      withAlpha: vi.fn((alpha) => ({ alpha })),
     })),
     WHITE: { r: 1, g: 1, b: 1, a: 1 },
     BLACK: { r: 0, g: 0, b: 0, a: 1 },
-    TRANSPARENT: { r: 0, g: 0, b: 0, a: 0 }
+    TRANSPARENT: { r: 0, g: 0, b: 0, a: 0 },
   },
   LabelStyle: {
-    FILL_AND_OUTLINE: 2
+    FILL_AND_OUTLINE: 2,
   },
   Cartesian2: vi.fn((x, y) => ({ x, y })),
   Cartesian3: {
-    distance: vi.fn(() => 100)
+    distance: vi.fn(() => 100),
   },
   ConstantProperty: vi.fn((value) => value),
   ConstantPositionProperty: vi.fn((value) => value),
   ColorMaterialProperty: vi.fn((color) => ({ color })),
   PolylineDashMaterialProperty: vi.fn((options) => options),
   JulianDate: {
-    now: vi.fn(() => ({}))
+    now: vi.fn(() => ({})),
   },
   Cartographic: {
     fromCartesian: vi.fn(() => ({
       longitude: 1.9949,
       latitude: 0.5323,
-      height: 100
-    }))
+      height: 100,
+    })),
   },
   Math: {
-    toDegrees: vi.fn((rad) => rad * 57.2958)
+    toDegrees: vi.fn((rad) => rad * 57.2958),
   },
-  EllipsoidGeodesic: vi.fn(function(this: any) {
+  EllipsoidGeodesic: vi.fn(function (this: any) {
     this.surfaceDistance = 1000
-  })
+  }),
 }
 
 // 注入 mock
@@ -91,7 +93,7 @@ describe('LineGraphic', () => {
 
   it('应该创建 LineGraphic 实例', () => {
     const line = new LineGraphic(mockViewer, {
-      name: '测试线'
+      name: '测试线',
     })
 
     expect(line).toBeDefined()
@@ -108,15 +110,15 @@ describe('LineGraphic', () => {
       expect.objectContaining({
         polyline: expect.objectContaining({
           positions: mockPositions,
-          width: expect.any(Number)
-        })
+          width: expect.any(Number),
+        }),
       })
     )
   })
 
   it('应该创建带长度标签的线', () => {
     const line = new LineGraphic(mockViewer, {
-      showLength: true
+      showLength: true,
     })
     line.create(mockPositions as any)
 
@@ -126,7 +128,7 @@ describe('LineGraphic', () => {
 
   it('应该支持虚线样式', () => {
     const line = new LineGraphic(mockViewer, {
-      lineStyle: 'dashed'
+      lineStyle: 'dashed',
     })
     line.create(mockPositions as any)
 
@@ -136,7 +138,7 @@ describe('LineGraphic', () => {
 
   it('应该支持点线样式', () => {
     const line = new LineGraphic(mockViewer, {
-      lineStyle: 'dotted'
+      lineStyle: 'dotted',
     })
     line.create(mockPositions as any)
 
@@ -176,7 +178,7 @@ describe('LineGraphic', () => {
 
   it('应该正确导出 GeoJSON', () => {
     const line = new LineGraphic(mockViewer, {
-      name: 'TestLine'
+      name: 'TestLine',
     })
     line.create(mockPositions as any)
 
@@ -187,18 +189,14 @@ describe('LineGraphic', () => {
       geometry: {
         type: 'LineString',
         coordinates: expect.arrayContaining([
-          expect.arrayContaining([
-            expect.any(Number),
-            expect.any(Number),
-            expect.any(Number)
-          ])
-        ])
+          expect.arrayContaining([expect.any(Number), expect.any(Number), expect.any(Number)]),
+        ]),
       },
       properties: expect.objectContaining({
         name: 'TestLine',
         length: expect.any(Number),
-        lineStyle: 'solid'
-      })
+        lineStyle: 'solid',
+      }),
     })
   })
 

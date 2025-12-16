@@ -2,38 +2,38 @@
 /**
  * DisplacementTrendChart - Line chart showing dam displacement trends.
  */
-import { computed } from 'vue';
-import type { EChartsOption } from 'echarts';
-import BaseChart from './BaseChart.vue';
-import { NEON_YELLOW, NEON_RED, TEXT_SECONDARY, NEON_GREEN } from './theme';
+import { computed } from 'vue'
+import type { EChartsOption } from 'echarts'
+import BaseChart from './BaseChart.vue'
+import { NEON_YELLOW, NEON_RED, TEXT_SECONDARY, NEON_GREEN } from './theme'
 
 const props = withDefaults(
   defineProps<{
-    currentValue: number;
-    height?: string;
-    loading?: boolean;
+    currentValue: number
+    height?: string
+    loading?: boolean
   }>(),
   {
     height: '100px',
     loading: false,
   }
-);
+)
 
 // Generate simulated displacement history
 const chartOptions = computed<EChartsOption>(() => {
-  const points = 20;
-  const times: string[] = [];
-  const values: number[] = [];
+  const points = 20
+  const times: string[] = []
+  const values: number[] = []
 
   // Generate historical values trending toward current value
   for (let i = 0; i < points; i++) {
-    times.push(`T-${points - i}`);
-    const baseValue = props.currentValue * (0.6 + 0.4 * (i / points));
-    const noise = (Math.random() - 0.5) * 0.5;
-    values.push(Math.round((baseValue + noise) * 100) / 100);
+    times.push(`T-${points - i}`)
+    const baseValue = props.currentValue * (0.6 + 0.4 * (i / points))
+    const noise = (Math.random() - 0.5) * 0.5
+    values.push(Math.round((baseValue + noise) * 100) / 100)
   }
-  times.push('Now');
-  values.push(props.currentValue);
+  times.push('Now')
+  values.push(props.currentValue)
 
   return {
     grid: {
@@ -45,9 +45,9 @@ const chartOptions = computed<EChartsOption>(() => {
     tooltip: {
       trigger: 'axis',
       formatter: (params: unknown) => {
-        const p = Array.isArray(params) ? params[0] : params;
-        const item = p as { name: string; value: number };
-        return `${item.name}<br/>位移: <b>${item.value}</b> mm`;
+        const p = Array.isArray(params) ? params[0] : params
+        const item = p as { name: string; value: number }
+        return `${item.name}<br/>位移: <b>${item.value}</b> mm`
       },
     },
     xAxis: {
@@ -108,8 +108,8 @@ const chartOptions = computed<EChartsOption>(() => {
         animationDuration: 300,
       },
     ],
-  };
-});
+  }
+})
 </script>
 
 <template>

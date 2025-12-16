@@ -86,7 +86,7 @@ export class DrawTool extends BaseTool {
     strokeWidth: 3,
     pointSize: 10,
     pointColor: '#22D3EE',
-    lineType: 'solid' as LineType
+    lineType: 'solid' as LineType,
   }
 
   /** 当前绘制的顶点 */
@@ -234,15 +234,15 @@ export class DrawTool extends BaseTool {
       name: '点标注',
       geometry: {
         type: 'Point',
-        coordinates: [coord.longitude, coord.latitude, coord.height || 0] // GeoJSON array format
+        coordinates: [coord.longitude, coord.latitude, coord.height || 0], // GeoJSON array format
       },
       style: {
         fillColor: this.style.pointColor,
-        pointSize: this.style.pointSize
+        pointSize: this.style.pointSize,
       },
       properties: {},
       visible: true,
-      createdAt: new Date()
+      createdAt: new Date(),
     }
 
     this.complete(feature)
@@ -344,8 +344,8 @@ export class DrawTool extends BaseTool {
         }, false),
         width: this.style.strokeWidth,
         material: this.createLineMaterial(strokeColor, this.style.lineType),
-        clampToGround: true
-      }
+        clampToGround: true,
+      },
     })
     this.previewEntities.push(previewLine)
 
@@ -359,9 +359,7 @@ export class DrawTool extends BaseTool {
           const totalLength = completedLength + segmentLength
           const segmentText = this.formatLength(segmentLength)
           const totalText = this.formatLength(totalLength)
-          return this.vertices.length > 1
-            ? `当前: ${segmentText}\n总计: ${totalText}`
-            : segmentText
+          return this.vertices.length > 1 ? `当前: ${segmentText}\n总计: ${totalText}` : segmentText
         }, false),
         font: '12px sans-serif',
         fillColor: Cesium.Color.WHITE,
@@ -371,27 +369,31 @@ export class DrawTool extends BaseTool {
         pixelOffset: new Cesium.Cartesian2(15, -15),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.6)')
-      }
+        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.6)'),
+      },
     })
     this.previewEntities.push(lengthLabel)
 
     // 完整线预览(仅在有多个顶点时)
     if (this.vertices.length >= 2) {
-      const staticPositions = this.vertices.map(v =>
+      const staticPositions = this.vertices.map((v) =>
         Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, v.height || 0)
       )
 
-      const completeStrokeColor = Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.3)
+      const completeStrokeColor = Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(
+        0.3
+      )
       const completeLine = this.viewer.entities.add({
         polyline: {
           positions: new Cesium.CallbackProperty(() => {
-            return this.drawCursorPosition ? [...staticPositions, this.drawCursorPosition] : staticPositions
+            return this.drawCursorPosition
+              ? [...staticPositions, this.drawCursorPosition]
+              : staticPositions
           }, false),
           width: this.style.strokeWidth,
           material: this.createLineMaterial(completeStrokeColor, this.style.lineType),
-          clampToGround: true
-        }
+          clampToGround: true,
+        },
       })
       this.previewEntities.push(completeLine)
     }
@@ -433,19 +435,22 @@ export class DrawTool extends BaseTool {
   /**
    * 根据线型创建材质
    */
-  private createLineMaterial(color: Cesium.Color, lineType: LineType): Cesium.Material | Cesium.MaterialProperty {
+  private createLineMaterial(
+    color: Cesium.Color,
+    lineType: LineType
+  ): Cesium.Material | Cesium.MaterialProperty {
     switch (lineType) {
       case 'dashed':
         return new Cesium.PolylineDashMaterialProperty({
           color: color,
           dashLength: 16.0,
-          dashPattern: parseInt('1111000011110000', 2) // 标准虚线
+          dashPattern: parseInt('1111000011110000', 2), // 标准虚线
         })
       case 'dotted':
         return new Cesium.PolylineDashMaterialProperty({
           color: color,
           dashLength: 8.0,
-          dashPattern: parseInt('1100110011001100', 2) // 点线
+          dashPattern: parseInt('1100110011001100', 2), // 点线
         })
       case 'solid':
       default:
@@ -459,7 +464,7 @@ export class DrawTool extends BaseTool {
   private updatePolygonPreview(): void {
     if (this.vertices.length < 2 || !this.drawCursorPosition) return
 
-    const staticPositions = this.vertices.map(v =>
+    const staticPositions = this.vertices.map((v) =>
       Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, v.height || 0)
     )
 
@@ -470,17 +475,21 @@ export class DrawTool extends BaseTool {
           if (!this.drawCursorPosition) return new Cesium.PolygonHierarchy(staticPositions)
           return new Cesium.PolygonHierarchy([...staticPositions, this.drawCursorPosition])
         }, false),
-        material: Cesium.Color.fromCssColorString(this.style.fillColor).withAlpha(this.style.fillOpacity * 0.5),
-        classificationType: Cesium.ClassificationType.TERRAIN
+        material: Cesium.Color.fromCssColorString(this.style.fillColor).withAlpha(
+          this.style.fillOpacity * 0.5
+        ),
+        classificationType: Cesium.ClassificationType.TERRAIN,
       },
       polyline: {
         positions: new Cesium.CallbackProperty(() => {
-          return this.drawCursorPosition ? [...staticPositions, this.drawCursorPosition] : staticPositions
+          return this.drawCursorPosition
+            ? [...staticPositions, this.drawCursorPosition]
+            : staticPositions
         }, false),
         width: this.style.strokeWidth,
         material: Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.7),
-        clampToGround: true
-      }
+        clampToGround: true,
+      },
     })
     this.previewEntities.push(previewPolygon)
 
@@ -517,8 +526,8 @@ export class DrawTool extends BaseTool {
           pixelOffset: new Cesium.Cartesian2(0, 0),
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
           showBackground: true,
-          backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.6)')
-        }
+          backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.6)'),
+        },
       })
       this.previewEntities.push(measurementLabel)
     }
@@ -540,10 +549,10 @@ export class DrawTool extends BaseTool {
           width: this.style.strokeWidth,
           material: new Cesium.PolylineDashMaterialProperty({
             color: Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.5),
-            dashLength: 8.0
+            dashLength: 8.0,
           }),
-          clampToGround: true
-        }
+          clampToGround: true,
+        },
       })
       this.previewEntities.push(closingLine)
     }
@@ -555,7 +564,9 @@ export class DrawTool extends BaseTool {
   private calculateCentroid(positions: Cesium.Cartesian3[]): Cesium.Cartesian3 {
     if (positions.length === 0) return Cesium.Cartesian3.ZERO
 
-    let x = 0, y = 0, z = 0
+    let x = 0,
+      y = 0,
+      z = 0
     for (const pos of positions) {
       x += pos.x
       y += pos.y
@@ -585,7 +596,7 @@ export class DrawTool extends BaseTool {
     if (positions.length < 3) return 0
 
     // 转换为经纬度
-    const coordinates = positions.map(pos => {
+    const coordinates = positions.map((pos) => {
       const carto = Cesium.Cartographic.fromCartesian(pos)
       return { lon: carto.longitude, lat: carto.latitude }
     })
@@ -596,11 +607,12 @@ export class DrawTool extends BaseTool {
 
     for (let i = 0; i < coordinates.length; i++) {
       const j = (i + 1) % coordinates.length
-      area += (coordinates[j].lon - coordinates[i].lon) *
-              (2 + Math.sin(coordinates[i].lat) + Math.sin(coordinates[j].lat))
+      area +=
+        (coordinates[j].lon - coordinates[i].lon) *
+        (2 + Math.sin(coordinates[i].lat) + Math.sin(coordinates[j].lat))
     }
 
-    area = Math.abs(area * earthRadius * earthRadius / 2)
+    area = Math.abs((area * earthRadius * earthRadius) / 2)
     return area
   }
 
@@ -634,23 +646,32 @@ export class DrawTool extends BaseTool {
       position: centerCartesian,
       ellipse: {
         semiMajorAxis: new Cesium.CallbackProperty(() => {
-          return this.drawCursorPosition ? Cesium.Cartesian3.distance(centerCartesian, this.drawCursorPosition) : 0
+          return this.drawCursorPosition
+            ? Cesium.Cartesian3.distance(centerCartesian, this.drawCursorPosition)
+            : 0
         }, false),
         semiMinorAxis: new Cesium.CallbackProperty(() => {
-          return this.drawCursorPosition ? Cesium.Cartesian3.distance(centerCartesian, this.drawCursorPosition) : 0
+          return this.drawCursorPosition
+            ? Cesium.Cartesian3.distance(centerCartesian, this.drawCursorPosition)
+            : 0
         }, false),
-        material: Cesium.Color.fromCssColorString(this.style.fillColor).withAlpha(this.style.fillOpacity * 0.5),
+        material: Cesium.Color.fromCssColorString(this.style.fillColor).withAlpha(
+          this.style.fillOpacity * 0.5
+        ),
         outline: true,
         outlineColor: Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.7),
         outlineWidth: this.style.strokeWidth,
-        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
-      }
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      },
     })
     this.previewEntities.push(previewCircle)
 
     // 动态半径和面积标签
     const radiusLabel = this.viewer.entities.add({
-      position: new Cesium.CallbackProperty(() => this.drawCursorPosition || centerCartesian, false),
+      position: new Cesium.CallbackProperty(
+        () => this.drawCursorPosition || centerCartesian,
+        false
+      ),
       label: {
         text: new Cesium.CallbackProperty(() => {
           if (!this.drawCursorPosition) return ''
@@ -666,8 +687,8 @@ export class DrawTool extends BaseTool {
         pixelOffset: new Cesium.Cartesian2(15, -15),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.6)')
-      }
+        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.6)'),
+      },
     })
     this.previewEntities.push(radiusLabel)
   }
@@ -695,19 +716,22 @@ export class DrawTool extends BaseTool {
 
           return Cesium.Rectangle.fromRadians(west, south, east, north)
         }, false),
-        material: Cesium.Color.fromCssColorString(this.style.fillColor).withAlpha(this.style.fillOpacity * 0.5),
+        material: Cesium.Color.fromCssColorString(this.style.fillColor).withAlpha(
+          this.style.fillOpacity * 0.5
+        ),
         outline: true,
         outlineColor: Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.7),
         outlineWidth: this.style.strokeWidth,
-        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
-      }
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      },
     })
     this.previewEntities.push(previewRectangle)
 
     // 动态尺寸和面积标签
     const dimensionsLabel = this.viewer.entities.add({
       position: new Cesium.CallbackProperty(() => {
-        if (!this.drawCursorPosition) return Cesium.Cartesian3.fromDegrees(corner1.longitude, corner1.latitude)
+        if (!this.drawCursorPosition)
+          return Cesium.Cartesian3.fromDegrees(corner1.longitude, corner1.latitude)
 
         const corner2Carto = Cesium.Cartographic.fromCartesian(this.drawCursorPosition)
         const centerLon = (corner1Carto.longitude + corner2Carto.longitude) / 2
@@ -723,12 +747,28 @@ export class DrawTool extends BaseTool {
           const centerLat = (corner1Carto.latitude + corner2Carto.latitude) / 2
 
           const width = Cesium.Cartesian3.distance(
-            Cesium.Cartesian3.fromRadians(Math.min(corner1Carto.longitude, corner2Carto.longitude), centerLat, 0),
-            Cesium.Cartesian3.fromRadians(Math.max(corner1Carto.longitude, corner2Carto.longitude), centerLat, 0)
+            Cesium.Cartesian3.fromRadians(
+              Math.min(corner1Carto.longitude, corner2Carto.longitude),
+              centerLat,
+              0
+            ),
+            Cesium.Cartesian3.fromRadians(
+              Math.max(corner1Carto.longitude, corner2Carto.longitude),
+              centerLat,
+              0
+            )
           )
           const height = Cesium.Cartesian3.distance(
-            Cesium.Cartesian3.fromRadians(centerLon, Math.min(corner1Carto.latitude, corner2Carto.latitude), 0),
-            Cesium.Cartesian3.fromRadians(centerLon, Math.max(corner1Carto.latitude, corner2Carto.latitude), 0)
+            Cesium.Cartesian3.fromRadians(
+              centerLon,
+              Math.min(corner1Carto.latitude, corner2Carto.latitude),
+              0
+            ),
+            Cesium.Cartesian3.fromRadians(
+              centerLon,
+              Math.max(corner1Carto.latitude, corner2Carto.latitude),
+              0
+            )
           )
 
           const area = width * height
@@ -741,8 +781,8 @@ export class DrawTool extends BaseTool {
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.6)')
-      }
+        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.6)'),
+      },
     })
     this.previewEntities.push(dimensionsLabel)
   }
@@ -751,7 +791,7 @@ export class DrawTool extends BaseTool {
    * 清除预览实体（仅清除预览，不清除顶点标记）
    */
   private clearPreviewEntities(): void {
-    this.previewEntities.forEach(entity => this.viewer.entities.remove(entity))
+    this.previewEntities.forEach((entity) => this.viewer.entities.remove(entity))
     this.previewEntities = []
   }
 
@@ -767,18 +807,18 @@ export class DrawTool extends BaseTool {
       name: '线绘制',
       geometry: {
         type: 'LineString',
-        coordinates: this.vertices.map(v => [v.longitude, v.latitude, v.height || 0]) // GeoJSON array format
+        coordinates: this.vertices.map((v) => [v.longitude, v.latitude, v.height || 0]), // GeoJSON array format
       },
       style: {
         strokeColor: this.style.strokeColor,
         strokeWidth: this.style.strokeWidth,
-        lineType: this.style.lineType
+        lineType: this.style.lineType,
       },
       properties: {
-        length: this.calculateCompletedLineLength()
+        length: this.calculateCompletedLineLength(),
       },
       visible: true,
-      createdAt: new Date()
+      createdAt: new Date(),
     }
 
     this.complete(feature)
@@ -791,7 +831,7 @@ export class DrawTool extends BaseTool {
     if (this.vertices.length < 3) return
 
     // GeoJSON Polygon: array of rings, first ring is exterior
-    const ring = this.vertices.map(v => [v.longitude, v.latitude, v.height || 0])
+    const ring = this.vertices.map((v) => [v.longitude, v.latitude, v.height || 0])
 
     const feature: Feature = {
       id: this.generateId(),
@@ -799,17 +839,17 @@ export class DrawTool extends BaseTool {
       name: '多边形',
       geometry: {
         type: 'Polygon',
-        coordinates: [ring] // GeoJSON requires array of rings
+        coordinates: [ring], // GeoJSON requires array of rings
       },
       style: {
         fillColor: this.style.fillColor,
         fillOpacity: this.style.fillOpacity,
         strokeColor: this.style.strokeColor,
-        strokeWidth: this.style.strokeWidth
+        strokeWidth: this.style.strokeWidth,
       },
       properties: {},
       visible: true,
-      createdAt: new Date()
+      createdAt: new Date(),
     }
 
     this.complete(feature)
@@ -838,20 +878,20 @@ export class DrawTool extends BaseTool {
       name: '圆形',
       geometry: {
         type: 'Point', // Circle is represented as center point
-        coordinates: [center.longitude, center.latitude, center.height || 0]
+        coordinates: [center.longitude, center.latitude, center.height || 0],
       },
       style: {
         fillColor: this.style.fillColor,
         fillOpacity: this.style.fillOpacity,
         strokeColor: this.style.strokeColor,
-        strokeWidth: this.style.strokeWidth
+        strokeWidth: this.style.strokeWidth,
       },
       properties: {
         radius: radius,
-        area: Math.PI * radius * radius
+        area: Math.PI * radius * radius,
       },
       visible: true,
-      createdAt: new Date()
+      createdAt: new Date(),
     }
 
     this.complete(feature)
@@ -878,7 +918,7 @@ export class DrawTool extends BaseTool {
       [east, south, height],
       [east, north, height],
       [west, north, height],
-      [west, south, height] // close the ring
+      [west, south, height], // close the ring
     ]
 
     const feature: Feature = {
@@ -887,22 +927,22 @@ export class DrawTool extends BaseTool {
       name: '矩形',
       geometry: {
         type: 'Polygon',
-        coordinates: [ring]
+        coordinates: [ring],
       },
       style: {
         fillColor: this.style.fillColor,
         fillOpacity: this.style.fillOpacity,
         strokeColor: this.style.strokeColor,
-        strokeWidth: this.style.strokeWidth
+        strokeWidth: this.style.strokeWidth,
       },
       properties: {
         west,
         east,
         south,
-        north
+        north,
       },
       visible: true,
-      createdAt: new Date()
+      createdAt: new Date(),
     }
 
     this.complete(feature)
@@ -919,8 +959,8 @@ export class DrawTool extends BaseTool {
         color: Cesium.Color.fromCssColorString(this.style.pointColor),
         outlineColor: Cesium.Color.WHITE,
         outlineWidth: 2,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     })
     this.markerEntities.push(marker)
   }
@@ -956,10 +996,10 @@ export class DrawTool extends BaseTool {
    * 清除预览实体
    */
   private clearPreview(): void {
-    this.previewEntities.forEach(entity => this.viewer.entities.remove(entity))
+    this.previewEntities.forEach((entity) => this.viewer.entities.remove(entity))
     this.previewEntities = []
 
-    this.markerEntities.forEach(entity => this.viewer.entities.remove(entity))
+    this.markerEntities.forEach((entity) => this.viewer.entities.remove(entity))
     this.markerEntities = []
   }
 
@@ -980,7 +1020,7 @@ export class DrawTool extends BaseTool {
     return {
       longitude: Cesium.Math.toDegrees(cartographic.longitude),
       latitude: Cesium.Math.toDegrees(cartographic.latitude),
-      height: cartographic.height
+      height: cartographic.height,
     }
   }
 

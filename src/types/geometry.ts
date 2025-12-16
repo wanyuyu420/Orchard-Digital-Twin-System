@@ -17,7 +17,7 @@ export enum HeightReference {
   RELATIVE_TO_GROUND = 'RELATIVE_TO_GROUND',
 
   /** 绝对高程模式 - 高度值表示相对 WGS84 椭球的高度 */
-  ABSOLUTE = 'ABSOLUTE'
+  ABSOLUTE = 'ABSOLUTE',
 }
 
 /**
@@ -98,7 +98,7 @@ export function to3D(
     longitude: coord.longitude,
     latitude: coord.latitude,
     height: height,
-    heightReference: heightReference
+    heightReference: heightReference,
   }
 }
 
@@ -110,7 +110,7 @@ export function to3D(
 export function to2D(coord: Coordinate3D): Coordinate2D {
   return {
     longitude: coord.longitude,
-    latitude: coord.latitude
+    latitude: coord.latitude,
   }
 }
 

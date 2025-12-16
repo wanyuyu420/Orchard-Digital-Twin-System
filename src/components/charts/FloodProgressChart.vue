@@ -2,39 +2,39 @@
 /**
  * FloodProgressChart - Area chart showing flood inundation progress over time.
  */
-import { computed } from 'vue';
-import type { EChartsOption } from 'echarts';
-import BaseChart from './BaseChart.vue';
-import { NEON_RED, createGradient, TEXT_SECONDARY } from './theme';
+import { computed } from 'vue'
+import type { EChartsOption } from 'echarts'
+import BaseChart from './BaseChart.vue'
+import { NEON_RED, createGradient, TEXT_SECONDARY } from './theme'
 
 const props = withDefaults(
   defineProps<{
-    progress: number; // 0-100
-    floodArea: number;
-    height?: string;
-    loading?: boolean;
+    progress: number // 0-100
+    floodArea: number
+    height?: string
+    loading?: boolean
   }>(),
   {
     height: '100px',
     loading: false,
   }
-);
+)
 
 // Generate simulated flood curve data
 const chartOptions = computed<EChartsOption>(() => {
-  const hours = 24;
-  const times: string[] = [];
-  const values: number[] = [];
-  const currentHour = Math.floor((props.progress / 100) * hours);
+  const hours = 24
+  const times: string[] = []
+  const values: number[] = []
+  const currentHour = Math.floor((props.progress / 100) * hours)
 
   for (let h = 0; h <= hours; h++) {
-    times.push(`${h}h`);
+    times.push(`${h}h`)
     // Simulate flood curve - rises then falls
-    const peak = 12;
-    const peakValue = props.floodArea || 50;
-    const t = h - peak;
-    const value = peakValue * Math.exp(-t * t / 50);
-    values.push(h <= currentHour ? Math.round(value * 10) / 10 : null as unknown as number);
+    const peak = 12
+    const peakValue = props.floodArea || 50
+    const t = h - peak
+    const value = peakValue * Math.exp((-t * t) / 50)
+    values.push(h <= currentHour ? Math.round(value * 10) / 10 : (null as unknown as number))
   }
 
   return {
@@ -47,10 +47,10 @@ const chartOptions = computed<EChartsOption>(() => {
     tooltip: {
       trigger: 'axis',
       formatter: (params: unknown) => {
-        const p = Array.isArray(params) ? params[0] : params;
-        const item = p as { name: string; value: number };
-        if (item.value === null) return '';
-        return `${item.name}<br/>淹没面积: <b>${item.value}</b> km²`;
+        const p = Array.isArray(params) ? params[0] : params
+        const item = p as { name: string; value: number }
+        if (item.value === null) return ''
+        return `${item.name}<br/>淹没面积: <b>${item.value}</b> km²`
       },
     },
     xAxis: {
@@ -83,8 +83,8 @@ const chartOptions = computed<EChartsOption>(() => {
         animationDuration: 300,
       },
     ],
-  };
-});
+  }
+})
 </script>
 
 <template>

@@ -16,15 +16,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAppStore } from '@/stores/app';
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAppStore } from '@/stores/app'
 
-const router = useRouter();
-const appStore = useAppStore();
+const router = useRouter()
+const appStore = useAppStore()
 
-const currentModule = computed(() => appStore.currentModule);
-const isUiHidden = computed(() => appStore.isUiHidden);
+const currentModule = computed(() => appStore.currentModule)
+const isUiHidden = computed(() => appStore.isUiHidden)
 
 const menuItems = [
   { id: 'dashboard', label: '态势', icon: 'fa-solid fa-earth-americas' },
@@ -33,10 +33,10 @@ const menuItems = [
   { id: 'data', label: '数据', icon: 'fa-solid fa-database' },
   { id: 'device', label: '运维', icon: 'fa-solid fa-microchip' },
   { id: 'ai', label: '工程', icon: 'fa-solid fa-brain' },
-];
+]
 
 function navigateTo(id: string) {
-  router.push({ name: id });
+  router.push({ name: id })
 }
 </script>
 
@@ -49,7 +49,7 @@ function navigateTo(id: string) {
   z-index: $z-layer-6;
   pointer-events: auto;
   transition: transform 0.4s $ease-out;
-  
+
   &.hidden {
     transform: translateX(-50%) translateY(100px);
   }
@@ -95,7 +95,7 @@ function navigateTo(id: string) {
     background: rgba(34, 211, 238, 0.1);
 
     &::after {
-      content: "";
+      content: '';
       position: absolute;
       bottom: 4px;
       width: 4px;

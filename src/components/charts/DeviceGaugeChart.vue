@@ -3,30 +3,30 @@
  * DeviceStatusChart - Gauge chart showing online device percentage.
  * Color zones: green > 80%, yellow 50-80%, red < 50%.
  */
-import { computed } from 'vue';
-import type { EChartsOption } from 'echarts';
-import BaseChart from './BaseChart.vue';
-import { NEON_GREEN, NEON_YELLOW, NEON_RED, TEXT_SECONDARY, TEXT_PRIMARY } from './theme';
+import { computed } from 'vue'
+import type { EChartsOption } from 'echarts'
+import BaseChart from './BaseChart.vue'
+import { NEON_GREEN, NEON_YELLOW, NEON_RED, TEXT_SECONDARY, TEXT_PRIMARY } from './theme'
 
 const props = withDefaults(
   defineProps<{
-    online: number;
-    total: number;
-    height?: string;
-    loading?: boolean;
-    title?: string;
+    online: number
+    total: number
+    height?: string
+    loading?: boolean
+    title?: string
   }>(),
   {
     height: '180px',
     loading: false,
     title: '设备在线率',
   }
-);
+)
 
 const percentage = computed(() => {
-  if (props.total === 0) return 0;
-  return Math.round((props.online / props.total) * 100);
-});
+  if (props.total === 0) return 0
+  return Math.round((props.online / props.total) * 100)
+})
 
 const chartOptions = computed<EChartsOption>(() => ({
   title: {
@@ -106,7 +106,7 @@ const chartOptions = computed<EChartsOption>(() => ({
       ],
     },
   ],
-}));
+}))
 </script>
 
 <template>

@@ -14,10 +14,10 @@
 import * as Cesium from 'cesium'
 
 export interface VolumeResult {
-  volume: number        // 总体积（立方米）
-  area: number          // 底面积（平方米）
-  maxHeight: number     // 最大高程
-  minHeight: number     // 最小高程
+  volume: number // 总体积（立方米）
+  area: number // 底面积（平方米）
+  maxHeight: number // 最大高程
+  minHeight: number // 最小高程
   triangleCount: number // 三角形数量
 }
 
@@ -47,9 +47,7 @@ export function computeAreaOfTriangle(
  * @param positions - 多边形顶点数组
  * @returns 重心的经纬度坐标
  */
-export function computeCentroidOfPolygon(
-  positions: Cesium.Cartesian3[]
-): Cesium.Cartographic {
+export function computeCentroidOfPolygon(positions: Cesium.Cartesian3[]): Cesium.Cartographic {
   const x: number[] = []
   const y: number[] = []
 
@@ -59,10 +57,14 @@ export function computeCentroidOfPolygon(
     y.push(cartographic.latitude)
   }
 
-  let x0 = 0.0, y0 = 0.0, x1 = 0.0, y1 = 0.0
+  let x0 = 0.0,
+    y0 = 0.0,
+    x1 = 0.0,
+    y1 = 0.0
   let signedArea = 0.0
   let a = 0.0
-  let centroidx = 0.0, centroidy = 0.0
+  let centroidx = 0.0,
+    centroidy = 0.0
 
   for (let i = 0; i < positions.length; i++) {
     x0 = x[i]
@@ -121,7 +123,7 @@ export function computeCutVolume(
   const polygonGeometry = Cesium.PolygonGeometry.fromPositions({
     positions: positions,
     vertexFormat: Cesium.PerInstanceColorAppearance.FLAT_VERTEX_FORMAT,
-    granularity: granularity
+    granularity: granularity,
   })
 
   const geom = Cesium.PolygonGeometry.createGeometry(polygonGeometry)
@@ -185,16 +187,17 @@ export function computeCutVolume(
   }
 
   // 计算总底面积（用于验证）
-  const totalArea = triangleCount > 0
-    ? totalCutVolume / ((maxHeight - minHeight) || 1)  // 粗略估算
-    : 0
+  const totalArea =
+    triangleCount > 0
+      ? totalCutVolume / (maxHeight - minHeight || 1) // 粗略估算
+      : 0
 
   return {
     volume: totalCutVolume,
     area: totalArea,
     maxHeight: maxHeight,
     minHeight: minHeight,
-    triangleCount: triangleCount
+    triangleCount: triangleCount,
   }
 }
 

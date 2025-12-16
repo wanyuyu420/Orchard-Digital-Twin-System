@@ -1,272 +1,272 @@
 <template>
-	<div class="bim-layer-status" v-if="isLoading || error">
-		<span v-if="isLoading" class="loading">加载 BIM 模型...</span>
-		<span v-if="error" class="error">{{ error }}</span>
-	</div>
+  <div class="bim-layer-status" v-if="isLoading || error">
+    <span v-if="isLoading" class="loading">加载 BIM 模型...</span>
+    <span v-if="error" class="error">{{ error }}</span>
+  </div>
 </template>
 
 <script setup lang="ts">
 /**
  * BIMLayer - Renders BIM 3D Tiles on Cesium map
- * 
+ *
  * Features:
  * - Load 3D Tiles from backend /tiles/bim endpoint
  * - Show/hide toggle support
  * - FlyTo functionality to navigate to tileset location
- * 
+ *
  * Data Info:
  * - Source: BIM model converted to 3D Tiles
  * - Size: ~1.1GB (project.b3dm 226MB)
  */
-import { ref, watch, onMounted, onUnmounted } from 'vue';
-import { useCesiumStore } from '@/stores/cesium';
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { useCesiumStore } from '@/stores/cesium'
 
-declare const Cesium: any;
+declare const Cesium: any
 
 // Props
 const props = defineProps<{
-	visible?: boolean;
-}>();
+  visible?: boolean
+}>()
 
 // Emits
 const emit = defineEmits<{
-	(e: 'ready'): void;
-	(e: 'error', message: string): void;
-}>();
+  (e: 'ready'): void
+  (e: 'error', message: string): void
+}>()
 
 // Store
-const cesiumStore = useCesiumStore();
+const cesiumStore = useCesiumStore()
 
 // State
-const isLoading = ref(false);
-const error = ref<string | null>(null);
-const tilesetReady = ref(false);
+const isLoading = ref(false)
+const error = ref<string | null>(null)
+const tilesetReady = ref(false)
 
 // Tileset reference
-let tileset: any = null;
+let tileset: any = null
 
 // API endpoint for BIM 3D Tiles
-const TILESET_URL = 'http://localhost:8000/tiles/bim/tileset.json';
+const TILESET_URL = 'http://localhost:8000/tiles/bim/tileset.json'
 
 /**
  * Load the 3D Tileset
  */
 const loadTileset = async () => {
-	const viewer = cesiumStore.viewer;
-	if (!viewer) {
-		console.warn('[BIMLayer] Viewer not ready');
-		return;
-	}
+  const viewer = cesiumStore.viewer
+  if (!viewer) {
+    console.warn('[BIMLayer] Viewer not ready')
+    return
+  }
 
-	if (tileset) {
-		console.log('[BIMLayer] Tileset already loaded');
-		return;
-	}
+  if (tileset) {
+    console.log('[BIMLayer] Tileset already loaded')
+    return
+  }
 
-	isLoading.value = true;
-	cesiumStore.bimLoading = true;
-	error.value = null;
+  isLoading.value = true
+  cesiumStore.bimLoading = true
+  error.value = null
 
-	try {
-		console.log('[BIMLayer] Loading 3D Tiles from:', TILESET_URL);
+  try {
+    console.log('[BIMLayer] Loading 3D Tiles from:', TILESET_URL)
 
-		// Use Cesium3DTileset.fromUrl for async loading
-		// Note: fromUrl returns a ready tileset, no need for readyPromise
-		tileset = await Cesium.Cesium3DTileset.fromUrl(TILESET_URL, {
-			// Performance options
-			maximumScreenSpaceError: 16,
-			maximumMemoryUsage: 512,
-			skipLevelOfDetail: true,
-			baseScreenSpaceError: 1024,
-			skipScreenSpaceErrorFactor: 16,
-			skipLevels: 1,
-		});
+    // Use Cesium3DTileset.fromUrl for async loading
+    // Note: fromUrl returns a ready tileset, no need for readyPromise
+    tileset = await Cesium.Cesium3DTileset.fromUrl(TILESET_URL, {
+      // Performance options
+      maximumScreenSpaceError: 16,
+      maximumMemoryUsage: 512,
+      skipLevelOfDetail: true,
+      baseScreenSpaceError: 1024,
+      skipScreenSpaceErrorFactor: 16,
+      skipLevels: 1,
+    })
 
-		// BIM tileset doesn't have a built-in transform matrix
-		// Apply modelMatrix to position it at the project's default location
-		// Using the same location as the project default view
-		const BIM_POSITION = {
-			lon: 87.57,
-			lat: 43.82,
-			height: 500  // Raised above ground level
-		};
-		const position = Cesium.Cartesian3.fromDegrees(
-			BIM_POSITION.lon,
-			BIM_POSITION.lat,
-			BIM_POSITION.height
-		);
+    // BIM tileset doesn't have a built-in transform matrix
+    // Apply modelMatrix to position it at the project's default location
+    // Using the same location as the project default view
+    const BIM_POSITION = {
+      lon: 87.57,
+      lat: 43.82,
+      height: 500, // Raised above ground level
+    }
+    const position = Cesium.Cartesian3.fromDegrees(
+      BIM_POSITION.lon,
+      BIM_POSITION.lat,
+      BIM_POSITION.height
+    )
 
-		// Create position matrix
-		const positionMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(position);
+    // Create position matrix
+    const positionMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(position)
 
-		// BIM models often use Y-up axis, but Cesium uses Z-up
-		// Apply rotation around X-axis by -90 degrees to fix orientation
-		const rotationAngle = Cesium.Math.toRadians(-90);
-		const rotationMatrix = Cesium.Matrix4.fromRotationTranslation(
-			Cesium.Matrix3.fromRotationX(rotationAngle)
-		);
+    // BIM models often use Y-up axis, but Cesium uses Z-up
+    // Apply rotation around X-axis by -90 degrees to fix orientation
+    const rotationAngle = Cesium.Math.toRadians(-90)
+    const rotationMatrix = Cesium.Matrix4.fromRotationTranslation(
+      Cesium.Matrix3.fromRotationX(rotationAngle)
+    )
 
-		// Combine: position * rotation
-		tileset.modelMatrix = Cesium.Matrix4.multiply(
-			positionMatrix,
-			rotationMatrix,
-			new Cesium.Matrix4()
-		);
-		console.log('[BIMLayer] Applied modelMatrix with -90° X rotation at:', BIM_POSITION);
+    // Combine: position * rotation
+    tileset.modelMatrix = Cesium.Matrix4.multiply(
+      positionMatrix,
+      rotationMatrix,
+      new Cesium.Matrix4()
+    )
+    console.log('[BIMLayer] Applied modelMatrix with -90° X rotation at:', BIM_POSITION)
 
-		// Add to scene
-		viewer.scene.primitives.add(tileset);
+    // Add to scene
+    viewer.scene.primitives.add(tileset)
 
-		tilesetReady.value = true;
-		console.log('[BIMLayer] 3D Tileset loaded successfully');
+    tilesetReady.value = true
+    console.log('[BIMLayer] 3D Tileset loaded successfully')
 
-		// Set initial visibility
-		tileset.show = props.visible !== false;
+    // Set initial visibility
+    tileset.show = props.visible !== false
 
-		// Auto fly to tileset location after loading
-		console.log('[BIMLayer] Auto flying to tileset...');
-		await viewer.flyTo(tileset, {
-			duration: 2,
-		});
+    // Auto fly to tileset location after loading
+    console.log('[BIMLayer] Auto flying to tileset...')
+    await viewer.flyTo(tileset, {
+      duration: 2,
+    })
 
-		emit('ready');
-	} catch (e: any) {
-		console.error('[BIMLayer] Failed to load tileset:', e);
-		error.value = `加载失败: ${e.message || '未知错误'}`;
-		emit('error', error.value);
-	} finally {
-		isLoading.value = false;
-		cesiumStore.bimLoading = false;
-	}
-};
+    emit('ready')
+  } catch (e: any) {
+    console.error('[BIMLayer] Failed to load tileset:', e)
+    error.value = `加载失败: ${e.message || '未知错误'}`
+    emit('error', error.value)
+  } finally {
+    isLoading.value = false
+    cesiumStore.bimLoading = false
+  }
+}
 
 /**
  * Remove tileset from scene
  */
 const removeTileset = () => {
-	if (tileset && cesiumStore.viewer) {
-		try {
-			cesiumStore.viewer.scene.primitives.remove(tileset);
-			tileset.destroy();
-		} catch (e) {
-			console.warn('[BIMLayer] Error removing tileset:', e);
-		}
-		tileset = null;
-		tilesetReady.value = false;
-	}
-};
+  if (tileset && cesiumStore.viewer) {
+    try {
+      cesiumStore.viewer.scene.primitives.remove(tileset)
+      tileset.destroy()
+    } catch (e) {
+      console.warn('[BIMLayer] Error removing tileset:', e)
+    }
+    tileset = null
+    tilesetReady.value = false
+  }
+}
 
 /**
  * Toggle tileset visibility
  */
 const setVisible = (visible: boolean) => {
-	if (tileset) {
-		tileset.show = visible;
-	}
-};
+  if (tileset) {
+    tileset.show = visible
+  }
+}
 
 /**
  * Fly to tileset location
  */
 const flyTo = async (duration = 2) => {
-	if (!tileset || !cesiumStore.viewer) {
-		console.warn('[BIMLayer] Cannot flyTo: tileset or viewer not ready');
-		return;
-	}
+  if (!tileset || !cesiumStore.viewer) {
+    console.warn('[BIMLayer] Cannot flyTo: tileset or viewer not ready')
+    return
+  }
 
-	try {
-		await cesiumStore.viewer.flyTo(tileset, {
-			duration,
-		});
-	} catch (e) {
-		console.error('[BIMLayer] flyTo failed:', e);
-	}
-};
+  try {
+    await cesiumStore.viewer.flyTo(tileset, {
+      duration,
+    })
+  } catch (e) {
+    console.error('[BIMLayer] flyTo failed:', e)
+  }
+}
 
 /**
  * Get tileset info
  */
 const getInfo = () => {
-	if (!tileset || !tilesetReady.value) return null;
+  if (!tileset || !tilesetReady.value) return null
 
-	return {
-		ready: tilesetReady.value,
-		show: tileset.show,
-		asset: tileset.asset,
-		totalMemoryUsageInBytes: tileset.totalMemoryUsageInBytes,
-	};
-};
+  return {
+    ready: tilesetReady.value,
+    show: tileset.show,
+    asset: tileset.asset,
+    totalMemoryUsageInBytes: tileset.totalMemoryUsageInBytes,
+  }
+}
 
 // Watch visibility prop
 watch(
-	() => props.visible,
-	(visible) => {
-		if (visible !== undefined) {
-			setVisible(visible);
-		}
-	}
-);
+  () => props.visible,
+  (visible) => {
+    if (visible !== undefined) {
+      setVisible(visible)
+    }
+  }
+)
 
 // Lifecycle
 onMounted(() => {
-	console.log('[BIMLayer] Component mounted, viewer ready:', !!cesiumStore.viewer);
-	if (cesiumStore.viewer) {
-		loadTileset();
-	} else {
-		console.log('[BIMLayer] Waiting for viewer...');
-		const unwatch = watch(
-			() => cesiumStore.viewer,
-			(viewer) => {
-				if (viewer) {
-					console.log('[BIMLayer] Viewer now ready, loading tileset');
-					loadTileset();
-					unwatch();
-				}
-			}
-		);
-	}
-});
+  console.log('[BIMLayer] Component mounted, viewer ready:', !!cesiumStore.viewer)
+  if (cesiumStore.viewer) {
+    loadTileset()
+  } else {
+    console.log('[BIMLayer] Waiting for viewer...')
+    const unwatch = watch(
+      () => cesiumStore.viewer,
+      (viewer) => {
+        if (viewer) {
+          console.log('[BIMLayer] Viewer now ready, loading tileset')
+          loadTileset()
+          unwatch()
+        }
+      }
+    )
+  }
+})
 
 onUnmounted(() => {
-	removeTileset();
-});
+  removeTileset()
+})
 
 // Expose for parent components
 defineExpose({
-	loadTileset,
-	removeTileset,
-	setVisible,
-	flyTo,
-	getInfo,
-	isLoading,
-	tilesetReady,
-});
+  loadTileset,
+  removeTileset,
+  setVisible,
+  flyTo,
+  getInfo,
+  isLoading,
+  tilesetReady,
+})
 </script>
 
 <style scoped lang="scss">
 .bim-layer-status {
-	position: absolute;
-	top: 120px;
-	left: 50%;
-	transform: translateX(-50%);
-	z-index: 100;
-	padding: 8px 16px;
-	border-radius: 4px;
-	font-size: 14px;
-	pointer-events: none;
+  position: absolute;
+  top: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  pointer-events: none;
 
-	.loading {
-		color: var(--color-primary);
-		background: rgba(0, 0, 0, 0.7);
-		padding: 8px 16px;
-		border-radius: 4px;
-	}
+  .loading {
+    color: var(--color-primary);
+    background: rgba(0, 0, 0, 0.7);
+    padding: 8px 16px;
+    border-radius: 4px;
+  }
 
-	.error {
-		color: var(--color-danger);
-		background: rgba(0, 0, 0, 0.7);
-		padding: 8px 16px;
-		border-radius: 4px;
-	}
+  .error {
+    color: var(--color-danger);
+    background: rgba(0, 0, 0, 0.7);
+    padding: 8px 16px;
+    border-radius: 4px;
+  }
 }
 </style>

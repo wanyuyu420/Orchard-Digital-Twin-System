@@ -5,37 +5,26 @@
     <!-- System Prompt Editor -->
     <div class="editor-section">
       <label class="section-label">System Prompt</label>
-      <textarea 
-        class="prompt-editor"
-        v-model="systemPrompt"
-      ></textarea>
+      <textarea class="prompt-editor" v-model="systemPrompt"></textarea>
     </div>
 
     <!-- Playground -->
     <div class="playground-section glass-sub">
       <div class="section-label">调试预览 (Playground)</div>
-      
+
       <div class="chat-log">
-        <div class="chat-message">
-          <span class="msg-role">User:</span> 现在的防汛响应等级？
-        </div>
+        <div class="chat-message"><span class="msg-role">User:</span> 现在的防汛响应等级？</div>
         <div class="chat-message ai-response">
           <div class="ai-header">
             <span class="msg-role text-neon">AI:</span>
             <span class="citation-tag">[检索命中: 预案 P.12]</span>
           </div>
-          <div class="msg-content">
-            根据最新预案，当前处于防汛 IV 级应急响应状态。
-          </div>
+          <div class="msg-content">根据最新预案，当前处于防汛 IV 级应急响应状态。</div>
         </div>
       </div>
 
       <div class="input-row">
-        <input 
-          type="text" 
-          placeholder="输入测试问题..." 
-          class="chat-input"
-        />
+        <input type="text" placeholder="输入测试问题..." class="chat-input" />
         <button class="send-btn">发送</button>
       </div>
     </div>
@@ -43,13 +32,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref } from 'vue'
 
-const systemPrompt = ref('You are an expert in water conservancy. Use the retrieved context to answer user questions accurately. If unsure, say "Data insufficient".');
+const systemPrompt = ref(
+  'You are an expert in water conservancy. Use the retrieved context to answer user questions accurately. If unsure, say "Data insufficient".'
+)
 </script>
 
 <style scoped lang="scss">
-@use "sass:color";
+@use 'sass:color';
 
 .prompt-container {
   flex: 1;
@@ -87,7 +78,7 @@ const systemPrompt = ref('You are an expert in water conservancy. Use the retrie
   font-size: 12px;
   line-height: 1.5;
   resize: none;
-  
+
   &:focus {
     border-color: $neon-cyan;
   }
@@ -136,7 +127,9 @@ const systemPrompt = ref('You are an expert in water conservancy. Use the retrie
   margin-left: 5px;
 }
 
-.text-neon { color: $neon-cyan; }
+.text-neon {
+  color: $neon-cyan;
+}
 
 .input-row {
   display: flex;
@@ -161,7 +154,7 @@ const systemPrompt = ref('You are an expert in water conservancy. Use the retrie
   border-radius: 4px;
   cursor: pointer;
   font-weight: bold;
-  
+
   &:hover {
     background: color.adjust($neon-cyan, $lightness: 10%);
   }

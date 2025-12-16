@@ -23,17 +23,17 @@
 
 <script setup lang="ts">
 defineProps<{
-  modelValue: boolean;
-  title: string;
-  size?: 'small' | 'medium' | 'large';
-}>();
+  modelValue: boolean
+  title: string
+  size?: 'small' | 'medium' | 'large'
+}>()
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: boolean): void;
-}>();
+  (e: 'update:modelValue', value: boolean): void
+}>()
 
 function close() {
-  emit('update:modelValue', false);
+  emit('update:modelValue', false)
 }
 </script>
 

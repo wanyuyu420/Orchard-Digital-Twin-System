@@ -68,7 +68,9 @@ body {
 
 // Cesium Blur Transition
 .cesium-container {
-  transition: filter 0.5s ease, transform 0.5s ease;
+  transition:
+    filter 0.5s ease,
+    transform 0.5s ease;
   &.is-blurred {
     filter: blur(12px) brightness(0.4);
     transform: scale(1.02);

@@ -21,17 +21,17 @@
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router';
+import { useRouter } from 'vue-router'
 
 defineProps<{
-  title: string;
-  icon?: string;
-}>();
+  title: string
+  icon?: string
+}>()
 
-const router = useRouter();
+const router = useRouter()
 
 function close() {
-  router.push({ name: 'dashboard' });
+  router.push({ name: 'dashboard' })
 }
 </script>
 
@@ -88,7 +88,7 @@ function close() {
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
-  
+
   &:hover {
     background: $alert-red;
     color: #fff;

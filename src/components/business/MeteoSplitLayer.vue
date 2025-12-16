@@ -4,17 +4,10 @@
     <div ref="cesiumContainer" class="cesium-full"></div>
 
     <!-- 分割线（纯视觉） -->
-    <div
-      class="split-line"
-      :style="{ left: splitPos + '%' }"
-    ></div>
+    <div class="split-line" :style="{ left: splitPos + '%' }"></div>
 
     <!-- 分割手柄（只有手柄可拖拽） -->
-    <div
-      class="split-handle"
-      :style="{ left: splitPos + '%' }"
-      @mousedown="startDrag"
-    >
+    <div class="split-handle" :style="{ left: splitPos + '%' }" @mousedown="startDrag">
       <i class="fa-solid fa-left-right"></i>
     </div>
 
@@ -85,7 +78,7 @@ defineExpose({
   resetSplit,
   setRainfallMode,
   toggleRadarLayer,
-  toggleRainfallLayer
+  toggleRainfallLayer,
 })
 
 onMounted(() => {
@@ -104,7 +97,7 @@ onMounted(() => {
     selectionIndicator: false,
     navigationHelpButton: false,
     creditContainer: document.createElement('div'),
-    imageryProvider: false
+    imageryProvider: false,
   })
 
   // 隐藏logo
@@ -118,19 +111,23 @@ onMounted(() => {
     new Cesium.UrlTemplateImageryProvider({
       url: `https://t{s}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=${tdtKey}`,
       subdomains: ['0', '1', '2', '3', '4', '5', '6', '7'],
-      maximumLevel: 18
+      maximumLevel: 18,
     })
   )
   baseLayer.splitDirection = Cesium.SplitDirection.NONE
 
   // 设置初始视角
   viewer.camera.setView({
-    destination: Cesium.Cartesian3.fromDegrees(DEFAULT_CENTER.lon, DEFAULT_CENTER.lat, DEFAULT_HEIGHT),
+    destination: Cesium.Cartesian3.fromDegrees(
+      DEFAULT_CENTER.lon,
+      DEFAULT_CENTER.lat,
+      DEFAULT_HEIGHT
+    ),
     orientation: {
       heading: 0,
       pitch: Cesium.Math.toRadians(-60),
-      roll: 0
-    }
+      roll: 0,
+    },
   })
 
   // 添加雷达回波图层 (左侧)
@@ -198,7 +195,7 @@ function createRadarImageryProvider() {
     url: canvas.toDataURL(),
     rectangle: Cesium.Rectangle.fromDegrees(85.5, 42.5, 89.5, 45.0),
     tileWidth: 512,
-    tileHeight: 512
+    tileHeight: 512,
   })
 }
 
@@ -243,7 +240,7 @@ function createRainfallImageryProvider() {
     url: canvas.toDataURL(),
     rectangle: Cesium.Rectangle.fromDegrees(85.5, 42.5, 89.5, 45.0),
     tileWidth: 512,
-    tileHeight: 512
+    tileHeight: 512,
   })
 }
 
@@ -258,7 +255,10 @@ function addRadarLayer() {
   const provider = createRadarImageryProvider()
   radarImageryLayer = viewer.imageryLayers.addImageryProvider(provider)
   radarImageryLayer.splitDirection = Cesium.SplitDirection.LEFT
-  console.log('[MeteoSplitLayer] Radar layer added, splitDirection:', radarImageryLayer.splitDirection)
+  console.log(
+    '[MeteoSplitLayer] Radar layer added, splitDirection:',
+    radarImageryLayer.splitDirection
+  )
 }
 
 // 添加降雨图层
@@ -272,7 +272,10 @@ function addRainfallLayer() {
   const provider = createRainfallImageryProvider()
   rainfallImageryLayer = viewer.imageryLayers.addImageryProvider(provider)
   rainfallImageryLayer.splitDirection = Cesium.SplitDirection.RIGHT
-  console.log('[MeteoSplitLayer] Rainfall layer added, splitDirection:', rainfallImageryLayer.splitDirection)
+  console.log(
+    '[MeteoSplitLayer] Rainfall layer added, splitDirection:',
+    rainfallImageryLayer.splitDirection
+  )
 }
 
 // 添加降雨粒子效果
@@ -296,7 +299,7 @@ function addParticleSystem() {
     updateCallback: (particle: any, dt: number) => {
       const gravity = new Cesium.Cartesian3(0.0, 0.0, -150.0 * dt)
       particle.velocity = Cesium.Cartesian3.add(particle.velocity, gravity, particle.velocity)
-    }
+    },
   })
 
   viewer.scene.primitives.add(particleSystem)
@@ -394,9 +397,9 @@ function syncFromMain() {
       orientation: {
         heading: camera.heading,
         pitch: camera.pitch,
-        roll: camera.roll
+        roll: camera.roll,
       },
-      duration: 1
+      duration: 1,
     })
   } catch (e) {
     console.warn('Failed to sync from main:', e)
@@ -407,13 +410,17 @@ function syncFromMain() {
 function resetView() {
   if (!viewer) return
   viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(DEFAULT_CENTER.lon, DEFAULT_CENTER.lat, DEFAULT_HEIGHT),
+    destination: Cesium.Cartesian3.fromDegrees(
+      DEFAULT_CENTER.lon,
+      DEFAULT_CENTER.lat,
+      DEFAULT_HEIGHT
+    ),
     orientation: {
       heading: 0,
       pitch: Cesium.Math.toRadians(-60),
-      roll: 0
+      roll: 0,
     },
-    duration: 1
+    duration: 1,
   })
 }
 
@@ -472,13 +479,17 @@ onUnmounted(() => {
   &.left {
     left: 20%;
     border-left: 3px solid #ef4444;
-    i { color: #ef4444; }
+    i {
+      color: #ef4444;
+    }
   }
 
   &.right {
     right: 20%;
     border-right: 3px solid $neon-cyan;
-    i { color: $neon-cyan; }
+    i {
+      color: $neon-cyan;
+    }
   }
 }
 
@@ -491,13 +502,16 @@ onUnmounted(() => {
   margin-left: -1.5px;
   z-index: 50;
   pointer-events: none;
-  background: linear-gradient(180deg,
+  background: linear-gradient(
+    180deg,
     transparent 0%,
     $neon-cyan 10%,
     $neon-cyan 90%,
     transparent 100%
   );
-  box-shadow: 0 0 15px $neon-cyan, 0 0 30px rgba($neon-cyan, 0.5);
+  box-shadow:
+    0 0 15px $neon-cyan,
+    0 0 30px rgba($neon-cyan, 0.5);
 }
 
 // 分割手柄 - 只有手柄本身可拖拽
@@ -514,16 +528,22 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   transform: translateY(-50%);
-  box-shadow: 0 0 20px $neon-cyan, 0 4px 15px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 0 20px $neon-cyan,
+    0 4px 15px rgba(0, 0, 0, 0.3);
   font-size: 16px;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
   cursor: col-resize;
   pointer-events: auto;
   z-index: 51;
 
   &:hover {
     transform: translateY(-50%) scale(1.1);
-    box-shadow: 0 0 30px $neon-cyan, 0 6px 20px rgba(0, 0, 0, 0.4);
+    box-shadow:
+      0 0 30px $neon-cyan,
+      0 6px 20px rgba(0, 0, 0, 0.4);
   }
 }
 
@@ -559,21 +579,11 @@ onUnmounted(() => {
 }
 
 .radar-bar {
-  background: linear-gradient(90deg,
-    #00ff00 0%,
-    #ffff00 33%,
-    #ff8800 66%,
-    #ff0000 100%
-  );
+  background: linear-gradient(90deg, #00ff00 0%, #ffff00 33%, #ff8800 66%, #ff0000 100%);
 }
 
 .rainfall-bar {
-  background: linear-gradient(90deg,
-    #64c8ff 0%,
-    #3296dc 33%,
-    #1464b4 66%,
-    #003278 100%
-  );
+  background: linear-gradient(90deg, #64c8ff 0%, #3296dc 33%, #1464b4 66%, #003278 100%);
 }
 
 .legend-labels {

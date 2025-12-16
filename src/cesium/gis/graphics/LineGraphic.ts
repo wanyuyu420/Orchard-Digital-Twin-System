@@ -61,7 +61,7 @@ export class LineGraphic extends BaseGraphic {
     strokeWidth: 3,
     pointSize: 8,
     pointColor: '#FFFFFF',
-    opacity: 1.0
+    opacity: 1.0,
   }
 
   /**
@@ -113,8 +113,8 @@ export class LineGraphic extends BaseGraphic {
         width: style.strokeWidth,
         material,
         clampToGround: true, // Enable terrain clamping
-        show: this.visible
-      }
+        show: this.visible,
+      },
     })
 
     this.entities.push(this.lineEntity)
@@ -130,13 +130,13 @@ export class LineGraphic extends BaseGraphic {
       case 'dashed':
         return new Cesium.PolylineDashMaterialProperty({
           color,
-          dashLength: 16
+          dashLength: 16,
         })
       case 'dotted':
         return new Cesium.PolylineDashMaterialProperty({
           color,
           dashLength: 4,
-          gapColor: Cesium.Color.TRANSPARENT
+          gapColor: Cesium.Color.TRANSPARENT,
         })
       case 'solid':
       default:
@@ -164,8 +164,8 @@ export class LineGraphic extends BaseGraphic {
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, -10),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        show: this.visible
-      }
+        show: this.visible,
+      },
     })
 
     this.entities.push(this.labelEntity)
@@ -235,12 +235,12 @@ export class LineGraphic extends BaseGraphic {
           color: Cesium.Color.fromCssColorString(style.pointColor),
           outlineColor: Cesium.Color.BLACK,
           outlineWidth: 2,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
         // Store vertex index for editing
         properties: {
-          vertexIndex
-        }
+          vertexIndex,
+        },
       })
       this.vertexMarkers.push(marker)
       this.entities.push(marker)
@@ -265,7 +265,7 @@ export class LineGraphic extends BaseGraphic {
    * 隐藏顶点标记
    */
   private hideVertexMarkers(): void {
-    this.vertexMarkers.forEach(marker => {
+    this.vertexMarkers.forEach((marker) => {
       this.viewer.entities.remove(marker)
       const index = this.entities.indexOf(marker)
       if (index > -1) {
@@ -309,7 +309,7 @@ export class LineGraphic extends BaseGraphic {
       return [
         Cesium.Math.toDegrees(cartographic.longitude),
         Cesium.Math.toDegrees(cartographic.latitude),
-        cartographic.height
+        cartographic.height,
       ]
     })
 
@@ -318,7 +318,7 @@ export class LineGraphic extends BaseGraphic {
       id: this.id,
       geometry: {
         type: 'LineString',
-        coordinates
+        coordinates,
       },
       properties: {
         name: this.name,
@@ -327,8 +327,8 @@ export class LineGraphic extends BaseGraphic {
         lineStyle: this.lineStyle,
         style: this.style,
         createdAt: this.createdAt.toISOString(),
-        ...this.properties
-      }
+        ...this.properties,
+      },
     }
   }
 
@@ -349,7 +349,9 @@ export class LineGraphic extends BaseGraphic {
     if (this.labelEntity && this.showLength) {
       const midIndex = Math.floor(positions.length / 2)
       this.labelEntity.position = new Cesium.ConstantPositionProperty(positions[midIndex])
-      this.labelEntity.label!.text = new Cesium.ConstantProperty(this.formatLength(this.totalLength))
+      this.labelEntity.label!.text = new Cesium.ConstantProperty(
+        this.formatLength(this.totalLength)
+      )
     }
   }
 
@@ -376,12 +378,12 @@ export class LineGraphic extends BaseGraphic {
     const positions = this.getPositions()
     if (!positions) return null
 
-    return positions.map(pos => {
+    return positions.map((pos) => {
       const cartographic = Cesium.Cartographic.fromCartesian(pos)
       return {
         longitude: Cesium.Math.toDegrees(cartographic.longitude),
         latitude: Cesium.Math.toDegrees(cartographic.latitude),
-        height: cartographic.height
+        height: cartographic.height,
       }
     })
   }
@@ -421,7 +423,7 @@ export class LineGraphic extends BaseGraphic {
     if (!positions || positions.length === 0) return
 
     // Apply offset to all vertices
-    const newPositions = positions.map(pos =>
+    const newPositions = positions.map((pos) =>
       Cesium.Cartesian3.add(pos, offset, new Cesium.Cartesian3())
     )
 

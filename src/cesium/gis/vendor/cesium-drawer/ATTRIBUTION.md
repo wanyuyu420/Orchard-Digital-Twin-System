@@ -1,6 +1,7 @@
 # cesium-drawer Attribution
 
 ## Source
+
 - **Repository**: https://github.com/hongfaqiu/cesium-drawer
 - **Commit**: 39959be5d48aa094619a0b8841cf5133ccbcca63
 - **Date**: 2022-04-14
@@ -8,11 +9,13 @@
 - **Copyright**: (c) 2022 練氣士
 
 ## Files Extracted
+
 - `PolygonDrawer.ts` - Core polygon drawing and editing logic
 - `subscriber.ts` - Event subscription system
 - `index.ts` - Entry point
 
 ## Purpose
+
 These files provide battle-tested polygon drawing and vertex editing algorithms for our GIS toolkit. The code has been extracted and will be adapted to our TypeScript + Pinia architecture while maintaining the core drawing logic.
 
 ## License Text

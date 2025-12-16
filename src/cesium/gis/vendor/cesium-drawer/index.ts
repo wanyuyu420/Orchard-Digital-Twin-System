@@ -1,5 +1,3 @@
-import PolygonDrawer from "./PolygonDrawer";
+import PolygonDrawer from './PolygonDrawer'
 
-export {
-  PolygonDrawer,
-};
+export { PolygonDrawer }

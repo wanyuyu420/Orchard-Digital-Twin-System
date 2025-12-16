@@ -12,7 +12,7 @@
       </thead>
       <tbody>
         <tr v-for="i in 10" :key="i">
-          <td class="font-mono">12:00:0{{ i-1 }}</td>
+          <td class="font-mono">12:00:0{{ i - 1 }}</td>
           <td>ST_88{{ i }}2</td>
           <td class="font-mono text-alert">9999.0</td>
           <td>
@@ -43,26 +43,30 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  
+
   th {
     text-align: left;
     padding: 10px;
     color: $text-sub;
     border-bottom: 1px solid $border-subtle;
   }
-  
+
   td {
     padding: 10px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   }
-  
+
   tr:hover {
     background: rgba(255, 255, 255, 0.05);
   }
 }
 
-.text-alert { color: $alert-red; }
-.text-warn { color: $warn-yellow; }
+.text-alert {
+  color: $alert-red;
+}
+.text-warn {
+  color: $warn-yellow;
+}
 
 .rule-tag {
   background: rgba(239, 68, 68, 0.1);

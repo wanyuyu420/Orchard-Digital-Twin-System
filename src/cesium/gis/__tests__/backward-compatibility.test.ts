@@ -44,7 +44,7 @@ describe('Backward Compatibility', () => {
         distance: 100.5,
         startPoint: { longitude: 120.0, latitude: 30.0 },
         endPoint: { longitude: 120.1, latitude: 30.1 },
-        createdAt: new Date()
+        createdAt: new Date(),
       }
 
       measureStore.addMeasurement(measurement)
@@ -63,7 +63,7 @@ describe('Backward Compatibility', () => {
         distance: 100,
         startPoint: { longitude: 120.0, latitude: 30.0 },
         endPoint: { longitude: 120.1, latitude: 30.1 },
-        createdAt: new Date()
+        createdAt: new Date(),
       }
 
       const m2: Measurement = {
@@ -73,9 +73,9 @@ describe('Backward Compatibility', () => {
         vertices: [
           { longitude: 120.0, latitude: 30.0 },
           { longitude: 120.1, latitude: 30.0 },
-          { longitude: 120.1, latitude: 30.1 }
+          { longitude: 120.1, latitude: 30.1 },
         ],
-        createdAt: new Date()
+        createdAt: new Date(),
       }
 
       measureStore.addMeasurement(m1)
@@ -96,7 +96,7 @@ describe('Backward Compatibility', () => {
         distance: 100,
         startPoint: { longitude: 120.0, latitude: 30.0 },
         endPoint: { longitude: 120.1, latitude: 30.1 },
-        createdAt: new Date()
+        createdAt: new Date(),
       }
 
       measureStore.addMeasurement(m1)
@@ -115,7 +115,7 @@ describe('Backward Compatibility', () => {
         distance: 100,
         startPoint: { longitude: 120.0, latitude: 30.0 },
         endPoint: { longitude: 120.1, latitude: 30.1 },
-        createdAt: new Date()
+        createdAt: new Date(),
       }
 
       measureStore.addMeasurement(m1)
@@ -193,7 +193,7 @@ describe('Backward Compatibility', () => {
         distance: 100,
         startPoint: { longitude: 120.0, latitude: 30.0 },
         endPoint: { longitude: 120.1, latitude: 30.1 },
-        createdAt: new Date()
+        createdAt: new Date(),
       }
 
       measureStore.addMeasurement(m1)

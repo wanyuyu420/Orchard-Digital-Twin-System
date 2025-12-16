@@ -3,53 +3,53 @@
  * MonitoringData - Displays real sensor monitoring data from the database.
  * Shows pore pressure, stress, strain, and other metrics from 发电引水洞.
  */
-import { computed, onMounted } from 'vue';
-import { useDashboardStore } from '@/stores/dashboard';
-import GlassPanel from '@/components/common/GlassPanel.vue';
+import { computed, onMounted } from 'vue'
+import { useDashboardStore } from '@/stores/dashboard'
+import GlassPanel from '@/components/common/GlassPanel.vue'
 
-const store = useDashboardStore();
+const store = useDashboardStore()
 
 // Group data by metric type
-const porePressures = computed(() => store.porePressures);
-const stressData = computed(() => store.stressData);
+const porePressures = computed(() => store.porePressures)
+const stressData = computed(() => store.stressData)
 
 // Format sensor name for display (truncate long names)
 function formatSensorName(name: string): string {
   if (name.length > 20) {
     // Extract key identifier (e.g., "Pcg-1", "Rcg-2")
-    const match = name.match(/^([A-Za-z]+\d*-\d+)/);
-    if (match) return match[1];
-    return name.substring(0, 18) + '...';
+    const match = name.match(/^([A-Za-z]+\d*-\d+)/)
+    if (match) return match[1]
+    return name.substring(0, 18) + '...'
   }
-  return name;
+  return name
 }
 
 // Format value with unit
 function formatValue(value: number | null, unit: string | null): string {
-  if (value === null) return '--';
-  return `${value.toFixed(2)} ${unit || ''}`;
+  if (value === null) return '--'
+  return `${value.toFixed(2)} ${unit || ''}`
 }
 
 // Get status class based on value (for visual indication)
 function getStatusClass(value: number | null, metric: string): string {
-  if (value === null) return 'status-unknown';
+  if (value === null) return 'status-unknown'
   // Add thresholds based on metric type
   if (metric === 'pore_pressure') {
-    if (value > 300) return 'status-warning';
-    if (value < 0) return 'status-info';
+    if (value > 300) return 'status-warning'
+    if (value < 0) return 'status-info'
   }
   if (metric === 'stress') {
-    if (Math.abs(value) > 50) return 'status-warning';
+    if (Math.abs(value) > 50) return 'status-warning'
   }
-  return 'status-normal';
+  return 'status-normal'
 }
 
 onMounted(() => {
   // Data is already fetched by Dashboard, but ensure it's loaded
   if (store.porePressures.length === 0) {
-    store.fetchData();
+    store.fetchData()
   }
-});
+})
 </script>
 
 <template>

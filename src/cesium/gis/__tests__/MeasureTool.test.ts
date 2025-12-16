@@ -17,9 +17,15 @@ vi.mock('cesium', () => {
       vi.fn((x: number, y: number, z: number) => ({ x, y, z })),
       {
         distance: vi.fn(() => 500),
-        midpoint: vi.fn((a: any, b: any, result: any) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 })),
-        fromDegrees: vi.fn((lon: number, lat: number, height?: number) => mockCartesian3(lon, lat, height || 0)),
-        clone: vi.fn((c: any) => ({ ...c }))
+        midpoint: vi.fn((a: any, b: any, result: any) => ({
+          x: (a.x + b.x) / 2,
+          y: (a.y + b.y) / 2,
+          z: (a.z + b.z) / 2,
+        })),
+        fromDegrees: vi.fn((lon: number, lat: number, height?: number) =>
+          mockCartesian3(lon, lat, height || 0)
+        ),
+        clone: vi.fn((c: any) => ({ ...c })),
       }
     ),
     Cartesian2: vi.fn((x: number, y: number) => ({ x, y })),
@@ -27,34 +33,34 @@ vi.mock('cesium', () => {
       vi.fn((lon: number, lat: number, height?: number) => ({
         longitude: lon,
         latitude: lat,
-        height: height || 0
+        height: height || 0,
       })),
       {
         fromCartesian: vi.fn((cartesian: any) => ({
           longitude: 2.0,
           latitude: 0.5,
-          height: 0
-        }))
+          height: 0,
+        })),
       }
     ),
     PolygonHierarchy: vi.fn((positions: any) => ({ positions })),
     PolygonGeometry: {
-      computeArea2D: vi.fn(() => 10000)
+      computeArea2D: vi.fn(() => 10000),
     },
     Color: {
       fromCssColorString: vi.fn((color: string) => ({
-        withAlpha: vi.fn((alpha: number) => ({ r: 1, g: 0.8, b: 0.2, a: alpha }))
+        withAlpha: vi.fn((alpha: number) => ({ r: 1, g: 0.8, b: 0.2, a: alpha })),
       })),
       WHITE: { r: 1, g: 1, b: 1, a: 1 },
       CYAN: { r: 0, g: 1, b: 1, a: 1 },
       RED: { r: 1, g: 0, b: 0, a: 1 },
-      YELLOW: { r: 1, g: 1, b: 0, a: 1 }
+      YELLOW: { r: 1, g: 1, b: 0, a: 1 },
     },
     ColorMaterialProperty: vi.fn((color: any) => ({ color })),
     ConstantProperty: vi.fn((value: any) => ({ getValue: () => value })),
     CallbackProperty: vi.fn((callback: any, isConstant: boolean) => ({
       getValue: callback,
-      isConstant
+      isConstant,
     })),
     LabelStyle: { FILL_AND_OUTLINE: 0 },
     HeightReference: { CLAMP_TO_GROUND: 0 },
@@ -62,7 +68,7 @@ vi.mock('cesium', () => {
       LEFT_CLICK: 0,
       RIGHT_CLICK: 1,
       LEFT_DOUBLE_CLICK: 2,
-      MOUSE_MOVE: 3
+      MOUSE_MOVE: 3,
     },
     ScreenSpaceEventHandler: class {
       setInputAction = vi.fn()
@@ -70,11 +76,11 @@ vi.mock('cesium', () => {
       destroy = vi.fn()
     },
     Math: {
-      toDegrees: vi.fn((radians: number) => radians * 180 / Math.PI),
-      toRadians: vi.fn((degrees: number) => degrees * Math.PI / 180)
+      toDegrees: vi.fn((radians: number) => (radians * 180) / Math.PI),
+      toRadians: vi.fn((degrees: number) => (degrees * Math.PI) / 180),
     },
     defined: vi.fn((value: any) => value !== undefined && value !== null),
-    Entity: vi.fn()
+    Entity: vi.fn(),
   }
 })
 
@@ -90,27 +96,27 @@ function createMockViewer() {
         ellipsoid: {
           maximumRadius: 6378137,
           cartesianToCartographic: vi.fn(() => ({ longitude: 2.0, latitude: 0.5, height: 0 })),
-          cartographicToCartesian: vi.fn(() => ({ x: 100, y: 200, z: 300 }))
-        }
+          cartographicToCartesian: vi.fn(() => ({ x: 100, y: 200, z: 300 })),
+        },
       },
-      pick: vi.fn(() => undefined)
+      pick: vi.fn(() => undefined),
     },
     camera: {
       getPickRay: vi.fn(() => ({ origin: {}, direction: {} })),
-      pickEllipsoid: vi.fn(() => ({ x: 100, y: 200, z: 300 }))
+      pickEllipsoid: vi.fn(() => ({ x: 100, y: 200, z: 300 })),
     },
     canvas: {
-      style: { cursor: 'default' }
+      style: { cursor: 'default' },
     },
     entities: {
       add: vi.fn((options) => ({
         id: options.id || 'test-entity',
         ...options,
-        show: true
+        show: true,
       })),
       remove: vi.fn(),
-      removeById: vi.fn()
-    }
+      removeById: vi.fn(),
+    },
   } as any
 }
 
@@ -167,7 +173,7 @@ describe('MeasureTool', () => {
       const onComplete = vi.fn()
       measureTool = new MeasureTool(mockViewer, {
         measureType: 'distance',
-        onComplete
+        onComplete,
       })
       expect(measureTool).toBeDefined()
     })
@@ -176,7 +182,7 @@ describe('MeasureTool', () => {
       const onCancel = vi.fn()
       measureTool = new MeasureTool(mockViewer, {
         measureType: 'distance',
-        onCancel
+        onCancel,
       })
       expect(measureTool).toBeDefined()
     })

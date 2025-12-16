@@ -1,6 +1,10 @@
 <template>
   <transition name="slide-fade">
-    <div v-if="measureStore.measurements.length > 0" class="measure-panel" :class="{ collapsed: isCollapsed }">
+    <div
+      v-if="measureStore.measurements.length > 0"
+      class="measure-panel"
+      :class="{ collapsed: isCollapsed }"
+    >
       <div class="panel-header">
         <div class="header-title">
           <i class="fa-solid fa-ruler-combined"></i>
@@ -19,30 +23,32 @@
 
       <transition name="expand">
         <div v-show="!isCollapsed" class="panel-body">
-        <div
-          v-for="measurement in measureStore.measurements"
-          :key="measurement.id"
-          class="measurement-item"
-        >
-          <div class="item-icon">
-            <i
-              class="fa-solid"
-              :class="measurement.type === 'distance' ? 'fa-ruler' : 'fa-draw-polygon'"
-              :style="{ color: measurement.type === 'distance' ? '#22D3EE' : '#FCD34D' }"
-            ></i>
-          </div>
-          <div class="item-content">
-            <div class="item-type">{{ measurement.type === 'distance' ? '距离测量' : '面积测量' }}</div>
-            <div class="item-value">
-              {{ formatValue(measurement) }}
+          <div
+            v-for="measurement in measureStore.measurements"
+            :key="measurement.id"
+            class="measurement-item"
+          >
+            <div class="item-icon">
+              <i
+                class="fa-solid"
+                :class="measurement.type === 'distance' ? 'fa-ruler' : 'fa-draw-polygon'"
+                :style="{ color: measurement.type === 'distance' ? '#22D3EE' : '#FCD34D' }"
+              ></i>
             </div>
-            <div class="item-time">{{ formatTime(measurement.createdAt) }}</div>
+            <div class="item-content">
+              <div class="item-type">
+                {{ measurement.type === 'distance' ? '距离测量' : '面积测量' }}
+              </div>
+              <div class="item-value">
+                {{ formatValue(measurement) }}
+              </div>
+              <div class="item-time">{{ formatTime(measurement.createdAt) }}</div>
+            </div>
+            <button class="btn-delete" @click="deleteMeasurement(measurement.id)" title="删除">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
           </div>
-          <button class="btn-delete" @click="deleteMeasurement(measurement.id)" title="删除">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
         </div>
-      </div>
       </transition>
     </div>
   </transition>
@@ -98,7 +104,7 @@ function formatTime(date: Date): string {
       month: 'numeric',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     })
   }
 }
@@ -187,7 +193,7 @@ function clearAll() {
   &:hover {
     background: rgba(239, 68, 68, 0.2);
     border-color: rgba(239, 68, 68, 0.5);
-    color: #EF4444;
+    color: #ef4444;
   }
 }
 
@@ -291,7 +297,7 @@ function clearAll() {
 
   &:hover {
     background: rgba(239, 68, 68, 0.2);
-    color: #EF4444;
+    color: #ef4444;
   }
 }
 

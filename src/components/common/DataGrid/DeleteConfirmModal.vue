@@ -17,35 +17,35 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import FormModal from './FormModal.vue';
+import { computed } from 'vue'
+import FormModal from './FormModal.vue'
 
 const props = defineProps<{
-  modelValue: boolean;
-  loading?: boolean;
-}>();
+  modelValue: boolean
+  loading?: boolean
+}>()
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: boolean): void;
-  (e: 'confirm'): void;
-}>();
+  (e: 'update:modelValue', value: boolean): void
+  (e: 'confirm'): void
+}>()
 
 const isOpen = computed({
   get: () => props.modelValue,
   set: (val) => emit('update:modelValue', val),
-});
+})
 
 function cancel() {
-  emit('update:modelValue', false);
+  emit('update:modelValue', false)
 }
 
 function confirm() {
-  emit('confirm');
+  emit('confirm')
 }
 </script>
 
 <style scoped lang="scss">
-@use "sass:color";
+@use 'sass:color';
 
 .delete-confirm {
   text-align: center;

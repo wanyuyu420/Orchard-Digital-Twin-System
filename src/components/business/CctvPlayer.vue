@@ -5,24 +5,20 @@
         <div class="video-placeholder">
           <i class="fa-solid fa-play play-icon"></i>
         </div>
-        <div class="cctv-info">
-          <span class="status-dot">●</span> 溢洪道
-        </div>
+        <div class="cctv-info"><span class="status-dot">●</span> 溢洪道</div>
       </div>
       <div class="cctv-item">
         <div class="video-placeholder">
           <i class="fa-solid fa-play play-icon"></i>
         </div>
-        <div class="cctv-info">
-          <span class="status-dot">●</span> 坝顶
-        </div>
+        <div class="cctv-info"><span class="status-dot">●</span> 坝顶</div>
       </div>
     </div>
   </GlassPanel>
 </template>
 
 <script setup lang="ts">
-import GlassPanel from '@/components/common/GlassPanel.vue';
+import GlassPanel from '@/components/common/GlassPanel.vue'
 </script>
 
 <style scoped lang="scss">
@@ -45,12 +41,12 @@ import GlassPanel from '@/components/common/GlassPanel.vue';
   justify-content: center;
   background: radial-gradient(circle, #333 0%, #000 100%);
   cursor: pointer;
-  
+
   .play-icon {
     color: rgba(255, 255, 255, 0.5);
     transition: all 0.2s;
   }
-  
+
   &:hover .play-icon {
     color: $neon-cyan;
     transform: scale(1.2);

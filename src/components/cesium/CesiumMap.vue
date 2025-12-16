@@ -38,10 +38,14 @@ onMounted(() => {
         viewer.camera.flyTo({
           destination: Cesium.Cartesian3.fromDegrees(view.lon, view.lat, view.height),
           orientation: {
-            direction: new Cesium.Cartesian3(view.direction[0], view.direction[1], view.direction[2]),
-            up: new Cesium.Cartesian3(view.up[0], view.up[1], view.up[2])
+            direction: new Cesium.Cartesian3(
+              view.direction[0],
+              view.direction[1],
+              view.direction[2]
+            ),
+            up: new Cesium.Cartesian3(view.up[0], view.up[1], view.up[2]),
           },
-          duration: view.duration
+          duration: view.duration,
         })
       }, 100)
     }
@@ -59,7 +63,7 @@ defineExpose({
   viewer: () => viewer,
   flyTo: (lon: number, lat: number, height: number, duration?: number) => {
     GController.flyTo(lon, lat, height, duration)
-  }
+  },
 })
 </script>
 

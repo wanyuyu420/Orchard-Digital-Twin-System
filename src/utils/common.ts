@@ -32,11 +32,7 @@ export function getUrlParma(p: string, type = 'string'): unknown {
   }
   if (UrlParma && type === 'array') {
     const parts = UrlParma.split(',')
-    return [
-      parseFloat(parts[0]),
-      parseFloat(parts[1]),
-      parseFloat(parts[2]),
-    ]
+    return [parseFloat(parts[0]), parseFloat(parts[1]), parseFloat(parts[2])]
   }
   return UrlParma
 }

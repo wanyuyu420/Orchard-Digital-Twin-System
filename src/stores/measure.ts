@@ -1,61 +1,61 @@
-import { defineStore } from 'pinia';
-import { ref } from 'vue';
-import type { MeasureToolType, Measurement, DrawingState } from '@/types/measure';
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import type { MeasureToolType, Measurement, DrawingState } from '@/types/measure'
 
 export const useMeasureStore = defineStore('measure', () => {
   // Active tool state
-  const activeTool = ref<MeasureToolType>(null);
+  const activeTool = ref<MeasureToolType>(null)
 
   // Measurement history
-  const measurements = ref<Measurement[]>([]);
+  const measurements = ref<Measurement[]>([])
 
   // Current drawing state
   const currentDrawing = ref<DrawingState>({
     isDrawing: false,
     toolType: null,
-    vertices: []
-  });
+    vertices: [],
+  })
 
   // Actions
   function setTool(tool: MeasureToolType) {
-    activeTool.value = tool;
+    activeTool.value = tool
     if (tool) {
-      resetDrawing();
+      resetDrawing()
     }
   }
 
   function addMeasurement(measurement: Measurement) {
-    measurements.value.push(measurement);
+    measurements.value.push(measurement)
   }
 
   function removeMeasurement(id: string) {
-    const index = measurements.value.findIndex(m => m.id === id);
+    const index = measurements.value.findIndex((m) => m.id === id)
     if (index !== -1) {
-      measurements.value.splice(index, 1);
+      measurements.value.splice(index, 1)
     }
   }
 
   function clearAll() {
-    measurements.value = [];
-    resetDrawing();
+    measurements.value = []
+    resetDrawing()
   }
 
   function resetDrawing() {
     currentDrawing.value = {
       isDrawing: false,
       toolType: activeTool.value,
-      vertices: []
-    };
+      vertices: [],
+    }
   }
 
   function startDrawing() {
-    currentDrawing.value.isDrawing = true;
-    currentDrawing.value.toolType = activeTool.value;
-    currentDrawing.value.vertices = [];
+    currentDrawing.value.isDrawing = true
+    currentDrawing.value.toolType = activeTool.value
+    currentDrawing.value.vertices = []
   }
 
   function cancelDrawing() {
-    resetDrawing();
+    resetDrawing()
   }
 
   return {
@@ -71,6 +71,6 @@ export const useMeasureStore = defineStore('measure', () => {
     clearAll,
     resetDrawing,
     startDrawing,
-    cancelDrawing
-  };
-});
+    cancelDrawing,
+  }
+})

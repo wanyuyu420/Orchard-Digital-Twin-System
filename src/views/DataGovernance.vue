@@ -50,7 +50,15 @@
           <select
             class="filter-select"
             :value="store.filters.is_simulated"
-            @change="(e) => store.setFilter('is_simulated', (e.target as HTMLSelectElement).value === '' ? undefined : (e.target as HTMLSelectElement).value === 'true')"
+            @change="
+              (e) =>
+                store.setFilter(
+                  'is_simulated',
+                  (e.target as HTMLSelectElement).value === ''
+                    ? undefined
+                    : (e.target as HTMLSelectElement).value === 'true'
+                )
+            "
           >
             <option value="">全部数据</option>
             <option value="false">真实数据</option>
@@ -62,7 +70,9 @@
             v-if="store.activeEntity === 'sensors'"
             class="filter-select"
             :value="store.filters.status"
-            @change="(e) => store.setFilter('status', (e.target as HTMLSelectElement).value || undefined)"
+            @change="
+              (e) => store.setFilter('status', (e.target as HTMLSelectElement).value || undefined)
+            "
           >
             <option value="">全部状态</option>
             <option value="active">在线</option>
@@ -82,12 +92,7 @@
           <template v-if="store.activeEntity === 'sensors'">
             <div class="form-group">
               <label>测点编号 *</label>
-              <input
-                type="text"
-                v-model="formData.point_code"
-                required
-                placeholder="如: Pcg-1"
-              />
+              <input type="text" v-model="formData.point_code" required placeholder="如: Pcg-1" />
             </div>
             <div class="form-group">
               <label>断面 *</label>
@@ -120,12 +125,7 @@
           <template v-if="store.activeEntity === 'stations'">
             <div class="form-group">
               <label>站点编码 *</label>
-              <input
-                type="text"
-                v-model="formData.station_code"
-                required
-                placeholder="如: MQG"
-              />
+              <input type="text" v-model="formData.station_code" required placeholder="如: MQG" />
             </div>
             <div class="form-group">
               <label>站点名称 *</label>
@@ -159,12 +159,7 @@
           <template v-if="store.activeEntity === 'facilities'">
             <div class="form-group">
               <label>设施编码 *</label>
-              <input
-                type="text"
-                v-model="formData.code"
-                required
-                placeholder="如: F001"
-              />
+              <input type="text" v-model="formData.code" required placeholder="如: F001" />
             </div>
             <div class="form-group">
               <label>设施名称 *</label>
@@ -177,11 +172,7 @@
             </div>
             <div class="form-group">
               <label>设施类型</label>
-              <input
-                type="text"
-                v-model="formData.facility_type"
-                placeholder="如: 水文站、大坝"
-              />
+              <input type="text" v-model="formData.facility_type" placeholder="如: 水文站、大坝" />
             </div>
             <div class="form-group">
               <label>位置描述</label>
@@ -233,11 +224,7 @@
 
         <template #footer>
           <button class="btn-cancel" @click="store.closeFormModal">取消</button>
-          <button
-            class="btn-submit"
-            @click="handleSubmit"
-            :disabled="store.isSubmitting"
-          >
+          <button class="btn-submit" @click="handleSubmit" :disabled="store.isSubmitting">
             <i v-if="store.isSubmitting" class="fa-solid fa-spinner fa-spin"></i>
             {{ store.editingItem ? '保存修改' : '确认新增' }}
           </button>
@@ -255,13 +242,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, reactive } from 'vue';
-import ModalBox from '@/components/common/ModalBox.vue';
-import { DataGrid, FormModal, DeleteConfirmModal } from '@/components/common/DataGrid';
-import { useDataManagementStore, type EntityType } from '@/stores/dataManagement';
-import * as adminApi from '@/api/admin';
+import { ref, computed, onMounted, watch, reactive } from 'vue'
+import ModalBox from '@/components/common/ModalBox.vue'
+import { DataGrid, FormModal, DeleteConfirmModal } from '@/components/common/DataGrid'
+import { useDataManagementStore, type EntityType } from '@/stores/dataManagement'
+import * as adminApi from '@/api/admin'
 
-const store = useDataManagementStore();
+const store = useDataManagementStore()
 
 const tabs: { key: EntityType; label: string; icon: string }[] = [
   { key: 'sensors', label: '传感器', icon: 'fa-solid fa-microchip' },
@@ -269,7 +256,7 @@ const tabs: { key: EntityType; label: string; icon: string }[] = [
   { key: 'stations', label: '水文站', icon: 'fa-solid fa-water' },
   { key: 'facilities', label: '设施', icon: 'fa-solid fa-building' },
   { key: 'sections', label: '断面', icon: 'fa-solid fa-layer-group' },
-];
+]
 
 // Column definitions per entity
 const sensorColumns = [
@@ -279,7 +266,7 @@ const sensorColumns = [
   { key: 'section_name', label: '断面' },
   { key: 'status', label: '状态', type: 'status' as const },
   { key: 'is_simulated', label: '数据来源', type: 'boolean' as const },
-];
+]
 
 const readingColumns = [
   { key: 'id', label: 'ID', sortable: true, width: '60px' },
@@ -290,7 +277,7 @@ const readingColumns = [
   { key: 'reading_time', label: '时间', sortable: true, type: 'datetime' as const },
   { key: 'quality_flag', label: '质量' },
   { key: 'is_simulated', label: '来源', type: 'boolean' as const },
-];
+]
 
 const stationColumns = [
   { key: 'id', label: 'ID', sortable: true, width: '60px' },
@@ -300,7 +287,7 @@ const stationColumns = [
   { key: 'basin_name', label: '流域' },
   { key: 'facility_name', label: '所属设施' },
   { key: 'is_simulated', label: '来源', type: 'boolean' as const },
-];
+]
 
 const facilityColumns = [
   { key: 'id', label: 'ID', sortable: true, width: '60px' },
@@ -309,7 +296,7 @@ const facilityColumns = [
   { key: 'facility_type', label: '类型' },
   { key: 'section_count', label: '断面数', sortable: true },
   { key: 'is_simulated', label: '来源', type: 'boolean' as const },
-];
+]
 
 const sectionColumns = [
   { key: 'id', label: 'ID', sortable: true, width: '60px' },
@@ -320,40 +307,40 @@ const sectionColumns = [
   { key: 'chainage', label: '桩号' },
   { key: 'sensor_count', label: '传感器数' },
   { key: 'is_simulated', label: '来源', type: 'boolean' as const },
-];
+]
 
 const currentColumns = computed(() => {
   switch (store.activeEntity) {
     case 'sensors':
-      return sensorColumns;
+      return sensorColumns
     case 'readings':
-      return readingColumns;
+      return readingColumns
     case 'stations':
-      return stationColumns;
+      return stationColumns
     case 'facilities':
-      return facilityColumns;
+      return facilityColumns
     case 'sections':
-      return sectionColumns;
+      return sectionColumns
     default:
-      return [];
+      return []
   }
-});
+})
 
 // Whether create is supported for current entity
-const canCreate = computed(() => store.activeEntity !== 'readings');
+const canCreate = computed(() => store.activeEntity !== 'readings')
 
 // Form data
-const formData = reactive<Record<string, any>>({});
+const formData = reactive<Record<string, any>>({})
 
 // Sections for sensor form
-const sections = ref<adminApi.SectionAdmin[]>([]);
+const sections = ref<adminApi.SectionAdmin[]>([])
 
 async function loadSections() {
   try {
-    const res = await adminApi.fetchSections({ page_size: 100 });
-    sections.value = res.items;
+    const res = await adminApi.fetchSections({ page_size: 100 })
+    sections.value = res.items
   } catch (e) {
-    console.error('Failed to load sections:', e);
+    console.error('Failed to load sections:', e)
   }
 }
 
@@ -363,28 +350,28 @@ watch(
   (open) => {
     if (open) {
       if (store.editingItem) {
-        Object.assign(formData, store.editingItem);
+        Object.assign(formData, store.editingItem)
       } else {
         // Reset form for new item
-        Object.keys(formData).forEach((k) => delete formData[k]);
-        formData.is_simulated = false;
-        formData.status = 'active';
+        Object.keys(formData).forEach((k) => delete formData[k])
+        formData.is_simulated = false
+        formData.status = 'active'
       }
     }
   }
-);
+)
 
 async function handleSubmit() {
-  await store.saveItem({ ...formData });
+  await store.saveItem({ ...formData })
 }
 
 onMounted(async () => {
-  await Promise.all([store.fetchData(), store.fetchLookups(), loadSections()]);
-});
+  await Promise.all([store.fetchData(), store.fetchLookups(), loadSections()])
+})
 </script>
 
 <style scoped lang="scss">
-@use "sass:color";
+@use 'sass:color';
 
 .data-management {
   display: flex;

@@ -11,15 +11,15 @@ const mockViewer = {
     add: vi.fn((options) => ({
       id: options.id,
       position: {
-        getValue: vi.fn(() => mockCartesian3)
+        getValue: vi.fn(() => mockCartesian3),
       },
       point: options.point,
       billboard: options.billboard,
       label: options.label,
-      show: options.show
+      show: options.show,
     })),
-    remove: vi.fn()
-  }
+    remove: vi.fn(),
+  },
 } as any
 
 const mockCartesian3 = {
@@ -28,44 +28,44 @@ const mockCartesian3 = {
   z: 300,
   clone: vi.fn(),
   equals: vi.fn(),
-  equalsEpsilon: vi.fn()
+  equalsEpsilon: vi.fn(),
 }
 
 // Mock Cesium static methods
 const mockCesium = {
   Color: {
     fromCssColorString: vi.fn(() => ({
-      withAlpha: vi.fn((alpha) => ({ alpha }))
+      withAlpha: vi.fn((alpha) => ({ alpha })),
     })),
     WHITE: { r: 1, g: 1, b: 1, a: 1 },
-    BLACK: { r: 0, g: 0, b: 0, a: 1 }
+    BLACK: { r: 0, g: 0, b: 0, a: 1 },
   },
   VerticalOrigin: {
     BOTTOM: 1,
-    CENTER: 0
+    CENTER: 0,
   },
   HorizontalOrigin: {
-    CENTER: 0
+    CENTER: 0,
   },
   LabelStyle: {
-    FILL_AND_OUTLINE: 2
+    FILL_AND_OUTLINE: 2,
   },
   Cartesian2: vi.fn((x, y) => ({ x, y })),
   ConstantProperty: vi.fn((value) => value),
   ConstantPositionProperty: vi.fn((value) => value),
   JulianDate: {
-    now: vi.fn(() => ({}))
+    now: vi.fn(() => ({})),
   },
   Cartographic: {
     fromCartesian: vi.fn(() => ({
       longitude: 1.9949,
       latitude: 0.5323,
-      height: 100
-    }))
+      height: 100,
+    })),
   },
   Math: {
-    toDegrees: vi.fn((rad) => rad * 57.2958)
-  }
+    toDegrees: vi.fn((rad) => rad * 57.2958),
+  },
 }
 
 // 注入 mock
@@ -78,7 +78,7 @@ describe('PointGraphic', () => {
 
   it('应该创建 PointGraphic 实例', () => {
     const point = new PointGraphic(mockViewer, {
-      name: '测试点'
+      name: '测试点',
     })
 
     expect(point).toBeDefined()
@@ -95,38 +95,38 @@ describe('PointGraphic', () => {
       expect.objectContaining({
         position: mockCartesian3,
         point: expect.objectContaining({
-          pixelSize: expect.any(Number)
-        })
+          pixelSize: expect.any(Number),
+        }),
       })
     )
   })
 
   it('应该创建带标签的点', () => {
     const point = new PointGraphic(mockViewer, {
-      label: '水位站A'
+      label: '水位站A',
     })
     point.create([mockCartesian3])
 
     expect(mockViewer.entities.add).toHaveBeenCalledWith(
       expect.objectContaining({
         label: expect.objectContaining({
-          text: '水位站A'
-        })
+          text: '水位站A',
+        }),
       })
     )
   })
 
   it('应该创建带图标的点（billboard）', () => {
     const point = new PointGraphic(mockViewer, {
-      icon: 'marker.png'
+      icon: 'marker.png',
     })
     point.create([mockCartesian3])
 
     expect(mockViewer.entities.add).toHaveBeenCalledWith(
       expect.objectContaining({
         billboard: expect.objectContaining({
-          image: 'marker.png'
-        })
+          image: 'marker.png',
+        }),
       })
     )
   })
@@ -134,7 +134,7 @@ describe('PointGraphic', () => {
   it('应该正确导出 GeoJSON', () => {
     const point = new PointGraphic(mockViewer, {
       name: 'TestPoint',
-      label: 'Label'
+      label: 'Label',
     })
     point.create([mockCartesian3])
 
@@ -147,13 +147,13 @@ describe('PointGraphic', () => {
         coordinates: expect.arrayContaining([
           expect.any(Number),
           expect.any(Number),
-          expect.any(Number)
-        ])
+          expect.any(Number),
+        ]),
       },
       properties: expect.objectContaining({
         name: 'TestPoint',
-        label: 'Label'
-      })
+        label: 'Label',
+      }),
     })
   })
 

@@ -13,6 +13,8 @@
 import * as Cesium from 'cesium'
 import { BaseTool, type BaseToolOptions, type ToolType } from '../core/BaseTool'
 import type { Coordinate } from '@/types/geometry'
+import { TOOL_COLORS, POINT_STYLES, createGlowLineMaterial } from '../utils/toolStyles'
+import { useGISStore } from '@/stores/gis'
 
 /**
  * 高度模式
@@ -123,10 +125,10 @@ export class Measure3DTool extends BaseTool {
 
   /** 默认样式 */
   private static readonly DEFAULT_STYLE = {
-    lineColor: '#00FFFF',
-    lineWidth: 3,
-    pointColor: '#FFFF00',
-    labelColor: '#FFFFFF'
+    lineColor: TOOL_COLORS.measure3d.fill,
+    lineWidth: 4,
+    pointColor: POINT_STYLES.vertex.color,
+    labelColor: TOOL_COLORS.common.white,
   }
 
   /** 测量点 */
@@ -269,7 +271,7 @@ export class Measure3DTool extends BaseTool {
    */
   private updateHeightModeFromKeys(): void {
     let newMode: HeightMode = 'terrain'
-    
+
     if (this.shiftPressed) {
       newMode = 'terrain'
     } else if (this.ctrlPressed) {
@@ -326,7 +328,7 @@ export class Measure3DTool extends BaseTool {
       coordinate: {
         longitude: Cesium.Math.toDegrees(cartographic.longitude),
         latitude: Cesium.Math.toDegrees(cartographic.latitude),
-        height: elevation
+        height: elevation,
       },
       position: Cesium.Cartesian3.fromRadians(
         cartographic.longitude,
@@ -334,7 +336,7 @@ export class Measure3DTool extends BaseTool {
         elevation
       ),
       elevation,
-      heightMode: this.heightMode
+      heightMode: this.heightMode,
     }
 
     this.points.push(point)
@@ -404,8 +406,8 @@ export class Measure3DTool extends BaseTool {
       polyline: {
         positions: [startPos, endPos],
         width: this.style.lineWidth,
-        material: Cesium.Color.fromCssColorString(this.style.lineColor)
-      }
+        material: createGlowLineMaterial(this.style.lineColor, 0.3),
+      },
     })
     this.previewEntities.push(mainLine)
 
@@ -426,10 +428,10 @@ export class Measure3DTool extends BaseTool {
         width: 2,
         material: new Cesium.PolylineDashMaterialProperty({
           color: Cesium.Color.GREEN.withAlpha(0.7),
-          dashLength: 8
+          dashLength: 8,
         }),
-        clampToGround: true
-      }
+        clampToGround: true,
+      },
     })
     this.previewEntities.push(horizontalLine)
 
@@ -440,9 +442,9 @@ export class Measure3DTool extends BaseTool {
         width: 2,
         material: new Cesium.PolylineDashMaterialProperty({
           color: Cesium.Color.RED.withAlpha(0.7),
-          dashLength: 8
-        })
-      }
+          dashLength: 8,
+        }),
+      },
     })
     this.previewEntities.push(verticalLine)
 
@@ -460,7 +462,7 @@ export class Measure3DTool extends BaseTool {
           `┌ 模式: ${this.getHeightModeLabel()}`,
           `├ 斜距: ${this.formatDistance(slopeDistance)}`,
           `├ 水平: ${this.formatDistance(horizontalDistance)}`,
-          `└ 垂直: ${this.formatDistance(verticalDistance)}`
+          `└ 垂直: ${this.formatDistance(verticalDistance)}`,
         ].join('\n'),
         font: '13px monospace',
         fillColor: Cesium.Color.WHITE,
@@ -470,8 +472,8 @@ export class Measure3DTool extends BaseTool {
         pixelOffset: new Cesium.Cartesian2(20, -40),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.8)')
-      }
+        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.8)'),
+      },
     })
     this.previewEntities.push(infoLabel)
   }
@@ -489,7 +491,7 @@ export class Measure3DTool extends BaseTool {
 
     // 计算各种距离
     const slopeDistance = Cesium.Cartesian3.distance(startPoint.position, endPoint.position)
-    
+
     const startGround = Cesium.Cartesian3.fromDegrees(
       startPoint.coordinate.longitude,
       startPoint.coordinate.latitude,
@@ -518,7 +520,7 @@ export class Measure3DTool extends BaseTool {
       elevationDifference,
       slopeAngle,
       slopePercent: isFinite(slopePercent) ? slopePercent : 0,
-      createdAt: new Date()
+      createdAt: new Date(),
     }
 
     this.lastResult = result
@@ -542,8 +544,8 @@ export class Measure3DTool extends BaseTool {
       polyline: {
         positions: [result.startPoint.position, result.endPoint.position],
         width: this.style.lineWidth + 1,
-        material: Cesium.Color.fromCssColorString(this.style.lineColor)
-      }
+        material: Cesium.Color.fromCssColorString(this.style.lineColor),
+      },
     })
     this.resultEntities.push(mainLine)
 
@@ -555,7 +557,7 @@ export class Measure3DTool extends BaseTool {
         color: Cesium.Color.GREEN,
         outlineColor: Cesium.Color.WHITE,
         outlineWidth: 2,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
         text: `起点 (${result.startPoint.elevation.toFixed(1)}m)`,
@@ -565,8 +567,8 @@ export class Measure3DTool extends BaseTool {
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, -25),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     })
     this.resultEntities.push(startMarker)
 
@@ -578,7 +580,7 @@ export class Measure3DTool extends BaseTool {
         color: Cesium.Color.RED,
         outlineColor: Cesium.Color.WHITE,
         outlineWidth: 2,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
         text: `终点 (${result.endPoint.elevation.toFixed(1)}m)`,
@@ -588,49 +590,24 @@ export class Measure3DTool extends BaseTool {
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, -25),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     })
     this.resultEntities.push(endMarker)
 
-    // 中点结果标签
+    // 添加分析结果到store
+    const gisStore = useGISStore()
     const midPoint = Cesium.Cartesian3.midpoint(
       result.startPoint.position,
       result.endPoint.position,
       new Cesium.Cartesian3()
     )
-    const resultLabel = this.viewer.entities.add({
+    gisStore.addAnalysisResult({
+      type: 'measure3d',
+      name: `3D测量 #${gisStore.analysisResults.length + 1}`,
+      data: result,
       position: midPoint,
-      label: {
-        text: this.formatResultText(result),
-        font: '14px sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.85)'),
-        backgroundPadding: new Cesium.Cartesian2(10, 8),
-        pixelOffset: new Cesium.Cartesian2(0, -60)
-      }
     })
-    this.resultEntities.push(resultLabel)
-  }
-
-  /**
-   * 格式化结果文本
-   */
-  private formatResultText(result: Measure3DResult): string {
-    const arrow = result.elevationDifference >= 0 ? '↑' : '↓'
-    return [
-      `📐 3D 测量结果`,
-      `━━━━━━━━━━━━━━`,
-      `斜距: ${this.formatDistance(result.slopeDistance)}`,
-      `水平: ${this.formatDistance(result.horizontalDistance)}`,
-      `垂直: ${this.formatDistance(result.verticalDistance)} ${arrow}`,
-      `坡度: ${result.slopeAngle.toFixed(1)}° (${result.slopePercent.toFixed(1)}%)`
-    ].join('\n')
   }
 
   /**
@@ -638,9 +615,12 @@ export class Measure3DTool extends BaseTool {
    */
   private getHeightModeLabel(): string {
     switch (this.heightMode) {
-      case 'terrain': return '地形'
-      case 'custom': return `自定义 (${this.customHeight}m)`
-      case 'relative': return '相对'
+      case 'terrain':
+        return '地形'
+      case 'custom':
+        return `自定义 (${this.customHeight}m)`
+      case 'relative':
+        return '相对'
     }
   }
 
@@ -672,7 +652,7 @@ export class Measure3DTool extends BaseTool {
         color: Cesium.Color.fromCssColorString(this.style.pointColor),
         outlineColor: Cesium.Color.WHITE,
         outlineWidth: 2,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
         text: label,
@@ -682,8 +662,8 @@ export class Measure3DTool extends BaseTool {
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(15, 0),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     })
     this.markerEntities.push(marker)
   }
@@ -704,7 +684,7 @@ export class Measure3DTool extends BaseTool {
     this.points = []
     this.referenceHeight = null
     this.cursorPosition = null
-    this.markerEntities.forEach(e => this.viewer.entities.remove(e))
+    this.markerEntities.forEach((e) => this.viewer.entities.remove(e))
     this.markerEntities = []
   }
 
@@ -712,7 +692,7 @@ export class Measure3DTool extends BaseTool {
    * 清除预览实体
    */
   private clearPreviewEntities(): void {
-    this.previewEntities.forEach(e => this.viewer.entities.remove(e))
+    this.previewEntities.forEach((e) => this.viewer.entities.remove(e))
     this.previewEntities = []
   }
 
@@ -721,7 +701,7 @@ export class Measure3DTool extends BaseTool {
    */
   private clearPreview(): void {
     this.clearPreviewEntities()
-    this.markerEntities.forEach(e => this.viewer.entities.remove(e))
+    this.markerEntities.forEach((e) => this.viewer.entities.remove(e))
     this.markerEntities = []
   }
 
@@ -729,7 +709,7 @@ export class Measure3DTool extends BaseTool {
    * 清除结果
    */
   public clearResult(): void {
-    this.resultEntities.forEach(e => this.viewer.entities.remove(e))
+    this.resultEntities.forEach((e) => this.viewer.entities.remove(e))
     this.resultEntities = []
     this.lastResult = null
   }

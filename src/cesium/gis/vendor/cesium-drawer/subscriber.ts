@@ -7,13 +7,7 @@
  * @Github: https://github.com/SkyBlueFeet
  */
 // @ts-nocheck
-import {
-  Viewer,
-  ScreenSpaceEventType,
-  ScreenSpaceEventHandler,
-  Entity,
-  Cartesian2
-} from 'cesium'
+import { Viewer, ScreenSpaceEventType, ScreenSpaceEventHandler, Entity, Cartesian2 } from 'cesium'
 
 export interface EventArgs {
   position?: Cartesian2
@@ -21,10 +15,7 @@ export interface EventArgs {
   startPosition?: Cartesian2
   [name: string]: any
 }
-export type ListenCallback<T extends Entity> = (
-  movement: EventArgs,
-  substance: T
-) => void
+export type ListenCallback<T extends Entity> = (movement: EventArgs, substance: T) => void
 
 export type ExternalListenCallback = (movement: EventArgs) => void
 
@@ -49,21 +40,16 @@ export type EventType =
 
 type EventCollection = Record<EventType, Map<string, ListenCallback<Entity>>>
 
-type ExternalEventCollection = Record<
-  EventType,
-  Map<string, ListenCallback<Entity>>
->
+type ExternalEventCollection = Record<EventType, Map<string, ListenCallback<Entity>>>
 
 function uniqueId(): string {
-  let _val = "";
+  let _val = ''
 
   do {
-    _val = Math.random()
-      .toString(36)
-      .slice(-8);
-  } while (_val.length < 8);
+    _val = Math.random().toString(36).slice(-8)
+  } while (_val.length < 8)
 
-  return _val;
+  return _val
 }
 
 export default class Subscriber {
@@ -90,7 +76,7 @@ export default class Subscriber {
     'WHEEL',
     'PINCH_START',
     'PINCH_MOVE',
-    'PINCH_END'
+    'PINCH_END',
   ]
 
   /**
@@ -110,7 +96,7 @@ export default class Subscriber {
   }
 
   private _initListener(): void {
-    this._eventTypeList.forEach(type => {
+    this._eventTypeList.forEach((type) => {
       this._eventCollection[type] = new Map()
       this._externalEventCollection[type] = new Map()
     })
@@ -133,7 +119,7 @@ export default class Subscriber {
       if (this._isDestroy) return
 
       if (movement.position || movement.endPosition) {
-        let entity: Entity;
+        let entity: Entity
         if (eventType === 'MOUSE_MOVE') {
           entity = this._viewer.scene.pick(movement.endPosition)?.id
         } else {
@@ -241,14 +227,10 @@ export default class Subscriber {
   }
 
   removeNative(viewer: Viewer, eventType: EventType): void {
-    viewer.screenSpaceEventHandler.removeInputAction(
-      this.convertCesiumEventType(eventType)
-    )
+    viewer.screenSpaceEventHandler.removeInputAction(this.convertCesiumEventType(eventType))
   }
 
-  private convertCesiumEventType(
-    subscriberEventType: EventType
-  ): ScreenSpaceEventType {
+  private convertCesiumEventType(subscriberEventType: EventType): ScreenSpaceEventType {
     return ScreenSpaceEventType[subscriberEventType]
   }
 

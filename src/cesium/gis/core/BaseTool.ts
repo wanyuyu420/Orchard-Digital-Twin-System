@@ -22,10 +22,10 @@ export type ToolType =
   | 'measure-distance'
   | 'measure-area'
   | 'measure-3d'
-  | 'volume'           // 方量分析
-  | 'flood'            // 淹没分析
-  | 'profile'          // 剖面分析
-  | 'measure3d'        // 3D测量
+  | 'volume' // 方量分析
+  | 'flood' // 淹没分析
+  | 'profile' // 剖面分析
+  | 'measure3d' // 3D测量
   | 'select'
   | 'modify'
   | 'custom'
@@ -100,7 +100,7 @@ export abstract class BaseTool {
     this.options = {
       snapEnabled: false,
       showTips: true,
-      ...options
+      ...options,
     }
     this.toolType = options.type || 'custom'
     this.handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas)

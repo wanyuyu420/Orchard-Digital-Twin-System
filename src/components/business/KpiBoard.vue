@@ -3,9 +3,7 @@
     <div class="kpi-grid">
       <div class="kpi-card">
         <div class="label">安全运行</div>
-        <div class="value font-mono">
-          2,140 <span class="unit">天</span>
-        </div>
+        <div class="value font-mono">2,140 <span class="unit">天</span></div>
       </div>
       <div class="kpi-card">
         <div class="label">当前蓄水</div>
@@ -29,40 +27,38 @@
 
     <!-- Rainfall Sparkline -->
     <div class="sparkline-section" v-if="rainfallSparklineData.length > 0">
-      <div class="sparkline-label">
-        <i class="fa-solid fa-cloud-rain"></i> 近期降雨趋势
-      </div>
+      <div class="sparkline-label"><i class="fa-solid fa-cloud-rain"></i> 近期降雨趋势</div>
       <SparklineChart :data="rainfallSparklineData" height="32px" />
     </div>
   </GlassPanel>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
-import { useDashboardStore } from '@/stores/dashboard';
-import { useRealtimeStore } from '@/stores/realtime';
-import GlassPanel from '@/components/common/GlassPanel.vue';
-import { SparklineChart } from '@/components/charts';
+import { computed, onMounted } from 'vue'
+import { useDashboardStore } from '@/stores/dashboard'
+import { useRealtimeStore } from '@/stores/realtime'
+import GlassPanel from '@/components/common/GlassPanel.vue'
+import { SparklineChart } from '@/components/charts'
 
-const store = useDashboardStore();
-const realtimeStore = useRealtimeStore();
+const store = useDashboardStore()
+const realtimeStore = useRealtimeStore()
 
 onMounted(() => {
-  realtimeStore.connect();
-});
+  realtimeStore.connect()
+})
 
 const alertClass = computed(() => {
-  if (store.todayAlerts === 0) return 'text-success';
-  if (store.todayAlerts < 3) return 'text-warn';
-  return 'text-alert';
-});
+  if (store.todayAlerts === 0) return 'text-success'
+  if (store.todayAlerts < 3) return 'text-warn'
+  return 'text-alert'
+})
 
 // Rainfall sparkline data from realtime store
 const rainfallSparklineData = computed(() => {
-  const data = realtimeStore.rainfallChartData;
-  if (data.length === 0) return [];
-  return data.map((d) => d.value);
-});
+  const data = realtimeStore.rainfallChartData
+  if (data.length === 0) return []
+  return data.map((d) => d.value)
+})
 </script>
 
 <style scoped lang="scss">

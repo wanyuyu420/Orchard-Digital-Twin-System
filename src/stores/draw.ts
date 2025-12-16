@@ -20,7 +20,7 @@ export const useDrawStore = defineStore('draw', () => {
   // 计算属性：绘制状态（完整实现新的 DrawingState 接口）
   const drawingState = computed<DrawingState>(() => ({
     activeTool: activeTool.value,
-    mode: isDrawing.value ? 'drawing' : (isEditing.value ? 'editing' : 'none'),
+    mode: isDrawing.value ? 'drawing' : isEditing.value ? 'editing' : 'none',
     isDrawing: isDrawing.value,
     isEditing: isEditing.value,
     currentFeatureId: currentFeatureId.value,
@@ -28,7 +28,7 @@ export const useDrawStore = defineStore('draw', () => {
     snapTolerance: snapTolerance.value,
     showTips: true,
     tipText: '',
-    continuousMode: false
+    continuousMode: false,
   }))
 
   // 计算属性：是否有激活工具
@@ -123,6 +123,6 @@ export const useDrawStore = defineStore('draw', () => {
     exitEditMode,
     setSnapEnabled,
     setSnapTolerance,
-    reset
+    reset,
   }
 })

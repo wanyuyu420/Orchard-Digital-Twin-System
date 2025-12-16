@@ -14,9 +14,10 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed, shallowRef } from 'vue'
-import type * as Cesium from 'cesium'
+import * as Cesium from 'cesium'
 
 // Types
+import type { AnalysisResult, AnalysisToolType } from '@/types/analysis'
 import type { BaseTool, ToolType } from '@/cesium/gis/core/BaseTool'
 import type { BaseGraphic } from '@/cesium/gis/core/BaseGraphic'
 import type { DrawMode, DrawToolType } from '@/types/draw'
@@ -30,12 +31,12 @@ import type { MeasureToolType, Measurement } from '@/types/measure'
 
 /** Action types for undo/redo */
 export type HistoryActionType =
-  | 'add'       // Feature added
-  | 'remove'    // Feature removed
-  | 'update'    // Feature properties updated
-  | 'move'      // Feature moved (geometry changed)
-  | 'style'     // Feature style changed
-  | 'batch'     // Multiple actions bundled
+  | 'add' // Feature added
+  | 'remove' // Feature removed
+  | 'update' // Feature properties updated
+  | 'move' // Feature moved (geometry changed)
+  | 'style' // Feature style changed
+  | 'batch' // Multiple actions bundled
 
 /** History record for undo/redo */
 export interface HistoryRecord {
@@ -53,6 +54,9 @@ export interface HistoryRecord {
 
 /** Maximum history stack size */
 const MAX_HISTORY_SIZE = 50
+
+// ========== Analysis Results Types ==========
+// Types imported from @/types/analysis.ts
 
 export const useGISStore = defineStore('gis', () => {
   // ========== Core State ==========
@@ -113,8 +117,118 @@ export const useGISStore = defineStore('gis', () => {
     fillOpacity: 0.3,
     lineType: 'solid' as 'solid' | 'dashed' | 'dotted',
     pointColor: '#22D3EE',
-    pointSize: 10
+    pointSize: 10,
   })
+
+  /** Per-tool style configuration (persisted to localStorage) */
+  interface ToolStyleConfig {
+    strokeColor?: string
+    strokeWidth?: number
+    fillColor?: string
+    fillOpacity?: number
+    lineType?: 'solid' | 'dashed' | 'dotted'
+    pointColor?: string
+    pointSize?: number
+    iconType?: 'pin' | 'marker' | 'dot' | 'star' // for point tools
+  }
+
+  interface ToolStyles {
+    point: ToolStyleConfig
+    line: ToolStyleConfig
+    polygon: ToolStyleConfig
+    circle: ToolStyleConfig
+    rectangle: ToolStyleConfig
+    distance: ToolStyleConfig // measurement tool
+    area: ToolStyleConfig // measurement tool
+  }
+
+  /** Default tool styles */
+  const DEFAULT_TOOL_STYLES: ToolStyles = {
+    point: {
+      pointColor: '#22D3EE',
+      pointSize: 12,
+      iconType: 'pin',
+    },
+    line: {
+      strokeColor: '#22D3EE',
+      strokeWidth: 3,
+      lineType: 'solid',
+    },
+    polygon: {
+      fillColor: '#3B82F6',
+      fillOpacity: 0.3,
+      strokeColor: '#22D3EE',
+      strokeWidth: 3,
+    },
+    circle: {
+      fillColor: '#10B981',
+      fillOpacity: 0.3,
+      strokeColor: '#059669',
+      strokeWidth: 3,
+    },
+    rectangle: {
+      fillColor: '#F59E0B',
+      fillOpacity: 0.3,
+      strokeColor: '#D97706',
+      strokeWidth: 3,
+    },
+    distance: {
+      strokeColor: '#EF4444',
+      strokeWidth: 2,
+    },
+    area: {
+      fillColor: '#8B5CF6',
+      fillOpacity: 0.3,
+      strokeColor: '#7C3AED',
+      strokeWidth: 2,
+    },
+  }
+
+  /**
+   * Load tool styles from localStorage
+   */
+  function loadToolStylesFromStorage(): ToolStyles {
+    try {
+      const stored = localStorage.getItem('gis-tool-styles')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        // Merge with defaults to ensure all tools have styles
+        return {
+          ...DEFAULT_TOOL_STYLES,
+          ...parsed,
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load tool styles from localStorage:', err)
+    }
+    return { ...DEFAULT_TOOL_STYLES }
+  }
+
+  /**
+   * Save tool styles to localStorage
+   */
+  function saveToolStylesToStorage(styles: ToolStyles): void {
+    try {
+      localStorage.setItem('gis-tool-styles', JSON.stringify(styles))
+    } catch (err) {
+      console.warn('Failed to save tool styles to localStorage:', err)
+    }
+  }
+
+  /** Tool-specific styles (loaded from localStorage on init) */
+  const toolStyles = ref<ToolStyles>(loadToolStylesFromStorage())
+
+  // ========== 3D分析结果管理 ==========
+  const analysisResults = ref<AnalysisResult[]>([])
+  const selectedResultId = ref<string | null>(null)
+
+  // ========== Analysis Results (for UI Panel) ==========
+
+  /** Current analysis result type */
+  const analysisResultType = ref<'volume' | 'measure3d' | 'profile' | 'flood' | null>(null)
+
+  /** Current analysis result data */
+  const analysisResultData = ref<any>(null)
 
   // ========== History State (Undo/Redo) ==========
 
@@ -150,7 +264,7 @@ export const useGISStore = defineStore('gis', () => {
   /** Selected features as array */
   const selectedFeatures = computed(() => {
     return Array.from(selectedFeatureIds.value)
-      .map(id => features.value.get(id))
+      .map((id) => features.value.get(id))
       .filter(Boolean) as Feature[]
   })
 
@@ -248,7 +362,7 @@ export const useGISStore = defineStore('gis', () => {
     const map: FeatureGraphicMap = {
       featureId: feature.id,
       feature: feature,
-      graphic: graphic
+      graphic: graphic,
     }
     featureGraphicMaps.value.set(feature.id, map)
 
@@ -336,7 +450,7 @@ export const useGISStore = defineStore('gis', () => {
    * Clear all features
    */
   function clearFeatures() {
-    graphics.value.forEach(graphic => graphic.destroy())
+    graphics.value.forEach((graphic) => graphic.destroy())
 
     features.value.clear()
     graphics.value.clear()
@@ -353,24 +467,24 @@ export const useGISStore = defineStore('gis', () => {
     let result = Array.from(features.value.values())
 
     if (filter.types && filter.types.length > 0) {
-      result = result.filter(f => filter.types!.includes(f.type))
+      result = result.filter((f) => filter.types!.includes(f.type))
     }
 
     if (filter.visible !== undefined) {
-      result = result.filter(f => f.visible === filter.visible)
+      result = result.filter((f) => f.visible === filter.visible)
     }
 
     if (filter.createdAfter) {
-      result = result.filter(f => f.createdAt >= filter.createdAfter!)
+      result = result.filter((f) => f.createdAt >= filter.createdAfter!)
     }
 
     if (filter.createdBefore) {
-      result = result.filter(f => f.createdAt <= filter.createdBefore!)
+      result = result.filter((f) => f.createdAt <= filter.createdBefore!)
     }
 
     if (filter.nameContains) {
       const query = filter.nameContains.toLowerCase()
-      result = result.filter(f => f.name.toLowerCase().includes(query))
+      result = result.filter((f) => f.name.toLowerCase().includes(query))
     }
 
     return result
@@ -390,7 +504,7 @@ export const useGISStore = defineStore('gis', () => {
       selectedFeatureIds.value.clear()
     }
 
-    ids.forEach(id => {
+    ids.forEach((id) => {
       if (features.value.has(id)) {
         selectedFeatureIds.value.add(id)
       }
@@ -408,7 +522,7 @@ export const useGISStore = defineStore('gis', () => {
     }
 
     const ids = Array.isArray(featureIds) ? featureIds : [featureIds]
-    ids.forEach(id => selectedFeatureIds.value.delete(id))
+    ids.forEach((id) => selectedFeatureIds.value.delete(id))
   }
 
   /**
@@ -446,7 +560,7 @@ export const useGISStore = defineStore('gis', () => {
    * @param id - Measurement ID
    */
   function removeMeasurement(id: string) {
-    const index = measurements.value.findIndex(m => m.id === id)
+    const index = measurements.value.findIndex((m) => m.id === id)
     if (index !== -1) {
       measurements.value.splice(index, 1)
     }
@@ -520,33 +634,49 @@ export const useGISStore = defineStore('gis', () => {
       case 'point':
         return {
           type: 'Point',
-          coordinates: [feature.position.longitude, feature.position.latitude, (feature.position as any).height || 0]
+          coordinates: [
+            feature.position.longitude,
+            feature.position.latitude,
+            (feature.position as any).height || 0,
+          ],
         }
       case 'line':
       case 'distance':
-        const lineCoords = feature.type === 'line'
-          ? feature.vertices.map(v => [v.longitude, v.latitude, (v as any).height || 0])
-          : [[feature.startPoint.longitude, feature.startPoint.latitude], [feature.endPoint.longitude, feature.endPoint.latitude]]
+        const lineCoords =
+          feature.type === 'line'
+            ? feature.vertices.map((v) => [v.longitude, v.latitude, (v as any).height || 0])
+            : [
+                [feature.startPoint.longitude, feature.startPoint.latitude],
+                [feature.endPoint.longitude, feature.endPoint.latitude],
+              ]
         return {
           type: 'LineString',
-          coordinates: lineCoords
+          coordinates: lineCoords,
         }
       case 'polygon':
       case 'area':
         // GeoJSON polygon requires first and last point to be the same
-        const polyCoords = feature.vertices.map(v => [v.longitude, v.latitude, (v as any).height || 0])
+        const polyCoords = feature.vertices.map((v) => [
+          v.longitude,
+          v.latitude,
+          (v as any).height || 0,
+        ])
         if (polyCoords.length > 0) {
           polyCoords.push(polyCoords[0]) // Close the ring
         }
         return {
           type: 'Polygon',
-          coordinates: [polyCoords]
+          coordinates: [polyCoords],
         }
       case 'circle':
         // GeoJSON doesn't have a native circle type, export as Point with radius in properties
         return {
           type: 'Point',
-          coordinates: [feature.center.longitude, feature.center.latitude, (feature.center as any).height || 0]
+          coordinates: [
+            feature.center.longitude,
+            feature.center.latitude,
+            (feature.center as any).height || 0,
+          ],
         }
       case 'rectangle':
         // Export rectangle as Polygon
@@ -557,11 +687,11 @@ export const useGISStore = defineStore('gis', () => {
           [ne.longitude, sw.latitude],
           [ne.longitude, ne.latitude],
           [sw.longitude, ne.latitude],
-          [sw.longitude, sw.latitude] // Close the ring
+          [sw.longitude, sw.latitude], // Close the ring
         ]
         return {
           type: 'Polygon',
-          coordinates: [rectCoords]
+          coordinates: [rectCoords],
         }
       default:
         return null
@@ -575,10 +705,10 @@ export const useGISStore = defineStore('gis', () => {
    */
   function exportGeoJSON(selectedOnly = false): string {
     const featuresToExport = selectedOnly
-      ? Array.from(features.value.values()).filter(f => selectedFeatureIds.value.has(f.id))
+      ? Array.from(features.value.values()).filter((f) => selectedFeatureIds.value.has(f.id))
       : Array.from(features.value.values())
 
-    const geojsonFeatures = featuresToExport.map(feature => {
+    const geojsonFeatures = featuresToExport.map((feature) => {
       const geometry = featureToGeoJSONGeometry(feature)
       return {
         type: 'Feature',
@@ -593,10 +723,14 @@ export const useGISStore = defineStore('gis', () => {
           createdAt: feature.createdAt?.toISOString(),
           // Special properties for circle/rectangle
           ...(feature.type === 'circle' ? { radius: feature.radius, area: feature.area } : {}),
-          ...(feature.type === 'rectangle' ? { width: feature.width, height: feature.height, area: feature.area } : {}),
+          ...(feature.type === 'rectangle'
+            ? { width: feature.width, height: feature.height, area: feature.area }
+            : {}),
           ...(feature.type === 'line' ? { length: feature.length } : {}),
-          ...(feature.type === 'polygon' ? { area: feature.area, perimeter: feature.perimeter } : {})
-        }
+          ...(feature.type === 'polygon'
+            ? { area: feature.area, perimeter: feature.perimeter }
+            : {}),
+        },
       }
     })
 
@@ -606,8 +740,8 @@ export const useGISStore = defineStore('gis', () => {
       metadata: {
         exportedAt: new Date().toISOString(),
         featureCount: geojsonFeatures.length,
-        source: 'water-digital-twin-platform'
-      }
+        source: 'water-digital-twin-platform',
+      },
     }
 
     return JSON.stringify(featureCollection, null, 2)
@@ -630,9 +764,7 @@ export const useGISStore = defineStore('gis', () => {
         return { success: 0, errors }
       }
 
-      const featuresToImport = geojson.type === 'FeatureCollection'
-        ? geojson.features
-        : [geojson]
+      const featuresToImport = geojson.type === 'FeatureCollection' ? geojson.features : [geojson]
 
       for (const geoFeature of featuresToImport) {
         try {
@@ -669,7 +801,7 @@ export const useGISStore = defineStore('gis', () => {
       updatedAt: now,
       style: properties.style || {},
       properties: { ...properties },
-      visible: true
+      visible: true,
     }
 
     // Determine feature type from properties or geometry
@@ -685,7 +817,7 @@ export const useGISStore = defineStore('gis', () => {
             type: 'circle',
             center: { longitude: pLng, latitude: pLat, height: pHeight },
             radius: properties.radius || 100,
-            area: properties.area || Math.PI * Math.pow(properties.radius || 100, 2)
+            area: properties.area || Math.PI * Math.pow(properties.radius || 100, 2),
           } as any
         }
         return {
@@ -693,21 +825,21 @@ export const useGISStore = defineStore('gis', () => {
           type: 'point',
           position: { longitude: pLng, latitude: pLat, height: pHeight },
           icon: properties.icon,
-          label: properties.label
+          label: properties.label,
         } as any
 
       case 'LineString':
         const lineVertices = geometry.coordinates.map((coord: number[]) => ({
           longitude: coord[0],
           latitude: coord[1],
-          height: coord[2] || 0
+          height: coord[2] || 0,
         }))
         return {
           ...baseProps,
           type: 'line',
           vertices: lineVertices,
           length: properties.length || 0,
-          lineType: 'solid'
+          lineType: 'solid',
         } as any
 
       case 'Polygon':
@@ -716,11 +848,14 @@ export const useGISStore = defineStore('gis', () => {
         const polyVertices = ring.slice(0, -1).map((coord: number[]) => ({
           longitude: coord[0],
           latitude: coord[1],
-          height: coord[2] || 0
+          height: coord[2] || 0,
         }))
 
         // Check if it's a rectangle
-        if (featureType === 'rectangle' || (polyVertices.length === 4 && properties.width && properties.height)) {
+        if (
+          featureType === 'rectangle' ||
+          (polyVertices.length === 4 && properties.width && properties.height)
+        ) {
           // Find southwest and northeast
           const lngs = polyVertices.map((v: any) => v.longitude)
           const lats = polyVertices.map((v: any) => v.latitude)
@@ -731,7 +866,7 @@ export const useGISStore = defineStore('gis', () => {
             northeast: { longitude: Math.max(...lngs), latitude: Math.max(...lats) },
             width: properties.width || 0,
             height: properties.height || 0,
-            area: properties.area || 0
+            area: properties.area || 0,
           } as any
         }
 
@@ -740,7 +875,7 @@ export const useGISStore = defineStore('gis', () => {
           type: 'polygon',
           vertices: polyVertices,
           area: properties.area || 0,
-          perimeter: properties.perimeter
+          perimeter: properties.perimeter,
         } as any
 
       default:
@@ -815,7 +950,7 @@ export const useGISStore = defineStore('gis', () => {
       actionType,
       featureId,
       beforeState: beforeState ? deepCloneFeature(beforeState) : null,
-      afterState: afterState ? deepCloneFeature(afterState) : null
+      afterState: afterState ? deepCloneFeature(afterState) : null,
     }
 
     // If we're not at the latest state, truncate future history
@@ -1034,6 +1169,118 @@ export const useGISStore = defineStore('gis', () => {
     mode.value = 'none'
   }
 
+  // ========== Tool Style Management ==========
+
+  /**
+   * Get style configuration for a specific tool
+   * @param toolType - Tool type (point, line, polygon, circle, rectangle, distance, area)
+   * @returns Tool style configuration
+   */
+  function getToolStyle(toolType: keyof ToolStyles): ToolStyleConfig {
+    return { ...toolStyles.value[toolType] }
+  }
+
+  /**
+   * Update style configuration for a specific tool
+   * @param toolType - Tool type
+   * @param style - Partial style update
+   */
+  function updateToolStyle(toolType: keyof ToolStyles, style: Partial<ToolStyleConfig>): void {
+    toolStyles.value[toolType] = {
+      ...toolStyles.value[toolType],
+      ...style,
+    }
+    // Persist to localStorage
+    saveToolStylesToStorage(toolStyles.value)
+  }
+
+  /**
+   * Reset tool styles to defaults
+   * @param toolType - Optional tool type (if not provided, resets all)
+   */
+  function resetToolStyles(toolType?: keyof ToolStyles): void {
+    if (toolType) {
+      toolStyles.value[toolType] = { ...DEFAULT_TOOL_STYLES[toolType] }
+    } else {
+      toolStyles.value = { ...DEFAULT_TOOL_STYLES }
+    }
+    saveToolStylesToStorage(toolStyles.value)
+  }
+
+  // ==========  STORE EXPORT ==========
+
+  /**
+   * Set analysis result (for UI panel display)
+   * @param type - Type of analysis result
+   * @param data - Data associated with the analysis result
+   */
+  function setAnalysisResult(
+    type: 'volume' | 'measure3d' | 'profile' | 'flood' | null,
+    data: any = null
+  ): void {
+    analysisResultType.value = type
+    analysisResultData.value = data
+  }
+
+  /**
+   * Clear analysis result
+   */
+  function clearAnalysisResult(): void {
+    analysisResultType.value = null
+    analysisResultData.value = null
+  }
+
+  // ========== 3D分析结果管理 Actions ==========
+
+  /**
+   * Add new 3D analysis result
+   * @param result - Analysis result configuration (id and timestamp will be auto-generated)
+   * @returns The generated result ID
+   */
+  function addAnalysisResult(result: Omit<AnalysisResult, 'id' | 'timestamp'>): string {
+    const newResult: AnalysisResult = {
+      ...result,
+      id: `result_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: Date.now(),
+    }
+    // 添加到列表首部（最新的在前）
+    analysisResults.value.unshift(newResult)
+    // 自动选中新结果
+    selectedResultId.value = newResult.id
+    return newResult.id
+  }
+
+  /**
+   * 移除分析结果
+   */
+  function removeAnalysisResult(id: string): void {
+    const index = analysisResults.value.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      analysisResults.value.splice(index, 1)
+      // 如果删除的是当前选中项，清除选中
+      if (selectedResultId.value === id) {
+        selectedResultId.value = null
+      }
+    }
+  }
+
+  /**
+   * 选中/取消选中结果
+   */
+  function selectAnalysisResult(id: string | null): void {
+    selectedResultId.value = id
+  }
+
+  /**
+   * 清空所有分析结果
+   */
+  function clearAllAnalysisResults(): void {
+    analysisResults.value = []
+    selectedResultId.value = null
+  }
+
+  // ========== STORE EXPORT ==========
+
   return {
     // ========== State ==========
     viewer,
@@ -1102,6 +1349,20 @@ export const useGISStore = defineStore('gis', () => {
     setShowTips,
     setContinuousMode,
 
+    // ========== Tool Styles ==========
+    toolStyles,
+    getToolStyle,
+    updateToolStyle,
+    resetToolStyles,
+
+    // ========== Analysis Results ==========
+    analysisResults,
+    selectedResultId,
+    addAnalysisResult,
+    removeAnalysisResult,
+    selectAnalysisResult,
+    clearAllAnalysisResults,
+
     // ========== Import/Export ==========
     exportGeoJSON,
     importGeoJSON,
@@ -1120,7 +1381,7 @@ export const useGISStore = defineStore('gis', () => {
 
     // ========== Reset ==========
     reset,
-    resetDrawing
+    resetDrawing,
   }
 })
 

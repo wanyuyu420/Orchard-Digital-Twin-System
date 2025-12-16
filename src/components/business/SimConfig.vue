@@ -13,16 +13,8 @@
     <!-- Flood Event Select (for flood/hydro engines) -->
     <div v-if="state.engine !== 'dam' && store.floodEvents.length > 0" class="form-group">
       <label class="form-label">洪水事件</label>
-      <select
-        class="form-select"
-        :value="store.selectedEventId"
-        @change="onEventChange"
-      >
-        <option
-          v-for="event in store.floodEvents"
-          :key="event.id"
-          :value="event.id"
-        >
+      <select class="form-select" :value="store.selectedEventId" @change="onEventChange">
+        <option v-for="event in store.floodEvents" :key="event.id" :value="event.id">
           {{ event.name }} ({{ severityLabel(event.severity) }})
         </option>
       </select>
@@ -72,31 +64,31 @@
 </template>
 
 <script setup lang="ts">
-import { storeToRefs } from 'pinia';
-import { useSimulationStore } from '@/stores/simulation';
-import GlassPanel from '@/components/common/GlassPanel.vue';
-import type { SimEngine } from '@/types/simulation';
+import { storeToRefs } from 'pinia'
+import { useSimulationStore } from '@/stores/simulation'
+import GlassPanel from '@/components/common/GlassPanel.vue'
+import type { SimEngine } from '@/types/simulation'
 
-const store = useSimulationStore();
-const { state } = storeToRefs(store);
+const store = useSimulationStore()
+const { state } = storeToRefs(store)
 
 function onEngineChange(e: Event) {
-  const target = e.target as HTMLSelectElement;
-  store.setEngine(target.value as SimEngine);
+  const target = e.target as HTMLSelectElement
+  store.setEngine(target.value as SimEngine)
 }
 
 function onEventChange(e: Event) {
-  const target = e.target as HTMLSelectElement;
-  store.selectEvent(target.value);
+  const target = e.target as HTMLSelectElement
+  store.selectEvent(target.value)
 }
 
 function severityLabel(severity: string): string {
   const labels: Record<string, string> = {
     mild: '中小洪水',
     medium: '大洪水',
-    severe: '特大洪水'
-  };
-  return labels[severity] || severity;
+    severe: '特大洪水',
+  }
+  return labels[severity] || severity
 }
 </script>
 
@@ -112,8 +104,12 @@ function severityLabel(severity: string): string {
   margin-bottom: 5px;
 }
 
-.mt-3 { margin-top: 12px; }
-.mt-4 { margin-top: 20px; }
+.mt-3 {
+  margin-top: 12px;
+}
+.mt-4 {
+  margin-top: 20px;
+}
 
 .form-select,
 .form-input {

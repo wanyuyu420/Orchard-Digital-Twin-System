@@ -7,18 +7,12 @@
 
       <div class="chat-history">
         <div class="message system">
-          <div class="msg-content">
-            DeepSeek: 已监测到丹江口流域未来2小时有强降雨。
-          </div>
+          <div class="msg-content">DeepSeek: 已监测到丹江口流域未来2小时有强降雨。</div>
         </div>
       </div>
 
       <div class="input-area">
-        <input 
-          type="text" 
-          placeholder="呼叫 AI..." 
-          class="ai-input"
-        />
+        <input type="text" placeholder="呼叫 AI..." class="ai-input" />
         <button class="mic-btn active">
           <i class="fa-solid fa-microphone"></i>
         </button>
@@ -28,7 +22,7 @@
 </template>
 
 <script setup lang="ts">
-import GlassPanel from '@/components/common/GlassPanel.vue';
+import GlassPanel from '@/components/common/GlassPanel.vue'
 </script>
 
 <style scoped lang="scss">
@@ -76,7 +70,7 @@ import GlassPanel from '@/components/common/GlassPanel.vue';
   border-radius: 4px;
   font-family: $font-ui;
   font-size: 12px;
-  
+
   &:focus {
     border-color: $neon-cyan;
   }
@@ -93,7 +87,7 @@ import GlassPanel from '@/components/common/GlassPanel.vue';
   cursor: pointer;
   color: #fff;
   background: rgba(255, 255, 255, 0.1);
-  
+
   &.active {
     background: $neon-cyan;
     color: #000;

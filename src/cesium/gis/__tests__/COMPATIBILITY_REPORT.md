@@ -14,21 +14,21 @@ The new GIS architecture (Phase 0) maintains **100% backward compatibility** wit
 
 ### 1. Store API Compatibility ✅
 
-| Legacy API | Status | Notes |
-|------------|--------|-------|
-| `useMeasureStore()` | ✅ PASS | Alias for `useGISStore()` |
-| `measurements` array | ✅ PASS | Same reactive array |
-| `addMeasurement()` | ✅ PASS | Identical behavior |
-| `removeMeasurement()` | ✅ PASS | Identical behavior |
-| `clearAll()` | ✅ PASS | Alias for `clearMeasurements()` |
-| `setTool()` | ✅ PASS | Works with old tool types |
-| `activeTool` | ✅ PASS | Mapped to `toolType` |
+| Legacy API            | Status  | Notes                           |
+| --------------------- | ------- | ------------------------------- |
+| `useMeasureStore()`   | ✅ PASS | Alias for `useGISStore()`       |
+| `measurements` array  | ✅ PASS | Same reactive array             |
+| `addMeasurement()`    | ✅ PASS | Identical behavior              |
+| `removeMeasurement()` | ✅ PASS | Identical behavior              |
+| `clearAll()`          | ✅ PASS | Alias for `clearMeasurements()` |
+| `setTool()`           | ✅ PASS | Works with old tool types       |
+| `activeTool`          | ✅ PASS | Mapped to `toolType`            |
 
 **Migration Path**: None required. Existing code continues to work.
 
 ```ts
 // ✅ Old code still works
-import { useMeasureStore } from '@/stores/gis'  // Changed import path only
+import { useMeasureStore } from '@/stores/gis' // Changed import path only
 
 const measureStore = useMeasureStore()
 measureStore.addMeasurement(measurement)
@@ -55,6 +55,7 @@ measureStore.clearAll()
 **Changes**: Complete rewrite (634 → 174 lines)
 
 **Benefits**:
+
 - ✅ 73% code reduction
 - ✅ Better error handling
 - ✅ Automatic cleanup
@@ -66,14 +67,15 @@ measureStore.clearAll()
 
 ### 3. Type System Compatibility ✅
 
-| Type | Status | Notes |
-|------|--------|-------|
-| `Measurement` | ✅ PASS | Unchanged |
-| `MeasureToolType` | ✅ PASS | Unchanged |
-| `Coordinate` | ✅ PASS | Enhanced with 3D support |
-| `DrawingState` | ✅ PASS | Extended, not replaced |
+| Type              | Status  | Notes                    |
+| ----------------- | ------- | ------------------------ |
+| `Measurement`     | ✅ PASS | Unchanged                |
+| `MeasureToolType` | ✅ PASS | Unchanged                |
+| `Coordinate`      | ✅ PASS | Enhanced with 3D support |
+| `DrawingState`    | ✅ PASS | Extended, not replaced   |
 
 **New Types** (Optional):
+
 - `Coordinate3D` - Explicit 3D coordinates
 - `HeightReference` - Height mode enum
 - Enhanced type guards: `is3D()`, `is2D()`
@@ -83,6 +85,7 @@ measureStore.clearAll()
 ### 4. Tool Lifecycle Compatibility ✅
 
 #### Old Approach (Still Works)
+
 ```ts
 // Set tool through store
 measureStore.setTool('distance')
@@ -92,6 +95,7 @@ measureStore.setTool('distance')
 ```
 
 #### New Approach (Optional)
+
 ```ts
 // Direct tool instantiation
 const tool = new MeasureTool(viewer, {
@@ -128,11 +132,13 @@ npm run test
 File: `src/cesium/gis/__tests__/minimal-standalone.example.ts`
 
 **Run independently** (no project dependencies):
+
 ```bash
 npx ts-node src/cesium/gis/__tests__/minimal-standalone.example.ts
 ```
 
 Tests:
+
 - ✅ 3D Coordinate Type System
 - ✅ BaseTool Architecture
 - ✅ Store Backward Compatibility
@@ -145,12 +151,14 @@ Tests:
 ### For Existing Components
 
 **Step 1**: Update import paths
+
 ```diff
 - import { useMeasureStore } from '@/stores/measure'
 + import { useMeasureStore } from '@/stores/gis'
 ```
 
 **Step 2**: (Optional) Consider migrating to new API
+
 ```ts
 // Old style (still works)
 const measureStore = useMeasureStore()
@@ -164,6 +172,7 @@ const gisStore = useGISStore()
 ### For New Features
 
 Use new architecture directly:
+
 ```ts
 import { useGISStore } from '@/stores/gis'
 import { MeasureTool } from '@/cesium/gis/tools/MeasureTool'
@@ -184,12 +193,12 @@ All existing code continues to work without modification.
 
 ## Performance Impact
 
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| MeasureLayer.vue LOC | 634 | 174 | -73% |
-| Bundle Size Impact | N/A | N/A | ~0 KB (tree-shaken) |
-| Runtime Overhead | Baseline | +0.1ms | Negligible |
-| Memory Usage | Baseline | -5% | Improved (better cleanup) |
+| Metric               | Before   | After  | Change                    |
+| -------------------- | -------- | ------ | ------------------------- |
+| MeasureLayer.vue LOC | 634      | 174    | -73%                      |
+| Bundle Size Impact   | N/A      | N/A    | ~0 KB (tree-shaken)       |
+| Runtime Overhead     | Baseline | +0.1ms | Negligible                |
+| Memory Usage         | Baseline | -5%    | Improved (better cleanup) |
 
 ---
 
@@ -202,17 +211,20 @@ All existing code continues to work without modification.
 **Status**: Deprecated but not removed
 
 **Recommendation**:
+
 - Keep for now (no harm)
 - Remove in Phase 2 after full migration
 
 ### 2. Type Import Paths
 
 Some old type imports may still reference:
+
 ```ts
 import type { Coordinate } from '@/types/measure'
 ```
 
 Should eventually migrate to:
+
 ```ts
 import type { Coordinate } from '@/types/geometry'
 ```
@@ -240,16 +252,19 @@ import type { Coordinate } from '@/types/geometry'
 ## Recommendations
 
 ### Immediate Actions
+
 1. ✅ Update import paths in affected components
 2. ✅ Run full test suite
 3. ✅ Manual QA testing
 
 ### Phase 1 Actions
+
 1. Consider migrating remaining components to new API
 2. Add integration tests for MeasureTool
 3. Create migration guide for team
 
 ### Phase 2 Actions
+
 1. Remove old store files after full migration
 2. Update all type import paths
 3. Add JSDoc deprecation notices
@@ -261,6 +276,7 @@ import type { Coordinate } from '@/types/geometry'
 ✅ **Phase 0 is production-ready with full backward compatibility.**
 
 The new architecture provides:
+
 - 🎯 Cleaner code (-73% LOC in MeasureLayer)
 - 🔒 Type safety (3D coordinate system)
 - 🚀 Better performance (improved cleanup)
@@ -273,6 +289,7 @@ The new architecture provides:
 ## Contact
 
 For questions or issues:
+
 - Check: `openspec/changes/add-gis-drawing-toolkit/`
 - Review: `src/cesium/gis/__tests__/`
 - Test: Run automated tests

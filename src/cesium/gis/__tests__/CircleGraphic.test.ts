@@ -9,49 +9,49 @@ vi.mock('cesium', () => {
   const mockCartographic = {
     longitude: 2.0,
     latitude: 0.5,
-    height: 0
+    height: 0,
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const mockEllipsoid = {
     maximumRadius: 6378137,
     cartesianToCartographic: vi.fn(() => mockCartographic),
-    cartographicToCartesian: vi.fn((_carto: any) => mockCenterPosition)
+    cartographicToCartesian: vi.fn((_carto: any) => mockCenterPosition),
   }
 
   return {
     Cartesian3: {
-      midpoint: vi.fn((_a: any, _b: any, _result: any) => mockCenterPosition)
+      midpoint: vi.fn((_a: any, _b: any, _result: any) => mockCenterPosition),
     },
     Cartesian2: vi.fn((x: number, y: number) => ({ x, y })),
     Color: {
       fromCssColorString: vi.fn((_color: string) => ({
-        withAlpha: vi.fn((alpha: number) => ({ r: 1, g: 0.8, b: 0.2, a: alpha }))
+        withAlpha: vi.fn((alpha: number) => ({ r: 1, g: 0.8, b: 0.2, a: alpha })),
       })),
       WHITE: { r: 1, g: 1, b: 1, a: 1 },
       BLACK: { r: 0, g: 0, b: 0, a: 1 },
       RED: { r: 1, g: 0, b: 0, a: 1 },
-      BLUE: { r: 0, g: 0, b: 1, a: 1 }
+      BLUE: { r: 0, g: 0, b: 1, a: 1 },
     },
     ColorMaterialProperty: vi.fn((color: any) => ({ color })),
     EllipsoidGeodesic: vi.fn().mockImplementation(() => ({
-      surfaceDistance: 5000,  // 5km
-      interpolateUsingFraction: vi.fn(() => mockCartographic)
+      surfaceDistance: 5000, // 5km
+      interpolateUsingFraction: vi.fn(() => mockCartographic),
     })),
     Cartographic: vi.fn((lon: number, lat: number, height?: number) => ({
       longitude: lon,
       latitude: lat,
-      height: height || 0
+      height: height || 0,
     })),
     LabelStyle: {
-      FILL_AND_OUTLINE: 0
+      FILL_AND_OUTLINE: 0,
     },
     HeightReference: {
-      CLAMP_TO_GROUND: 0
+      CLAMP_TO_GROUND: 0,
     },
     Math: {
-      toDegrees: vi.fn((radians: number) => radians * 180 / Math.PI)
-    }
+      toDegrees: vi.fn((radians: number) => (radians * 180) / Math.PI),
+    },
   }
 })
 
@@ -64,20 +64,20 @@ const mockEdgePosition = { x: 150, y: 200, z: 300 }
 const mockCartographic = {
   longitude: 2.0,
   latitude: 0.5,
-  height: 0
+  height: 0,
 }
 
 const mockEllipsoid = {
   maximumRadius: 6378137,
   cartesianToCartographic: vi.fn(() => mockCartographic),
-  cartographicToCartesian: vi.fn((carto: any) => mockCenterPosition)
+  cartographicToCartesian: vi.fn((carto: any) => mockCenterPosition),
 }
 
 const mockViewer = {
   scene: {
     globe: {
-      ellipsoid: mockEllipsoid
-    }
+      ellipsoid: mockEllipsoid,
+    },
   },
   entities: {
     add: vi.fn((options) => ({
@@ -86,10 +86,10 @@ const mockViewer = {
       ellipse: options.ellipse,
       point: options.point,
       label: options.label,
-      show: options.show !== false
+      show: options.show !== false,
     })),
-    remove: vi.fn()
-  }
+    remove: vi.fn(),
+  },
 } as any
 
 describe('CircleGraphic', () => {
@@ -116,7 +116,7 @@ describe('CircleGraphic', () => {
   it('应该创建带半径和面积标签的圆形', () => {
     const circle = new CircleGraphic(mockViewer, {
       showRadiusLabel: true,
-      showAreaLabel: true
+      showAreaLabel: true,
     })
     circle.create([mockCenterPosition, mockEdgePosition] as any)
 
@@ -129,7 +129,7 @@ describe('CircleGraphic', () => {
     circle.create([mockCenterPosition, mockEdgePosition] as any)
 
     const radius = circle.getRadius()
-    expect(radius).toBe(5000)  // mock 返回 5000m
+    expect(radius).toBe(5000) // mock 返回 5000m
   })
 
   it('应该正确计算面积', () => {
@@ -138,12 +138,12 @@ describe('CircleGraphic', () => {
 
     const area = circle.getArea()
     expect(area).toBeGreaterThan(0)
-    expect(area).toBe(Math.PI * 5000 * 5000)  // πr²
+    expect(area).toBe(Math.PI * 5000 * 5000) // πr²
   })
 
   it('应该正确格式化半径显示', () => {
     const circle = new CircleGraphic(mockViewer, {
-      showRadiusLabel: true
+      showRadiusLabel: true,
     })
     circle.create([mockCenterPosition, mockEdgePosition] as any)
 
@@ -153,7 +153,7 @@ describe('CircleGraphic', () => {
 
   it('应该正确格式化面积显示', () => {
     const circle = new CircleGraphic(mockViewer, {
-      showAreaLabel: true
+      showAreaLabel: true,
     })
     circle.create([mockCenterPosition, mockEdgePosition] as any)
 
@@ -180,7 +180,7 @@ describe('CircleGraphic', () => {
 
   it('应该导出正确的 GeoJSON 格式', () => {
     const circle = new CircleGraphic(mockViewer, {
-      name: '测试圆形'
+      name: '测试圆形',
     })
     circle.create([mockCenterPosition, mockEdgePosition] as any)
 
@@ -197,7 +197,7 @@ describe('CircleGraphic', () => {
     circle.create([mockCenterPosition, mockEdgePosition] as any)
 
     const geojson = circle.toGeoJSON()
-    expect(geojson.properties.center).toHaveLength(2)  // [lon, lat]
+    expect(geojson.properties.center).toHaveLength(2) // [lon, lat]
   })
 
   it('应该支持显示/隐藏功能', () => {

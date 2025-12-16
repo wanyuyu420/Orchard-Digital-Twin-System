@@ -1,5 +1,9 @@
 <template>
-  <div id="cesiumContainer" class="cesium-container" :class="{ 'is-blurred': viewMode === 'focus', 'is-hidden': isMeteoPage }"></div>
+  <div
+    id="cesiumContainer"
+    class="cesium-container"
+    :class="{ 'is-blurred': viewMode === 'focus', 'is-hidden': isMeteoPage }"
+  ></div>
 </template>
 
 <script setup lang="ts">
@@ -36,8 +40,8 @@ onMounted(() => {
     orientation: {
       heading: 0,
       pitch: Cesium.Math.toRadians(-60), // 俯视角度
-      roll: 0
-    }
+      roll: 0,
+    },
   })
 })
 

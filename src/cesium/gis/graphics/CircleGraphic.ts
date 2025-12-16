@@ -118,8 +118,8 @@ export class CircleGraphic extends BaseGraphic {
         material: this.getMaterial(),
         classificationType: Cesium.ClassificationType.TERRAIN, // Classify on terrain to avoid Z-fighting
         // Note: outline is disabled when using classificationType
-        outline: false
-      }
+        outline: false,
+      },
     })
 
     this.entities.push(this.circleEntity)
@@ -129,8 +129,9 @@ export class CircleGraphic extends BaseGraphic {
    * 获取填充材质
    */
   private getMaterial(): Cesium.MaterialProperty {
-    const color = Cesium.Color.fromCssColorString(this.style.fillColor || '#ffcc33')
-      .withAlpha(this.style.opacity ?? 0.5)
+    const color = Cesium.Color.fromCssColorString(this.style.fillColor || '#ffcc33').withAlpha(
+      this.style.opacity ?? 0.5
+    )
     return new Cesium.ColorMaterialProperty(color)
   }
 
@@ -158,8 +159,8 @@ export class CircleGraphic extends BaseGraphic {
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, -10),
         heightReference: this.heightReference,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     })
 
     this.entities.push(this.radiusLabelEntity)
@@ -182,8 +183,8 @@ export class CircleGraphic extends BaseGraphic {
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, 10),
         heightReference: this.heightReference,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     })
 
     this.entities.push(this.areaLabelEntity)
@@ -283,8 +284,8 @@ export class CircleGraphic extends BaseGraphic {
         color: Cesium.Color.RED,
         outlineColor: Cesium.Color.WHITE,
         outlineWidth: 2,
-        heightReference: this.heightReference
-      }
+        heightReference: this.heightReference,
+      },
     })
     this.entities.push(this.centerMarker)
 
@@ -312,8 +313,8 @@ export class CircleGraphic extends BaseGraphic {
         color: Cesium.Color.BLUE,
         outlineColor: Cesium.Color.WHITE,
         outlineWidth: 2,
-        heightReference: this.heightReference
-      }
+        heightReference: this.heightReference,
+      },
     })
     this.entities.push(this.edgeMarker)
   }
@@ -339,7 +340,7 @@ export class CircleGraphic extends BaseGraphic {
    * 移除圆形
    */
   remove(): void {
-    this.entities.forEach(entity => {
+    this.entities.forEach((entity) => {
       this.viewer.entities.remove(entity)
     })
     this.entities = []
@@ -414,13 +415,16 @@ export class CircleGraphic extends BaseGraphic {
    */
   protected applyStyle(): void {
     if (this.circleEntity && this.circleEntity.ellipse) {
-      const fillColor = Cesium.Color.fromCssColorString(this.style.fillColor || '#22D3EE')
-        .withAlpha(this.style.fillOpacity ?? this.style.opacity ?? 0.3)
+      const fillColor = Cesium.Color.fromCssColorString(
+        this.style.fillColor || '#22D3EE'
+      ).withAlpha(this.style.fillOpacity ?? this.style.opacity ?? 0.3)
       const outlineColor = Cesium.Color.fromCssColorString(this.style.strokeColor || '#22D3EE')
 
       this.circleEntity.ellipse.material = new Cesium.ColorMaterialProperty(fillColor)
       this.circleEntity.ellipse.outlineColor = new Cesium.ConstantProperty(outlineColor)
-      this.circleEntity.ellipse.outlineWidth = new Cesium.ConstantProperty(this.style.strokeWidth || 2)
+      this.circleEntity.ellipse.outlineWidth = new Cesium.ConstantProperty(
+        this.style.strokeWidth || 2
+      )
     }
   }
 
@@ -450,7 +454,7 @@ export class CircleGraphic extends BaseGraphic {
       const pointCartographic = geodesic.interpolateUsingFraction(1.0)
       coordinates.push([
         Cesium.Math.toDegrees(pointCartographic.longitude),
-        Cesium.Math.toDegrees(pointCartographic.latitude)
+        Cesium.Math.toDegrees(pointCartographic.latitude),
       ])
     }
 
@@ -458,7 +462,7 @@ export class CircleGraphic extends BaseGraphic {
       type: 'Feature',
       geometry: {
         type: 'Polygon',
-        coordinates: [coordinates]
+        coordinates: [coordinates],
       },
       properties: {
         id: this.id,
@@ -471,8 +475,8 @@ export class CircleGraphic extends BaseGraphic {
         area: this.area,
         areaFormatted: this.formatArea(this.area),
         style: this.style,
-        createdAt: new Date().toISOString()
-      }
+        createdAt: new Date().toISOString(),
+      },
     }
   }
 }

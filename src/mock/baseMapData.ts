@@ -22,8 +22,8 @@ export const MockMapConfig: { data: { name: string; value: string }[] } = {
     { name: 'geocoder', value: '0' },
     { name: 'sceneModePicker', value: '0' },
     { name: 'selectionIndicator', value: '0' },
-    { name: 'logo', value: '0' }
-  ]
+    { name: 'logo', value: '0' },
+  ],
 }
 
 // Initial view settings (Xinjiang - Urumqi area)
@@ -40,8 +40,8 @@ export const MockMapView = {
     { name: 'up_z', value: '-0.9' },
     { name: 'flytoView', value: '1' },
     { name: 'duration', value: '3' },
-    { name: 'showSaveButton', value: '1' }
-  ]
+    { name: 'showSaveButton', value: '1' },
+  ],
 }
 
 // Default AutoNavi basemap - NO filter applied initially (original color)
@@ -52,21 +52,21 @@ export const MockMapImageryList: { data: MapImageryConfig[] } = {
       classConfig: {
         url: 'https://webst0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&style=7',
         subdomains: ['1', '2', '3', '4'],
-        maximumLevel: 18
+        maximumLevel: 18,
       },
       // Default: original color style (no filter)
       interfaceConfig: {
-        saturation: 1.0,      // Full color
-        brightness: 1.0,      // Normal brightness
-        contrast: 1.0,        // Normal contrast
-        hue: 0.0,             // No hue shift
-        gamma: 1.0            // Normal gamma
+        saturation: 1.0, // Full color
+        brightness: 1.0, // Normal brightness
+        contrast: 1.0, // Normal contrast
+        hue: 0.0, // No hue shift
+        gamma: 1.0, // Normal gamma
       },
       offset: '0,0',
-      invertswitch: false,    // No color inversion
-      filterRGB: '#ffffff'    // No filter tint
-    }
-  ]
+      invertswitch: false, // No color inversion
+      filterRGB: '#ffffff', // No filter tint
+    },
+  ],
 }
 
 // Tianditu configuration (for basemap switching)
@@ -76,37 +76,37 @@ export const TiandituConfig = {
     classConfig: {
       url: `https://t{s}.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=${TIANDITU_KEY}`,
       subdomains: ['0', '1', '2', '3', '4', '5', '6', '7'],
-      maximumLevel: 18
+      maximumLevel: 18,
     },
     interfaceConfig: {},
     offset: '0,0',
     invertswitch: false,
-    filterRGB: '#ffffff'
+    filterRGB: '#ffffff',
   },
   cva: {
     type: 'UrlTemplateImageryProvider',
     classConfig: {
       url: `https://t{s}.tianditu.gov.cn/DataServer?T=cva_w&x={x}&y={y}&l={z}&tk=${TIANDITU_KEY}`,
       subdomains: ['0', '1', '2', '3', '4', '5', '6', '7'],
-      maximumLevel: 18
+      maximumLevel: 18,
     },
     interfaceConfig: {},
     offset: '0,0',
     invertswitch: false,
-    filterRGB: '#ffffff'
+    filterRGB: '#ffffff',
   },
   img: {
     type: 'UrlTemplateImageryProvider',
     classConfig: {
       url: `https://t{s}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=${TIANDITU_KEY}`,
       subdomains: ['0', '1', '2', '3', '4', '5', '6', '7'],
-      maximumLevel: 18
+      maximumLevel: 18,
     },
     interfaceConfig: {},
     offset: '0,0',
     invertswitch: false,
-    filterRGB: '#ffffff'
-  }
+    filterRGB: '#ffffff',
+  },
 }
 
 // Layer style presets
@@ -115,7 +115,7 @@ export const baseInkStyle = {
   brightness: 0.55,
   contrast: 1.6,
   gamma: 0.35,
-  hue: 1.0
+  hue: 1.0,
 }
 
 export const baseColorStyle = {
@@ -123,14 +123,14 @@ export const baseColorStyle = {
   brightness: 0.95,
   contrast: 1.0,
   gamma: 1.0,
-  hue: 0.0
+  hue: 0.0,
 }
 
 // Helper to convert MockMapConfig to BaseMapConfig
 export function getBaseMapConfig(): BaseMapConfig {
   const config: BaseMapConfig = {}
-  MockMapConfig.data.forEach(item => {
-    (config as Record<string, boolean>)[item.name] = item.value === '1'
+  MockMapConfig.data.forEach((item) => {
+    ;(config as Record<string, boolean>)[item.name] = item.value === '1'
   })
   return config
 }
@@ -147,7 +147,7 @@ export function getInitialView(): {
 } {
   const viewData = MockMapView.data
   const getValue = (name: string) => {
-    const item = viewData.find(d => d.name === name)
+    const item = viewData.find((d) => d.name === name)
     return item ? parseFloat(item.value) : 0
   }
 
@@ -158,7 +158,7 @@ export function getInitialView(): {
     direction: [getValue('direction_x'), getValue('direction_y'), getValue('direction_z')],
     up: [getValue('up_x'), getValue('up_y'), getValue('up_z')],
     flytoView: getValue('flytoView') === 1,
-    duration: getValue('duration')
+    duration: getValue('duration'),
   }
 }
 

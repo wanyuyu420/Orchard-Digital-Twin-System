@@ -21,10 +21,10 @@
 </template>
 
 <script setup lang="ts">
-import { useDashboardStore } from '@/stores/dashboard';
-import GlassPanel from '@/components/common/GlassPanel.vue';
+import { useDashboardStore } from '@/stores/dashboard'
+import GlassPanel from '@/components/common/GlassPanel.vue'
 
-const store = useDashboardStore();
+const store = useDashboardStore()
 </script>
 
 <style scoped lang="scss">

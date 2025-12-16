@@ -3,30 +3,30 @@
  * WaterLevelChart - Real-time line chart showing water level trends.
  * Displays last 24 hours with gradient fill and smooth animation.
  */
-import { computed } from 'vue';
-import type { EChartsOption } from 'echarts';
-import BaseChart from './BaseChart.vue';
-import { NEON_CYAN, NEON_BLUE, createGradient, TEXT_SECONDARY } from './theme';
+import { computed } from 'vue'
+import type { EChartsOption } from 'echarts'
+import BaseChart from './BaseChart.vue'
+import { NEON_CYAN, NEON_BLUE, createGradient, TEXT_SECONDARY } from './theme'
 
 const props = withDefaults(
   defineProps<{
-    data: Array<{ time: Date; value: number }>;
-    height?: string;
-    loading?: boolean;
-    title?: string;
+    data: Array<{ time: Date; value: number }>
+    height?: string
+    loading?: boolean
+    title?: string
   }>(),
   {
     height: '200px',
     loading: false,
     title: '水位趋势',
   }
-);
+)
 
 const chartOptions = computed<EChartsOption>(() => {
   const times = props.data.map((d) =>
     d.time.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-  );
-  const values = props.data.map((d) => d.value);
+  )
+  const values = props.data.map((d) => d.value)
 
   return {
     title: {
@@ -37,9 +37,9 @@ const chartOptions = computed<EChartsOption>(() => {
     tooltip: {
       trigger: 'axis',
       formatter: (params: unknown) => {
-        const p = Array.isArray(params) ? params[0] : params;
-        const item = p as { name: string; value: number };
-        return `${item.name}<br/>水位: <b>${item.value}</b> m`;
+        const p = Array.isArray(params) ? params[0] : params
+        const item = p as { name: string; value: number }
+        return `${item.name}<br/>水位: <b>${item.value}</b> m`
       },
     },
     grid: {
@@ -91,8 +91,8 @@ const chartOptions = computed<EChartsOption>(() => {
         animationDuration: 500,
       },
     ],
-  };
-});
+  }
+})
 </script>
 
 <template>

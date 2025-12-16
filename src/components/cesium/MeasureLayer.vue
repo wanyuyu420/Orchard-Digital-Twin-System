@@ -29,25 +29,30 @@ onUnmounted(() => {
 })
 
 // Watch for tool type changes (backward compatibility with old measure store API)
-watch(() => gisStore.toolType, (newToolType, oldToolType) => {
-  if (oldToolType) {
-    deactivateTool()
-  }
+watch(
+  () => gisStore.toolType,
+  (newToolType, oldToolType) => {
+    if (oldToolType) {
+      deactivateTool()
+    }
 
-  if (newToolType && isMeasureTool(newToolType)) {
-    activateTool(newToolType as MeasureToolType)
+    if (newToolType && isMeasureTool(newToolType)) {
+      activateTool(newToolType as MeasureToolType)
+    }
   }
-})
+)
 
 /**
  * Check if tool type is a measurement tool
  */
 function isMeasureTool(toolType: string | null): boolean {
   if (!toolType) return false
-  return toolType === 'measure-distance' ||
-         toolType === 'measure-area' ||
-         toolType === 'distance' ||
-         toolType === 'area'
+  return (
+    toolType === 'measure-distance' ||
+    toolType === 'measure-area' ||
+    toolType === 'distance' ||
+    toolType === 'area'
+  )
 }
 
 /**
@@ -61,9 +66,10 @@ function activateTool(toolType: string) {
   }
 
   // Determine measure type from tool type
-  const measureType = (toolType === 'measure-distance' || toolType === 'distance')
-    ? 'distance' as MeasureToolType
-    : 'area' as MeasureToolType
+  const measureType =
+    toolType === 'measure-distance' || toolType === 'distance'
+      ? ('distance' as MeasureToolType)
+      : ('area' as MeasureToolType)
 
   try {
     // Create new tool instance
@@ -81,7 +87,7 @@ function activateTool(toolType: string) {
       onCancel: () => {
         // User cancelled measurement
         console.log('Measurement cancelled')
-      }
+      },
     })
 
     // Activate the tool
@@ -120,56 +126,64 @@ function cleanup() {
     const entitiesToRemove: any[] = []
 
     viewer.entities.values.forEach((entity: any) => {
-      if (entity.id && (
-        entity.id.startsWith('measure_') ||
-        entity.id.includes('_line') ||
-        entity.id.includes('_label') ||
-        entity.id.includes('_polygon')
-      )) {
+      if (
+        entity.id &&
+        (entity.id.startsWith('measure_') ||
+          entity.id.includes('_line') ||
+          entity.id.includes('_label') ||
+          entity.id.includes('_polygon'))
+      ) {
         entitiesToRemove.push(entity)
       }
     })
 
-    entitiesToRemove.forEach(entity => {
+    entitiesToRemove.forEach((entity) => {
       viewer.entities.remove(entity)
     })
   }
 }
 
 // Watch for measurement removals to clean up entities
-watch(() => gisStore.measurements.length, () => {
-  // When measurements are cleared, remove all measurement entities
-  if (gisStore.measurements.length === 0) {
-    cleanup()
+watch(
+  () => gisStore.measurements.length,
+  () => {
+    // When measurements are cleared, remove all measurement entities
+    if (gisStore.measurements.length === 0) {
+      cleanup()
+    }
   }
-})
+)
 
 // Watch for individual measurement removals
 const previousMeasurementIds = new Set<string>()
-watch(() => gisStore.measurements, (newMeasurements) => {
-  const currentIds = new Set(newMeasurements.map(m => m.id))
+watch(
+  () => gisStore.measurements,
+  (newMeasurements) => {
+    const currentIds = new Set(newMeasurements.map((m) => m.id))
 
-  // Find removed measurement IDs
-  const removedIds = Array.from(previousMeasurementIds).filter(id => !currentIds.has(id))
+    // Find removed measurement IDs
+    const removedIds = Array.from(previousMeasurementIds).filter((id) => !currentIds.has(id))
 
-  // Remove entities for deleted measurements
-  const viewer = cesiumStore.viewer
-  if (viewer && removedIds.length > 0) {
-    removedIds.forEach(id => {
-      const lineEntity = viewer.entities.getById(`${id}_line`)
-      const labelEntity = viewer.entities.getById(`${id}_label`)
-      const polygonEntity = viewer.entities.getById(`${id}_polygon`)
+    // Remove entities for deleted measurements
+    const viewer = cesiumStore.viewer
+    if (viewer && removedIds.length > 0) {
+      removedIds.forEach((id) => {
+        const lineEntity = viewer.entities.getById(`${id}_line`)
+        const labelEntity = viewer.entities.getById(`${id}_label`)
+        const polygonEntity = viewer.entities.getById(`${id}_polygon`)
 
-      if (lineEntity) viewer.entities.remove(lineEntity)
-      if (labelEntity) viewer.entities.remove(labelEntity)
-      if (polygonEntity) viewer.entities.remove(polygonEntity)
-    })
-  }
+        if (lineEntity) viewer.entities.remove(lineEntity)
+        if (labelEntity) viewer.entities.remove(labelEntity)
+        if (polygonEntity) viewer.entities.remove(polygonEntity)
+      })
+    }
 
-  // Update previous IDs
-  previousMeasurementIds.clear()
-  currentIds.forEach(id => previousMeasurementIds.add(id))
-}, { deep: true })
+    // Update previous IDs
+    previousMeasurementIds.clear()
+    currentIds.forEach((id) => previousMeasurementIds.add(id))
+  },
+  { deep: true }
+)
 </script>
 
 <style scoped>

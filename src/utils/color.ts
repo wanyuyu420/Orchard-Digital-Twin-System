@@ -34,7 +34,7 @@ export function colorRgbString(inColor: string): string {
 // Convert hex color to normalized RGB [0.0-1.0]
 export function colorRgb1(inColor: string): number[] {
   const colorChange = colorRgb(inColor)
-  return colorChange.map(v => parseFloat((v / 255.0).toFixed(2)))
+  return colorChange.map((v) => parseFloat((v / 255.0).toFixed(2)))
 }
 
 // Convert RGB string to hex

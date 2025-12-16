@@ -47,7 +47,10 @@
             v-for="sensor in sensors"
             :key="sensor.id"
             class="sensor-item"
-            :class="{ selected: selectedSensorId === sensor.id, offline: sensor.status !== 'active' }"
+            :class="{
+              selected: selectedSensorId === sensor.id,
+              offline: sensor.status !== 'active',
+            }"
             @click="selectSensor(sensor.id)"
           >
             <div class="sensor-info">
@@ -79,77 +82,77 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
-import ModalBox from '@/components/common/ModalBox.vue';
-import TerminalLog from '@/components/business/TerminalLog.vue';
-import { DeviceGaugeChart, ProtocolPieChart } from '@/components/charts';
-import { useDeviceStore } from '@/stores/device';
-import { useRealtimeStore } from '@/stores/realtime';
-import * as adminApi from '@/api/admin';
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import ModalBox from '@/components/common/ModalBox.vue'
+import TerminalLog from '@/components/business/TerminalLog.vue'
+import { DeviceGaugeChart, ProtocolPieChart } from '@/components/charts'
+import { useDeviceStore } from '@/stores/device'
+import { useRealtimeStore } from '@/stores/realtime'
+import * as adminApi from '@/api/admin'
 
-const store = useDeviceStore();
-const realtimeStore = useRealtimeStore();
+const store = useDeviceStore()
+const realtimeStore = useRealtimeStore()
 
 // Real sensor data from database
-const sensors = ref<adminApi.SensorAdmin[]>([]);
-const isLoading = ref(false);
-const selectedSensorId = ref<number | null>(null);
+const sensors = ref<adminApi.SensorAdmin[]>([])
+const isLoading = ref(false)
+const selectedSensorId = ref<number | null>(null)
 
 // Computed stats from real sensor data
 const sensorStats = computed(() => {
-  const total = sensors.value.length;
-  const active = sensors.value.filter(s => s.status === 'active').length;
-  const offline = sensors.value.filter(s => s.status !== 'active').length;
-  return { total, active, offline };
-});
+  const total = sensors.value.length
+  const active = sensors.value.filter((s) => s.status === 'active').length
+  const offline = sensors.value.filter((s) => s.status !== 'active').length
+  return { total, active, offline }
+})
 
 // Sensor type distribution for pie chart
 const sensorTypeDistribution = computed(() => {
-  const countMap = new Map<string, number>();
-  sensors.value.forEach(s => {
-    const typeName = s.sensor_type_name || '未知';
-    countMap.set(typeName, (countMap.get(typeName) || 0) + 1);
-  });
-  return Array.from(countMap.entries()).map(([name, value]) => ({ name, value }));
-});
+  const countMap = new Map<string, number>()
+  sensors.value.forEach((s) => {
+    const typeName = s.sensor_type_name || '未知'
+    countMap.set(typeName, (countMap.get(typeName) || 0) + 1)
+  })
+  return Array.from(countMap.entries()).map(([name, value]) => ({ name, value }))
+})
 
 function selectSensor(id: number) {
-  selectedSensorId.value = id;
-  const sensor = sensors.value.find(s => s.id === id);
+  selectedSensorId.value = id
+  const sensor = sensors.value.find((s) => s.id === id)
   if (sensor) {
-    store.selectDevice(sensor.point_code);
+    store.selectDevice(sensor.point_code)
   }
 }
 
 async function loadSensors() {
-  isLoading.value = true;
+  isLoading.value = true
   try {
-    const response = await adminApi.fetchSensors({ page_size: 100 });
-    sensors.value = response.items;
+    const response = await adminApi.fetchSensors({ page_size: 100 })
+    sensors.value = response.items
     if (sensors.value.length > 0 && !selectedSensorId.value) {
-      selectedSensorId.value = sensors.value[0].id;
+      selectedSensorId.value = sensors.value[0].id
     }
   } catch (err) {
-    console.error('Failed to fetch sensors:', err);
+    console.error('Failed to fetch sensors:', err)
   } finally {
-    isLoading.value = false;
+    isLoading.value = false
   }
 }
 
 onMounted(() => {
   // Fetch real sensor data from database
-  loadSensors();
+  loadSensors()
   // Also fetch IoT devices for backward compatibility
-  store.fetchDevices();
+  store.fetchDevices()
   // Start log simulation
-  store.startSimulation();
+  store.startSimulation()
   // Connect WebSocket
-  realtimeStore.connect();
-});
+  realtimeStore.connect()
+})
 
 onUnmounted(() => {
-  store.stopSimulation();
-});
+  store.stopSimulation()
+})
 </script>
 
 <style scoped lang="scss">

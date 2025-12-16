@@ -58,7 +58,7 @@ export class MeasureTool extends BaseTool {
   constructor(viewer: Cesium.Viewer, options: MeasureToolOptions) {
     super(viewer, {
       ...options,
-      type: options.measureType === 'distance' ? 'measure-distance' : 'measure-area'
+      type: options.measureType === 'distance' ? 'measure-distance' : 'measure-area',
     })
 
     this.measureType = options.measureType
@@ -71,38 +71,26 @@ export class MeasureTool extends BaseTool {
    */
   protected setupEventHandlers(): void {
     // 左键单击
-    this.handler.setInputAction(
-      (click: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
-        this.handleLeftClick(click.position)
-      },
-      Cesium.ScreenSpaceEventType.LEFT_CLICK
-    )
+    this.handler.setInputAction((click: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
+      this.handleLeftClick(click.position)
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK)
 
     // 双击（仅面积测量）
     if (this.measureType === 'area') {
-      this.handler.setInputAction(
-        (click: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
-          this.handleDoubleClick(click.position)
-        },
-        Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK
-      )
+      this.handler.setInputAction((click: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
+        this.handleDoubleClick(click.position)
+      }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK)
     }
 
     // 右键取消
-    this.handler.setInputAction(
-      () => {
-        this.handleRightClick()
-      },
-      Cesium.ScreenSpaceEventType.RIGHT_CLICK
-    )
+    this.handler.setInputAction(() => {
+      this.handleRightClick()
+    }, Cesium.ScreenSpaceEventType.RIGHT_CLICK)
 
     // 鼠标移动
-    this.handler.setInputAction(
-      (movement: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
-        this.handleMouseMove(movement.endPosition)
-      },
-      Cesium.ScreenSpaceEventType.MOUSE_MOVE
-    )
+    this.handler.setInputAction((movement: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
+      this.handleMouseMove(movement.endPosition)
+    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE)
   }
 
   /**
@@ -214,7 +202,7 @@ export class MeasureTool extends BaseTool {
       distance: distance,
       startPoint: this.cartesianToCoordinate(this.points[0]),
       endPoint: this.cartesianToCoordinate(this.points[1]),
-      createdAt: new Date()
+      createdAt: new Date(),
     }
 
     // 创建永久显示的实体
@@ -245,8 +233,8 @@ export class MeasureTool extends BaseTool {
       id: this.generateMeasurementId(),
       type: 'area',
       area: area,
-      vertices: this.points.map(p => this.cartesianToCoordinate(p)),
-      createdAt: new Date()
+      vertices: this.points.map((p) => this.cartesianToCoordinate(p)),
+      createdAt: new Date(),
     }
 
     // 创建永久显示的实体
@@ -310,19 +298,15 @@ export class MeasureTool extends BaseTool {
         width: 2,
         material: new Cesium.PolylineDashMaterialProperty({
           color: Cesium.Color.CYAN.withAlpha(0.7),
-          dashLength: 16
+          dashLength: 16,
         }),
-        clampToGround: true
-      }
+        clampToGround: true,
+      },
     })
     this.previewEntities.push(line)
 
     // 预览标签
-    const midpoint = Cesium.Cartesian3.midpoint(
-      positions[0],
-      positions[1],
-      new Cesium.Cartesian3()
-    )
+    const midpoint = Cesium.Cartesian3.midpoint(positions[0], positions[1], new Cesium.Cartesian3())
     const label = this.viewer.entities.add({
       position: midpoint,
       label: {
@@ -333,8 +317,8 @@ export class MeasureTool extends BaseTool {
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, -20),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     })
     this.previewEntities.push(label)
   }
@@ -356,10 +340,10 @@ export class MeasureTool extends BaseTool {
         width: 2,
         material: new Cesium.PolylineDashMaterialProperty({
           color: Cesium.Color.YELLOW.withAlpha(0.7),
-          dashLength: 16
+          dashLength: 16,
         }),
-        clampToGround: true
-      }
+        clampToGround: true,
+      },
     })
     this.previewEntities.push(line)
 
@@ -370,8 +354,8 @@ export class MeasureTool extends BaseTool {
           hierarchy: new Cesium.PolygonHierarchy(positions),
           material: Cesium.Color.YELLOW.withAlpha(0.3),
           outline: false,
-          perPositionHeight: false
-        }
+          perPositionHeight: false,
+        },
       })
       this.previewEntities.push(polygon)
 
@@ -387,8 +371,8 @@ export class MeasureTool extends BaseTool {
           outlineWidth: 2,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           pixelOffset: new Cesium.Cartesian2(0, -20),
-          disableDepthTestDistance: Number.POSITIVE_INFINITY
-        }
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
       })
       this.previewEntities.push(label)
     }
@@ -419,10 +403,10 @@ export class MeasureTool extends BaseTool {
         width: 3,
         material: new Cesium.PolylineDashMaterialProperty({
           color: Cesium.Color.CYAN,
-          dashLength: 16
+          dashLength: 16,
         }),
-        clampToGround: true
-      }
+        clampToGround: true,
+      },
     })
 
     // 标签
@@ -438,8 +422,8 @@ export class MeasureTool extends BaseTool {
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, -20),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     })
   }
 
@@ -451,7 +435,7 @@ export class MeasureTool extends BaseTool {
     if (measurement.type !== 'area') return
     if (!measurement.vertices || measurement.vertices.length < 3) return
 
-    const positions = measurement.vertices.map(v =>
+    const positions = measurement.vertices.map((v) =>
       Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude)
     )
 
@@ -464,8 +448,8 @@ export class MeasureTool extends BaseTool {
         outline: true,
         outlineColor: Cesium.Color.YELLOW,
         outlineWidth: 3,
-        perPositionHeight: false
-      }
+        perPositionHeight: false,
+      },
     })
 
     // 标签
@@ -481,8 +465,8 @@ export class MeasureTool extends BaseTool {
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, -20),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     })
   }
 
@@ -497,8 +481,8 @@ export class MeasureTool extends BaseTool {
         color: this.measureType === 'distance' ? Cesium.Color.CYAN : Cesium.Color.YELLOW,
         outlineColor: Cesium.Color.WHITE,
         outlineWidth: 2,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     })
     this.markerEntities.push(marker)
   }
@@ -507,7 +491,7 @@ export class MeasureTool extends BaseTool {
    * 清除预览实体
    */
   private clearPreview(): void {
-    this.previewEntities.forEach(entity => {
+    this.previewEntities.forEach((entity) => {
       this.viewer.entities.remove(entity)
     })
     this.previewEntities = []
@@ -517,7 +501,7 @@ export class MeasureTool extends BaseTool {
    * 清除标记
    */
   private clearMarkers(): void {
-    this.markerEntities.forEach(entity => {
+    this.markerEntities.forEach((entity) => {
       this.viewer.entities.remove(entity)
     })
     this.markerEntities = []
@@ -547,7 +531,7 @@ export class MeasureTool extends BaseTool {
     // 使用 PolygonGeometry 计算精确面积
     const polygonGeometry = Cesium.PolygonGeometry.fromPositions({
       positions: positions,
-      vertexFormat: Cesium.VertexFormat.POSITION_ONLY
+      vertexFormat: Cesium.VertexFormat.POSITION_ONLY,
     })
 
     const geometry = Cesium.PolygonGeometry.createGeometry(polygonGeometry)
@@ -563,9 +547,21 @@ export class MeasureTool extends BaseTool {
       const i1 = indices[i + 1] * 3
       const i2 = indices[i + 2] * 3
 
-      const p0 = new Cesium.Cartesian3(positionsArray[i0], positionsArray[i0 + 1], positionsArray[i0 + 2])
-      const p1 = new Cesium.Cartesian3(positionsArray[i1], positionsArray[i1 + 1], positionsArray[i1 + 2])
-      const p2 = new Cesium.Cartesian3(positionsArray[i2], positionsArray[i2 + 1], positionsArray[i2 + 2])
+      const p0 = new Cesium.Cartesian3(
+        positionsArray[i0],
+        positionsArray[i0 + 1],
+        positionsArray[i0 + 2]
+      )
+      const p1 = new Cesium.Cartesian3(
+        positionsArray[i1],
+        positionsArray[i1 + 1],
+        positionsArray[i1 + 2]
+      )
+      const p2 = new Cesium.Cartesian3(
+        positionsArray[i2],
+        positionsArray[i2 + 1],
+        positionsArray[i2 + 2]
+      )
 
       area += this.triangleArea(p0, p1, p2)
     }
@@ -576,7 +572,11 @@ export class MeasureTool extends BaseTool {
   /**
    * 计算三角形面积
    */
-  private triangleArea(p0: Cesium.Cartesian3, p1: Cesium.Cartesian3, p2: Cesium.Cartesian3): number {
+  private triangleArea(
+    p0: Cesium.Cartesian3,
+    p1: Cesium.Cartesian3,
+    p2: Cesium.Cartesian3
+  ): number {
     const a = Cesium.Cartesian3.distance(p0, p1)
     const b = Cesium.Cartesian3.distance(p1, p2)
     const c = Cesium.Cartesian3.distance(p2, p0)
@@ -602,7 +602,7 @@ export class MeasureTool extends BaseTool {
     const cartographic = Cesium.Cartographic.fromCartesian(cartesian)
     return {
       longitude: Cesium.Math.toDegrees(cartographic.longitude),
-      latitude: Cesium.Math.toDegrees(cartographic.latitude)
+      latitude: Cesium.Math.toDegrees(cartographic.latitude),
     }
   }
 

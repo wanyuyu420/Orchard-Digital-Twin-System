@@ -9,26 +9,26 @@ import type * as Cesium from 'cesium'
  * 向后兼容：同时支持新格式（draw-*）和旧格式（无前缀）
  */
 export type DrawToolType =
-  | 'draw-point'      // 点标注（新格式）
-  | 'draw-line'       // 线绘制（新格式）
-  | 'draw-polygon'    // 多边形（新格式）
-  | 'draw-circle'     // 圆形（新格式）
-  | 'draw-rectangle'  // 矩形（新格式）
-  | 'point'           // 点标注（旧格式 - 向后兼容）
-  | 'line'            // 线绘制（旧格式 - 向后兼容）
-  | 'polygon'         // 多边形（旧格式 - 向后兼容）
-  | 'circle'          // 圆形（旧格式 - 向后兼容）
-  | 'rectangle'       // 矩形（旧格式 - 向后兼容）
-  | null              // 无激活工具
+  | 'draw-point' // 点标注（新格式）
+  | 'draw-line' // 线绘制（新格式）
+  | 'draw-polygon' // 多边形（新格式）
+  | 'draw-circle' // 圆形（新格式）
+  | 'draw-rectangle' // 矩形（新格式）
+  | 'point' // 点标注（旧格式 - 向后兼容）
+  | 'line' // 线绘制（旧格式 - 向后兼容）
+  | 'polygon' // 多边形（旧格式 - 向后兼容）
+  | 'circle' // 圆形（旧格式 - 向后兼容）
+  | 'rectangle' // 矩形（旧格式 - 向后兼容）
+  | null // 无激活工具
 
 /**
  * 3D 分析工具类型
  */
 export type AnalysisToolType =
-  | 'volume'          // 方量分析
-  | 'flood'           // 淹没分析
-  | 'profile'         // 剖面分析
-  | 'measure3d'       // 3D测量
+  | 'volume' // 方量分析
+  | 'flood' // 淹没分析
+  | 'profile' // 剖面分析
+  | 'measure3d' // 3D测量
 
 /**
  * 所有 GIS 工具类型（绘制 + 分析，不包含 null）
@@ -49,17 +49,17 @@ export type FeatureType =
   | 'polygon'
   | 'circle'
   | 'rectangle'
-  | 'distance'   // 距离测量（兼容现有）
-  | 'area'       // 面积测量（兼容现有）
+  | 'distance' // 距离测量（兼容现有）
+  | 'area' // 面积测量（兼容现有）
 
 /**
  * 绘制模式
  */
 export type DrawMode =
-  | 'none'        // 未激活
-  | 'drawing'     // 绘制中
-  | 'editing'     // 编辑中
-  | 'selecting'   // 选择中
+  | 'none' // 未激活
+  | 'drawing' // 绘制中
+  | 'editing' // 编辑中
+  | 'selecting' // 选择中
 
 /**
  * 绘制状态
@@ -101,12 +101,12 @@ export interface DrawingState {
  * 要素样式
  */
 export interface FeatureStyle {
-  fillColor: string       // rgba(255, 255, 255, 0.5) 或 #FFFFFF
-  strokeColor: string     // rgba(255, 204, 51, 1) 或 #FFCC33
-  strokeWidth: number     // 1-10
-  pointSize: number       // 5-20
-  opacity: number         // 0-1
-  lineType?: LineType     // 线型（可选）
+  fillColor: string // rgba(255, 255, 255, 0.5) 或 #FFFFFF
+  strokeColor: string // rgba(255, 204, 51, 1) 或 #FFCC33
+  strokeWidth: number // 1-10
+  pointSize: number // 5-20
+  opacity: number // 0-1
+  lineType?: LineType // 线型（可选）
 }
 
 /**
@@ -118,7 +118,7 @@ export const DEFAULT_STYLE: FeatureStyle = {
   strokeWidth: 3,
   pointSize: 10,
   opacity: 1,
-  lineType: 'solid'
+  lineType: 'solid',
 }
 
 /**
@@ -138,7 +138,7 @@ export const STYLE_PRESETS: StylePreset[] = [
   {
     id: 'default',
     name: '默认',
-    style: DEFAULT_STYLE
+    style: DEFAULT_STYLE,
   },
   {
     id: 'warning',
@@ -148,8 +148,8 @@ export const STYLE_PRESETS: StylePreset[] = [
       strokeColor: '#ff9800',
       strokeWidth: 3,
       pointSize: 10,
-      opacity: 1
-    }
+      opacity: 1,
+    },
   },
   {
     id: 'danger',
@@ -159,8 +159,8 @@ export const STYLE_PRESETS: StylePreset[] = [
       strokeColor: '#f44336',
       strokeWidth: 3,
       pointSize: 10,
-      opacity: 1
-    }
+      opacity: 1,
+    },
   },
   {
     id: 'safe',
@@ -170,8 +170,8 @@ export const STYLE_PRESETS: StylePreset[] = [
       strokeColor: '#4caf50',
       strokeWidth: 3,
       pointSize: 10,
-      opacity: 1
-    }
+      opacity: 1,
+    },
   },
   {
     id: 'water',
@@ -181,9 +181,9 @@ export const STYLE_PRESETS: StylePreset[] = [
       strokeColor: '#2196f3',
       strokeWidth: 2,
       pointSize: 8,
-      opacity: 1
-    }
-  }
+      opacity: 1,
+    },
+  },
 ]
 
 /**
@@ -213,10 +213,10 @@ export interface DrawOptions {
  * 顶点编辑操作类型
  */
 export type VertexEditAction =
-  | 'add'       // 添加顶点
-  | 'move'      // 移动顶点
-  | 'remove'    // 删除顶点
-  | 'insert'    // 插入顶点（在边的中点）
+  | 'add' // 添加顶点
+  | 'move' // 移动顶点
+  | 'remove' // 删除顶点
+  | 'insert' // 插入顶点（在边的中点）
 
 /**
  * 顶点编辑事件
@@ -239,10 +239,10 @@ export interface VertexEditEvent {
  * 捕捉目标类型
  */
 export type SnapTargetType =
-  | 'vertex'    // 顶点
-  | 'edge'      // 边
-  | 'midpoint'  // 中点
-  | 'center'    // 中心点
+  | 'vertex' // 顶点
+  | 'edge' // 边
+  | 'midpoint' // 中点
+  | 'center' // 中心点
 
 /**
  * 捕捉结果

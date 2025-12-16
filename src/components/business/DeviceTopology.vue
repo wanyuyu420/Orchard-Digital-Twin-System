@@ -1,7 +1,7 @@
 <template>
   <div class="topology-list">
-    <div 
-      v-for="device in devices" 
+    <div
+      v-for="device in devices"
       :key="device.id"
       class="device-item glass-panel"
       :class="{ active: selectedId === device.id }"
@@ -25,11 +25,11 @@
 </template>
 
 <script setup lang="ts">
-import { storeToRefs } from 'pinia';
-import { useDeviceStore } from '@/stores/device';
+import { storeToRefs } from 'pinia'
+import { useDeviceStore } from '@/stores/device'
 
-const store = useDeviceStore();
-const { devices, selectedId } = storeToRefs(store);
+const store = useDeviceStore()
+const { devices, selectedId } = storeToRefs(store)
 </script>
 
 <style scoped lang="scss">
@@ -48,11 +48,11 @@ const { devices, selectedId } = storeToRefs(store);
   border-left: 3px solid transparent;
   cursor: pointer;
   transition: all 0.2s;
-  
+
   &:hover {
     background: rgba(255, 255, 255, 0.05);
   }
-  
+
   &.active {
     background: rgba(34, 211, 238, 0.1);
     border-left-color: $neon-cyan;
@@ -84,6 +84,10 @@ const { devices, selectedId } = storeToRefs(store);
   margin-right: 2px;
 }
 
-.text-success { color: $success-green; }
-.text-alert { color: $alert-red; }
+.text-success {
+  color: $success-green;
+}
+.text-alert {
+  color: $alert-red;
+}
 </style>

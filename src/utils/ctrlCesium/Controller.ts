@@ -13,7 +13,8 @@ declare const Cesium: any
 
 // Cesium Ion Access Token (for World Terrain and other Ion assets)
 // Register at: https://cesium.com/ion/tokens
-const CESIUM_ION_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN ||
+const CESIUM_ION_TOKEN =
+  import.meta.env.VITE_CESIUM_ION_TOKEN ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlY2ViYjQyYy0xMzIyLTRlYjAtODdhOS1lMTM2ZTFhYjdhYjAiLCJpZCI6MzQ3OTk2LCJpYXQiOjE3NTk4MjkzODR9.dCi1uXY8ZD6Fym41vwc4-aTTeCdMR1EXM27V82Fp0ZI'
 
 // Set Ion default access token
@@ -69,7 +70,7 @@ class Controller {
 
     // Default viewer configuration - no imageryProvider, will be added via setConfigMapList
     let vConfig: any = {
-      imageryProvider: false,  // Disable default imagery, add layers explicitly
+      imageryProvider: false, // Disable default imagery, add layers explicitly
       contextOptions: {
         webgl: {
           alpha: false,
@@ -125,12 +126,12 @@ class Controller {
    */
   private async loadWorldTerrain(): Promise<void> {
     if (!this.viewer || this.terrainLoading) return
-    
+
     this.terrainLoading = true
     try {
       const terrainProvider = await Cesium.createWorldTerrainAsync({
         requestWaterMask: true,
-        requestVertexNormals: true
+        requestVertexNormals: true,
       })
       this.viewer.terrainProvider = terrainProvider
       this.terrainEnabled = true
@@ -188,7 +189,10 @@ class Controller {
       }
       new CesiumNavigation(viewer, options)
     } catch (error) {
-      console.warn('CesiumNavigation initialization failed (may be incompatible with Cesium 1.136):', error)
+      console.warn(
+        'CesiumNavigation initialization failed (may be incompatible with Cesium 1.136):',
+        error
+      )
     }
   }
 
@@ -236,7 +240,7 @@ class Controller {
 
     // Apply globe filter (tech/ink style) - uses new Globe filter API
     // Find first layer with filter enabled
-    const filterLayer = mapImageryList.find(elem => elem.invertswitch)
+    const filterLayer = mapImageryList.find((elem) => elem.invertswitch)
     if (filterLayer) {
       this.setGlobeFilter(viewer, true, filterLayer.filterRGB)
     }
@@ -290,16 +294,12 @@ class Controller {
       }
       viewer.resolutionScale = dpr
     }
-
   }
 
   // Get current view center coordinates
   getCurCenterLonLat(viewer: any): { lon: number; lat: number } | null {
     const result = viewer.camera.pickEllipsoid(
-      new Cesium.Cartesian2(
-        viewer.canvas.clientWidth / 2,
-        viewer.canvas.clientHeight / 2
-      )
+      new Cesium.Cartesian2(viewer.canvas.clientWidth / 2, viewer.canvas.clientHeight / 2)
     )
     if (!result) return null
 

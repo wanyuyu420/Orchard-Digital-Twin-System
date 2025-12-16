@@ -2,15 +2,25 @@
   <div class="map-toolbar-wrapper" :class="positionClass">
     <!-- 垂直工具栏按钮组 -->
     <div class="toolbar-container">
-      <div v-if="showMapStyle" class="toolbar-btn" @click="togglePanel" :class="{ 'is-active': isPanelVisible }"
-        title="底图与风格">
+      <div
+        v-if="showMapStyle"
+        class="toolbar-btn"
+        @click="togglePanel"
+        :class="{ 'is-active': isPanelVisible }"
+        title="底图与风格"
+      >
         <i class="fa-solid fa-layer-group"></i>
       </div>
       <div v-if="showLocation" class="toolbar-btn" @click="$emit('locate')" title="定位">
         <i class="fa-solid fa-location-crosshairs"></i>
       </div>
-      <div v-if="show3DToggle" class="toolbar-btn" @click="$emit('toggle3d')" :class="{ 'is-active': is3DActive }"
-        title="3D视角">
+      <div
+        v-if="show3DToggle"
+        class="toolbar-btn"
+        @click="$emit('toggle3d')"
+        :class="{ 'is-active': is3DActive }"
+        title="3D视角"
+      >
         <i class="fa-solid fa-cube"></i>
       </div>
       <!-- 自定义按钮插槽 -->
@@ -31,7 +41,11 @@
             <div class="filter-toggle">
               <span class="toggle-label">科技风滤镜</span>
               <label class="switch">
-                <input type="checkbox" v-model="localFilterState.enabled" @change="emitFilterChange">
+                <input
+                  type="checkbox"
+                  v-model="localFilterState.enabled"
+                  @change="emitFilterChange"
+                />
                 <span class="slider"></span>
               </label>
             </div>
@@ -40,15 +54,26 @@
           <!-- 滤镜颜色 -->
           <div class="setting-group" v-if="localFilterState.enabled">
             <div class="group-label">滤镜颜色</div>
-            <input type="color" v-model="localFilterState.color" @change="emitFilterChange" class="color-input" />
+            <input
+              type="color"
+              v-model="localFilterState.color"
+              @change="emitFilterChange"
+              class="color-input"
+            />
           </div>
 
           <!-- 预设主题 -->
           <div class="setting-group" v-if="localFilterState.enabled">
             <div class="group-label">预设主题</div>
             <div class="preset-colors">
-              <span v-for="preset in presetColors" :key="preset.color" class="color-block"
-                :style="{ background: preset.color }" :title="preset.name" @click="applyPreset(preset.color)"></span>
+              <span
+                v-for="preset in presetColors"
+                :key="preset.color"
+                class="color-block"
+                :style="{ background: preset.color }"
+                :title="preset.name"
+                @click="applyPreset(preset.color)"
+              ></span>
             </div>
           </div>
 
@@ -59,22 +84,35 @@
           <div class="setting-group" v-if="showBasemapSelector">
             <div class="group-label">底图样式</div>
             <div class="basemap-list">
-              <div class="basemap-item" :class="{ active: localMapType === 'amap' }" @click="selectBasemap('amap')">
+              <div
+                class="basemap-item"
+                :class="{ active: localMapType === 'amap' }"
+                @click="selectBasemap('amap')"
+              >
                 <div class="thumb amap"></div>
                 <span>高德</span>
               </div>
-              <div class="basemap-item" :class="{ active: localMapType === 'tdt_vec' }"
-                @click="selectBasemap('tdt_vec')">
+              <div
+                class="basemap-item"
+                :class="{ active: localMapType === 'tdt_vec' }"
+                @click="selectBasemap('tdt_vec')"
+              >
                 <div class="thumb vec"></div>
                 <span>矢量</span>
               </div>
-              <div class="basemap-item" :class="{ active: localMapType === 'tdt_ter' }"
-                @click="selectBasemap('tdt_ter')">
+              <div
+                class="basemap-item"
+                :class="{ active: localMapType === 'tdt_ter' }"
+                @click="selectBasemap('tdt_ter')"
+              >
                 <div class="thumb ter"></div>
                 <span>地形</span>
               </div>
-              <div class="basemap-item" :class="{ active: localMapType === 'tdt_img' }"
-                @click="selectBasemap('tdt_img')">
+              <div
+                class="basemap-item"
+                :class="{ active: localMapType === 'tdt_img' }"
+                @click="selectBasemap('tdt_img')"
+              >
                 <div class="thumb img"></div>
                 <span>影像</span>
               </div>
@@ -90,27 +128,30 @@
 import { ref, computed, watch } from 'vue'
 
 // Props
-const props = withDefaults(defineProps<{
-  position?: 'left' | 'right'
-  showMapStyle?: boolean
-  showLocation?: boolean
-  show3DToggle?: boolean
-  showBasemapSelector?: boolean
-  is3DActive?: boolean
-  panelTitle?: string
-  filterState?: { enabled: boolean; color: string }
-  mapType?: string
-}>(), {
-  position: 'right',
-  showMapStyle: true,
-  showLocation: true,
-  show3DToggle: false,
-  showBasemapSelector: true,
-  is3DActive: false,
-  panelTitle: '地图风格控制',
-  filterState: () => ({ enabled: true, color: '#4E70A6' }),
-  mapType: 'amap'
-})
+const props = withDefaults(
+  defineProps<{
+    position?: 'left' | 'right'
+    showMapStyle?: boolean
+    showLocation?: boolean
+    show3DToggle?: boolean
+    showBasemapSelector?: boolean
+    is3DActive?: boolean
+    panelTitle?: string
+    filterState?: { enabled: boolean; color: string }
+    mapType?: string
+  }>(),
+  {
+    position: 'right',
+    showMapStyle: true,
+    showLocation: true,
+    show3DToggle: false,
+    showBasemapSelector: true,
+    is3DActive: false,
+    panelTitle: '地图风格控制',
+    filterState: () => ({ enabled: true, color: '#4E70A6' }),
+    mapType: 'amap',
+  }
+)
 
 // Emits
 const emit = defineEmits<{
@@ -134,23 +175,28 @@ const presetColors = [
   { name: '森林绿', color: '#006450' },
   { name: '暗紫色', color: '#3C2850' },
   { name: '棕褐色', color: '#503C28' },
-  { name: '深邃黑', color: '#141428' }
+  { name: '深邃黑', color: '#141428' },
 ]
 
 // Computed
 const positionClass = computed(() => `position-${props.position}`)
-const panelTransition = computed(() =>
-  props.position === 'left' ? 'slide-left' : 'slide-right'
-)
+const panelTransition = computed(() => (props.position === 'left' ? 'slide-left' : 'slide-right'))
 
 // Watch props changes
-watch(() => props.filterState, (val) => {
-  localFilterState.value = { ...val }
-}, { deep: true })
+watch(
+  () => props.filterState,
+  (val) => {
+    localFilterState.value = { ...val }
+  },
+  { deep: true }
+)
 
-watch(() => props.mapType, (val) => {
-  localMapType.value = val
-})
+watch(
+  () => props.mapType,
+  (val) => {
+    localMapType.value = val
+  }
+)
 
 // Methods
 const togglePanel = () => {
@@ -177,8 +223,12 @@ const selectBasemap = (type: string) => {
 // Expose
 defineExpose({
   togglePanel,
-  closePanel: () => { isPanelVisible.value = false },
-  openPanel: () => { isPanelVisible.value = true }
+  closePanel: () => {
+    isPanelVisible.value = false
+  },
+  openPanel: () => {
+    isPanelVisible.value = true
+  },
 })
 </script>
 
@@ -392,7 +442,7 @@ defineExpose({
           left: 15%;
           right: 15%;
           height: 2px;
-          background: #3385FF;
+          background: #3385ff;
           transform: translateY(-50%);
         }
       }
@@ -452,7 +502,7 @@ defineExpose({
 
     &:before {
       position: absolute;
-      content: "";
+      content: '';
       height: 18px;
       width: 18px;
       left: 2px;

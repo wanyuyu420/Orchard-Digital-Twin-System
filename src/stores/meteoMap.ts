@@ -45,9 +45,9 @@ export const useMeteoMapStore = defineStore('meteoMap', () => {
         orientation: {
           heading: camera.heading,
           pitch: camera.pitch,
-          roll: camera.roll
+          roll: camera.roll,
         },
-        duration: 1
+        duration: 1,
       })
     } catch (e) {
       console.warn('Failed to sync from main Cesium:', e)
@@ -62,13 +62,17 @@ export const useMeteoMapStore = defineStore('meteoMap', () => {
     height.value = DEFAULT_HEIGHT
 
     viewer.value.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(DEFAULT_CENTER.lon, DEFAULT_CENTER.lat, DEFAULT_HEIGHT),
+      destination: Cesium.Cartesian3.fromDegrees(
+        DEFAULT_CENTER.lon,
+        DEFAULT_CENTER.lat,
+        DEFAULT_HEIGHT
+      ),
       orientation: {
         heading: 0,
         pitch: Cesium.Math.toRadians(-60),
-        roll: 0
+        roll: 0,
       },
-      duration: 1
+      duration: 1,
     })
   }
 
@@ -97,6 +101,6 @@ export const useMeteoMapStore = defineStore('meteoMap', () => {
     destroy,
     TDT_KEY,
     DEFAULT_CENTER,
-    DEFAULT_HEIGHT
+    DEFAULT_HEIGHT,
   }
 })

@@ -9,20 +9,20 @@ vi.mock('cesium', () => {
     { x: 100, y: 200, z: 300 },
     { x: 150, y: 200, z: 300 },
     { x: 150, y: 250, z: 300 },
-    { x: 100, y: 250, z: 300 }
+    { x: 100, y: 250, z: 300 },
   ]
 
   const mockCartographic = {
     longitude: 2.0,
     latitude: 0.5,
-    height: 0
+    height: 0,
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const mockEllipsoid = {
     maximumRadius: 6378137,
     cartesianToCartographic: vi.fn(() => mockCartographic),
-    cartographicToCartesian: vi.fn((_carto: any) => mockPositions[0])
+    cartographicToCartesian: vi.fn((_carto: any) => mockPositions[0]),
   }
 
   return {
@@ -32,26 +32,26 @@ vi.mock('cesium', () => {
     Cartographic: vi.fn((lon: number, lat: number, height?: number) => ({
       longitude: lon,
       latitude: lat,
-      height: height || 0
+      height: height || 0,
     })),
     Color: {
       fromCssColorString: vi.fn((_color: string) => ({
-        withAlpha: vi.fn((alpha: number) => ({ r: 1, g: 0.8, b: 0.2, a: alpha }))
+        withAlpha: vi.fn((alpha: number) => ({ r: 1, g: 0.8, b: 0.2, a: alpha })),
       })),
       WHITE: { r: 1, g: 1, b: 1, a: 1 },
       BLACK: { r: 0, g: 0, b: 0, a: 1 },
-      RED: { r: 1, g: 0, b: 0, a: 1 }
+      RED: { r: 1, g: 0, b: 0, a: 1 },
     },
     ColorMaterialProperty: vi.fn((color: any) => ({ color })),
     LabelStyle: {
-      FILL_AND_OUTLINE: 0
+      FILL_AND_OUTLINE: 0,
     },
     HeightReference: {
-      CLAMP_TO_GROUND: 0
+      CLAMP_TO_GROUND: 0,
     },
     Math: {
-      toDegrees: vi.fn((radians: number) => radians * 180 / Math.PI)
-    }
+      toDegrees: vi.fn((radians: number) => (radians * 180) / Math.PI),
+    },
   }
 })
 
@@ -62,26 +62,26 @@ const mockPositions = [
   { x: 100, y: 200, z: 300 },
   { x: 150, y: 200, z: 300 },
   { x: 150, y: 250, z: 300 },
-  { x: 100, y: 250, z: 300 }
+  { x: 100, y: 250, z: 300 },
 ]
 
 const mockCartographic = {
   longitude: 2.0,
   latitude: 0.5,
-  height: 0
+  height: 0,
 }
 
 const mockEllipsoid = {
   maximumRadius: 6378137,
   cartesianToCartographic: vi.fn(() => mockCartographic),
-  cartographicToCartesian: vi.fn(() => mockPositions[0])
+  cartographicToCartesian: vi.fn(() => mockPositions[0]),
 }
 
 const mockViewer = {
   scene: {
     globe: {
-      ellipsoid: mockEllipsoid
-    }
+      ellipsoid: mockEllipsoid,
+    },
   },
   entities: {
     add: vi.fn((options) => ({
@@ -92,10 +92,10 @@ const mockViewer = {
       point: options.point,
       label: options.label,
       properties: options.properties,
-      show: options.show !== false
+      show: options.show !== false,
     })),
-    remove: vi.fn()
-  }
+    remove: vi.fn(),
+  },
 } as any
 
 describe('PolygonGraphic', () => {
@@ -132,7 +132,7 @@ describe('PolygonGraphic', () => {
 
   it('应该创建带面积标签的多边形', () => {
     const polygon = new PolygonGraphic(mockViewer, {
-      showAreaLabel: true
+      showAreaLabel: true,
     })
     polygon.create(mockPositions as any)
 
@@ -207,7 +207,7 @@ describe('PolygonGraphic', () => {
 
   it('应该导出正确的 GeoJSON 格式', () => {
     const polygon = new PolygonGraphic(mockViewer, {
-      name: '测试多边形'
+      name: '测试多边形',
     })
     polygon.create(mockPositions as any)
 

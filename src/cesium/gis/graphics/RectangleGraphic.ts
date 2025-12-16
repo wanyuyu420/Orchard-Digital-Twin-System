@@ -82,9 +82,7 @@ export class RectangleGraphic extends BaseGraphic {
 
     // 转换为经纬度
     const ellipsoid = this.viewer.scene.globe.ellipsoid
-    const cartographics = positions.slice(0, 2).map(pos =>
-      ellipsoid.cartesianToCartographic(pos)
-    )
+    const cartographics = positions.slice(0, 2).map((pos) => ellipsoid.cartesianToCartographic(pos))
 
     // 计算矩形范围
     const west = Math.min(cartographics[0].longitude, cartographics[1].longitude)
@@ -128,8 +126,8 @@ export class RectangleGraphic extends BaseGraphic {
         material: this.getMaterial(),
         classificationType: Cesium.ClassificationType.TERRAIN, // Classify on terrain to avoid Z-fighting
         // Note: outline is disabled when using classificationType
-        outline: false
-      }
+        outline: false,
+      },
     })
 
     this.entities.push(this.rectangleEntity)
@@ -139,8 +137,9 @@ export class RectangleGraphic extends BaseGraphic {
    * 获取填充材质
    */
   private getMaterial(): Cesium.MaterialProperty {
-    const color = Cesium.Color.fromCssColorString(this.style.fillColor || '#ffcc33')
-      .withAlpha(this.style.opacity ?? 0.5)
+    const color = Cesium.Color.fromCssColorString(this.style.fillColor || '#ffcc33').withAlpha(
+      this.style.opacity ?? 0.5
+    )
     return new Cesium.ColorMaterialProperty(color)
   }
 
@@ -152,11 +151,7 @@ export class RectangleGraphic extends BaseGraphic {
 
     // 标签位置：矩形中心偏上
     const center = Cesium.Rectangle.center(this.rectangleBounds)
-    const centerCartesian = Cesium.Cartesian3.fromRadians(
-      center.longitude,
-      center.latitude,
-      0
-    )
+    const centerCartesian = Cesium.Cartesian3.fromRadians(center.longitude, center.latitude, 0)
 
     this.dimensionsLabelEntity = this.viewer.entities.add({
       position: centerCartesian,
@@ -169,8 +164,8 @@ export class RectangleGraphic extends BaseGraphic {
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, -15),
         heightReference: this.heightReference,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     })
 
     this.entities.push(this.dimensionsLabelEntity)
@@ -184,11 +179,7 @@ export class RectangleGraphic extends BaseGraphic {
 
     // 标签位置：矩形中心偏下
     const center = Cesium.Rectangle.center(this.rectangleBounds)
-    const centerCartesian = Cesium.Cartesian3.fromRadians(
-      center.longitude,
-      center.latitude,
-      0
-    )
+    const centerCartesian = Cesium.Cartesian3.fromRadians(center.longitude, center.latitude, 0)
 
     this.areaLabelEntity = this.viewer.entities.add({
       position: centerCartesian,
@@ -201,8 +192,8 @@ export class RectangleGraphic extends BaseGraphic {
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, 15),
         heightReference: this.heightReference,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     })
 
     this.entities.push(this.areaLabelEntity)
@@ -334,7 +325,7 @@ export class RectangleGraphic extends BaseGraphic {
       ),
       ellipsoid.cartographicToCartesian(
         new Cesium.Cartographic(this.rectangleBounds.west, this.rectangleBounds.south)
-      )
+      ),
     ]
 
     corners.forEach((corner, vertexIndex) => {
@@ -345,12 +336,12 @@ export class RectangleGraphic extends BaseGraphic {
           color: Cesium.Color.RED,
           outlineColor: Cesium.Color.WHITE,
           outlineWidth: 2,
-          heightReference: this.heightReference
+          heightReference: this.heightReference,
         },
         // Store vertex index for editing
         properties: {
-          vertexIndex
-        }
+          vertexIndex,
+        },
       })
       this.cornerMarkers.push(marker)
       this.entities.push(marker)
@@ -364,7 +355,7 @@ export class RectangleGraphic extends BaseGraphic {
     this.editing = false
 
     // 移除角标记
-    this.cornerMarkers.forEach(marker => {
+    this.cornerMarkers.forEach((marker) => {
       this.viewer.entities.remove(marker)
     })
     this.cornerMarkers = []
@@ -374,7 +365,7 @@ export class RectangleGraphic extends BaseGraphic {
    * 移除矩形
    */
   remove(): void {
-    this.entities.forEach(entity => {
+    this.entities.forEach((entity) => {
       this.viewer.entities.remove(entity)
     })
     this.entities = []
@@ -416,7 +407,7 @@ export class RectangleGraphic extends BaseGraphic {
       ),
       ellipsoid.cartographicToCartesian(
         new Cesium.Cartographic(this.rectangleBounds.east, this.rectangleBounds.north)
-      )
+      ),
     ]
   }
 
@@ -452,13 +443,16 @@ export class RectangleGraphic extends BaseGraphic {
    */
   protected applyStyle(): void {
     if (this.rectangleEntity && this.rectangleEntity.rectangle) {
-      const fillColor = Cesium.Color.fromCssColorString(this.style.fillColor || '#22D3EE')
-        .withAlpha(this.style.fillOpacity ?? this.style.opacity ?? 0.3)
+      const fillColor = Cesium.Color.fromCssColorString(
+        this.style.fillColor || '#22D3EE'
+      ).withAlpha(this.style.fillOpacity ?? this.style.opacity ?? 0.3)
       const outlineColor = Cesium.Color.fromCssColorString(this.style.strokeColor || '#22D3EE')
 
       this.rectangleEntity.rectangle.material = new Cesium.ColorMaterialProperty(fillColor)
       this.rectangleEntity.rectangle.outlineColor = new Cesium.ConstantProperty(outlineColor)
-      this.rectangleEntity.rectangle.outlineWidth = new Cesium.ConstantProperty(this.style.strokeWidth || 2)
+      this.rectangleEntity.rectangle.outlineWidth = new Cesium.ConstantProperty(
+        this.style.strokeWidth || 2
+      )
     }
   }
 
@@ -477,13 +471,15 @@ export class RectangleGraphic extends BaseGraphic {
       type: 'Feature',
       geometry: {
         type: 'Polygon',
-        coordinates: [[
-          [west, north],
-          [east, north],
-          [east, south],
-          [west, south],
-          [west, north]  // 闭合
-        ]]
+        coordinates: [
+          [
+            [west, north],
+            [east, north],
+            [east, south],
+            [west, south],
+            [west, north], // 闭合
+          ],
+        ],
       },
       properties: {
         id: this.id,
@@ -496,8 +492,8 @@ export class RectangleGraphic extends BaseGraphic {
         height: this.height,
         dimensionsFormatted: this.formatDimensions(this.width, this.height),
         style: this.style,
-        createdAt: new Date().toISOString()
-      }
+        createdAt: new Date().toISOString(),
+      },
     }
   }
 }

@@ -15,10 +15,10 @@
 </template>
 
 <script setup lang="ts">
-import CesiumViewer from '@/components/cesium/CesiumViewer.vue';
-import MeasureLayer from '@/components/cesium/MeasureLayer.vue';
-import DrawLayer from '@/components/cesium/DrawLayer.vue';
-import MainLayout from '@/layout/MainLayout.vue';
+import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
+import MeasureLayer from '@/components/cesium/MeasureLayer.vue'
+import DrawLayer from '@/components/cesium/DrawLayer.vue'
+import MainLayout from '@/layout/MainLayout.vue'
 </script>
 
 <style scoped>

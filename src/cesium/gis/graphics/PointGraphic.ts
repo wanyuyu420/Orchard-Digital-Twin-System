@@ -55,7 +55,7 @@ export class PointGraphic extends BaseGraphic {
     strokeWidth: 2,
     pointSize: 10,
     pointColor: '#22D3EE',
-    opacity: 1.0
+    opacity: 1.0,
   }
 
   /**
@@ -92,7 +92,7 @@ export class PointGraphic extends BaseGraphic {
     const entityOptions: Cesium.Entity.ConstructorOptions = {
       id: `${this.id}_point`,
       position,
-      show: this.visible
+      show: this.visible,
     }
 
     // 如果有图标，使用 billboard
@@ -104,7 +104,7 @@ export class PointGraphic extends BaseGraphic {
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
       }
     } else {
       // 否则使用简单的点
@@ -114,7 +114,7 @@ export class PointGraphic extends BaseGraphic {
         outlineColor: Cesium.Color.fromCssColorString(style.strokeColor),
         outlineWidth: style.strokeWidth,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
       }
     }
 
@@ -129,7 +129,7 @@ export class PointGraphic extends BaseGraphic {
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, -style.pointSize - 5),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
       }
     }
 
@@ -187,8 +187,8 @@ export class PointGraphic extends BaseGraphic {
         coordinates: [
           Cesium.Math.toDegrees(cartographic.longitude),
           Cesium.Math.toDegrees(cartographic.latitude),
-          cartographic.height
-        ]
+          cartographic.height,
+        ],
       },
       properties: {
         name: this.name,
@@ -196,8 +196,8 @@ export class PointGraphic extends BaseGraphic {
         icon: this.iconUrl,
         style: this.style,
         createdAt: this.createdAt.toISOString(),
-        ...this.properties
-      }
+        ...this.properties,
+      },
     }
   }
 
@@ -254,7 +254,7 @@ export class PointGraphic extends BaseGraphic {
     return {
       longitude: Cesium.Math.toDegrees(cartographic.longitude),
       latitude: Cesium.Math.toDegrees(cartographic.latitude),
-      height: cartographic.height
+      height: cartographic.height,
     }
   }
 

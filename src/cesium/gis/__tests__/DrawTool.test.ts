@@ -18,9 +18,15 @@ vi.mock('cesium', () => {
       vi.fn((x: number, y: number, z: number) => ({ x, y, z })),
       {
         distance: vi.fn(() => 100),
-        midpoint: vi.fn((a: any, b: any, result: any) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 })),
-        fromDegrees: vi.fn((lon: number, lat: number, height?: number) => mockCartesian3(lon, lat, height || 0)),
-        clone: vi.fn((c: any) => ({ ...c }))
+        midpoint: vi.fn((a: any, b: any, result: any) => ({
+          x: (a.x + b.x) / 2,
+          y: (a.y + b.y) / 2,
+          z: (a.z + b.z) / 2,
+        })),
+        fromDegrees: vi.fn((lon: number, lat: number, height?: number) =>
+          mockCartesian3(lon, lat, height || 0)
+        ),
+        clone: vi.fn((c: any) => ({ ...c })),
       }
     ),
     Cartesian2: vi.fn((x: number, y: number) => ({ x, y })),
@@ -28,29 +34,29 @@ vi.mock('cesium', () => {
       vi.fn((lon: number, lat: number, height?: number) => ({
         longitude: lon,
         latitude: lat,
-        height: height || 0
+        height: height || 0,
       })),
       {
         fromCartesian: vi.fn((cartesian: any) => ({
           longitude: 2.0,
           latitude: 0.5,
-          height: 0
-        }))
+          height: 0,
+        })),
       }
     ),
     Color: {
       fromCssColorString: vi.fn((color: string) => ({
-        withAlpha: vi.fn((alpha: number) => ({ r: 1, g: 0.8, b: 0.2, a: alpha }))
+        withAlpha: vi.fn((alpha: number) => ({ r: 1, g: 0.8, b: 0.2, a: alpha })),
       })),
       WHITE: { r: 1, g: 1, b: 1, a: 1 },
       CYAN: { r: 0, g: 1, b: 1, a: 1 },
-      RED: { r: 1, g: 0, b: 0, a: 1 }
+      RED: { r: 1, g: 0, b: 0, a: 1 },
     },
     ColorMaterialProperty: vi.fn((color: any) => ({ color })),
     ConstantProperty: vi.fn((value: any) => ({ getValue: () => value })),
     CallbackProperty: vi.fn((callback: any, isConstant: boolean) => ({
       getValue: callback,
-      isConstant
+      isConstant,
     })),
     PolygonHierarchy: vi.fn((positions: any) => ({ positions })),
     PolylineDashMaterialProperty: vi.fn((options: any) => options),
@@ -60,7 +66,7 @@ vi.mock('cesium', () => {
       LEFT_CLICK: 0,
       RIGHT_CLICK: 1,
       LEFT_DOUBLE_CLICK: 2,
-      MOUSE_MOVE: 3
+      MOUSE_MOVE: 3,
     },
     ScreenSpaceEventHandler: class {
       setInputAction = vi.fn()
@@ -68,11 +74,11 @@ vi.mock('cesium', () => {
       destroy = vi.fn()
     },
     Math: {
-      toDegrees: vi.fn((radians: number) => radians * 180 / Math.PI),
-      toRadians: vi.fn((degrees: number) => degrees * Math.PI / 180)
+      toDegrees: vi.fn((radians: number) => (radians * 180) / Math.PI),
+      toRadians: vi.fn((degrees: number) => (degrees * Math.PI) / 180),
     },
     defined: vi.fn((value: any) => value !== undefined && value !== null),
-    Entity: vi.fn()
+    Entity: vi.fn(),
   }
 })
 
@@ -88,27 +94,27 @@ function createMockViewer() {
         ellipsoid: {
           maximumRadius: 6378137,
           cartesianToCartographic: vi.fn(() => ({ longitude: 2.0, latitude: 0.5, height: 0 })),
-          cartographicToCartesian: vi.fn(() => ({ x: 100, y: 200, z: 300 }))
-        }
+          cartographicToCartesian: vi.fn(() => ({ x: 100, y: 200, z: 300 })),
+        },
       },
-      pick: vi.fn(() => undefined)
+      pick: vi.fn(() => undefined),
     },
     camera: {
       getPickRay: vi.fn(() => ({ origin: {}, direction: {} })),
-      pickEllipsoid: vi.fn(() => ({ x: 100, y: 200, z: 300 }))
+      pickEllipsoid: vi.fn(() => ({ x: 100, y: 200, z: 300 })),
     },
     canvas: {
-      style: { cursor: 'default' }
+      style: { cursor: 'default' },
     },
     entities: {
       add: vi.fn((options) => ({
         id: options.id || 'test-entity',
         ...options,
-        show: true
+        show: true,
       })),
       remove: vi.fn(),
-      removeById: vi.fn()
-    }
+      removeById: vi.fn(),
+    },
   } as any
 }
 
@@ -135,7 +141,7 @@ describe('DrawTool', () => {
 
     it('应该支持不同几何类型', () => {
       const types = ['point', 'line', 'polygon', 'circle', 'rectangle'] as const
-      types.forEach(type => {
+      types.forEach((type) => {
         const tool = new DrawTool(mockViewer, { geometryType: type })
         expect(tool).toBeDefined()
         tool.destroy()
@@ -148,8 +154,8 @@ describe('DrawTool', () => {
         style: {
           fillColor: '#FF0000',
           strokeColor: '#00FF00',
-          strokeWidth: 5
-        }
+          strokeWidth: 5,
+        },
       })
       expect(drawTool).toBeDefined()
     })
@@ -191,7 +197,7 @@ describe('DrawTool', () => {
       const onComplete = vi.fn()
       drawTool = new DrawTool(mockViewer, {
         geometryType: 'point',
-        onComplete
+        onComplete,
       })
       drawTool.activate()
 
@@ -205,7 +211,7 @@ describe('DrawTool', () => {
       const onCancel = vi.fn()
       drawTool = new DrawTool(mockViewer, {
         geometryType: 'polygon',
-        onCancel
+        onCancel,
       })
       drawTool.activate()
 
@@ -234,7 +240,7 @@ describe('DrawTool', () => {
       const onComplete = vi.fn()
       drawTool = new DrawTool(mockViewer, {
         geometryType: 'point',
-        onComplete
+        onComplete,
       })
       drawTool.activate()
       // 点类型在单击后应立即完成
@@ -271,7 +277,7 @@ describe('DrawTool', () => {
     it('应支持不同线型通过style配置', () => {
       drawTool = new DrawTool(mockViewer, {
         geometryType: 'line',
-        style: { strokeColor: '#FF0000' }
+        style: { strokeColor: '#FF0000' },
       })
       expect(drawTool).toBeDefined()
     })

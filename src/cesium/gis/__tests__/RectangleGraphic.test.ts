@@ -12,13 +12,13 @@ vi.mock('cesium', () => {
   const mockCartographic1 = {
     longitude: 2.0,
     latitude: 0.5,
-    height: 0
+    height: 0,
   }
 
   const mockCartographic2 = {
     longitude: 2.1,
     latitude: 0.6,
-    height: 0
+    height: 0,
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -27,49 +27,52 @@ vi.mock('cesium', () => {
     cartesianToCartographic: vi.fn((pos) => {
       return pos.x === 100 ? mockCartographic1 : mockCartographic2
     }),
-    cartographicToCartesian: vi.fn(() => mockPosition1)
+    cartographicToCartesian: vi.fn(() => mockPosition1),
   }
 
   const mockGeodesic = {
-    surfaceDistance: 10000,  // 10km
-    interpolateUsingFraction: vi.fn(() => mockCartographic1)
+    surfaceDistance: 10000, // 10km
+    interpolateUsingFraction: vi.fn(() => mockCartographic1),
   }
 
   return {
     Cartesian3: {
-      fromRadians: vi.fn(() => mockPosition1)
+      fromRadians: vi.fn(() => mockPosition1),
     },
     Cartesian2: vi.fn((x: number, y: number) => ({ x, y })),
     Rectangle: {
       fromRadians: vi.fn((west, south, east, north) => ({
-        west, south, east, north
+        west,
+        south,
+        east,
+        north,
       })),
-      center: vi.fn(() => mockCartographic1)
+      center: vi.fn(() => mockCartographic1),
     },
     Color: {
       fromCssColorString: vi.fn((_color: string) => ({
-        withAlpha: vi.fn((alpha: number) => ({ r: 1, g: 0.8, b: 0.2, a: alpha }))
+        withAlpha: vi.fn((alpha: number) => ({ r: 1, g: 0.8, b: 0.2, a: alpha })),
       })),
       WHITE: { r: 1, g: 1, b: 1, a: 1 },
       BLACK: { r: 0, g: 0, b: 0, a: 1 },
-      RED: { r: 1, g: 0, b: 0, a: 1 }
+      RED: { r: 1, g: 0, b: 0, a: 1 },
     },
     ColorMaterialProperty: vi.fn((color: any) => ({ color })),
     EllipsoidGeodesic: vi.fn().mockImplementation(() => mockGeodesic),
     Cartographic: vi.fn((lon: number, lat: number, height?: number) => ({
       longitude: lon,
       latitude: lat,
-      height: height || 0
+      height: height || 0,
     })),
     LabelStyle: {
-      FILL_AND_OUTLINE: 0
+      FILL_AND_OUTLINE: 0,
     },
     HeightReference: {
-      CLAMP_TO_GROUND: 0
+      CLAMP_TO_GROUND: 0,
     },
     Math: {
-      toDegrees: vi.fn((radians: number) => radians * 180 / Math.PI)
-    }
+      toDegrees: vi.fn((radians: number) => (radians * 180) / Math.PI),
+    },
   }
 })
 
@@ -82,20 +85,20 @@ const mockPosition2 = { x: 150, y: 250, z: 300 }
 const mockCartographic = {
   longitude: 2.0,
   latitude: 0.5,
-  height: 0
+  height: 0,
 }
 
 const mockEllipsoid = {
   maximumRadius: 6378137,
   cartesianToCartographic: vi.fn(() => mockCartographic),
-  cartographicToCartesian: vi.fn(() => mockPosition1)
+  cartographicToCartesian: vi.fn(() => mockPosition1),
 }
 
 const mockViewer = {
   scene: {
     globe: {
-      ellipsoid: mockEllipsoid
-    }
+      ellipsoid: mockEllipsoid,
+    },
   },
   entities: {
     add: vi.fn((options) => ({
@@ -104,10 +107,10 @@ const mockViewer = {
       rectangle: options.rectangle,
       point: options.point,
       label: options.label,
-      show: options.show !== false
+      show: options.show !== false,
     })),
-    remove: vi.fn()
-  }
+    remove: vi.fn(),
+  },
 } as any
 
 describe('RectangleGraphic', () => {
@@ -134,7 +137,7 @@ describe('RectangleGraphic', () => {
   it('应该创建带尺寸和面积标签的矩形', () => {
     const rectangle = new RectangleGraphic(mockViewer, {
       showDimensionsLabel: true,
-      showAreaLabel: true
+      showAreaLabel: true,
     })
     rectangle.create([mockPosition1, mockPosition2] as any)
 
@@ -148,7 +151,7 @@ describe('RectangleGraphic', () => {
 
     const area = rectangle.getArea()
     expect(area).toBeGreaterThan(0)
-    expect(area).toBe(10000 * 10000)  // width * height
+    expect(area).toBe(10000 * 10000) // width * height
   })
 
   it('应该正确获取矩形尺寸', () => {
@@ -162,7 +165,7 @@ describe('RectangleGraphic', () => {
 
   it('应该导出正确的 GeoJSON 格式', () => {
     const rectangle = new RectangleGraphic(mockViewer, {
-      name: '测试矩形'
+      name: '测试矩形',
     })
     rectangle.create([mockPosition1, mockPosition2] as any)
 

@@ -13,6 +13,15 @@
 import * as Cesium from 'cesium'
 import { BaseTool, type BaseToolOptions, type ToolType } from '../core/BaseTool'
 import type { Coordinate } from '@/types/geometry'
+import {
+  TOOL_COLORS,
+  POINT_STYLES,
+  createGlowLineMaterial,
+  createLabelEntity,
+  createHintLabel,
+  createPointMarker,
+} from '../utils/toolStyles'
+import { useGISStore } from '@/stores/gis'
 
 /**
  * 剖面采样点
@@ -120,9 +129,9 @@ export class ProfileTool extends BaseTool {
 
   /** 默认样式 */
   private static readonly DEFAULT_STYLE = {
-    lineColor: '#00FFFF',      // 青色 neon
-    lineWidth: 3,
-    pointColor: '#FFFF00'      // 黄色
+    lineColor: TOOL_COLORS.profile.fill,
+    lineWidth: 4,
+    pointColor: POINT_STYLES.vertex.color,
   }
 
   /** 当前绘制的顶点 */
@@ -299,35 +308,31 @@ export class ProfileTool extends BaseTool {
         width: this.style.lineWidth,
         material: new Cesium.PolylineDashMaterialProperty({
           color: Cesium.Color.fromCssColorString(this.style.lineColor).withAlpha(0.7),
-          dashLength: 16
+          dashLength: 16,
         }),
-        clampToGround: true
-      }
+        clampToGround: true,
+      },
     })
     this.previewEntities.push(previewLine)
 
     // 距离标签
-    const distanceLabel = this.viewer.entities.add({
-      position: new Cesium.CallbackProperty(() => 
-        this.cursorPosition || staticPositions[staticPositions.length - 1], false
-      ) as unknown as Cesium.PositionProperty,
-      label: {
-        text: new Cesium.CallbackProperty(() => {
+    const distanceLabel = this.viewer.entities.add(
+      createLabelEntity(
+        new Cesium.CallbackProperty(() => {
           if (!this.cursorPosition || this.positions.length === 0) return ''
           const dist = this.calculatePathDistance([...this.positions, this.cursorPosition])
-          return `📏 ${this.formatDistance(dist)}\n单击完成 / 右键取消`
+          return (
+            createHintLabel('剖面线', this.positions.length) +
+            `\n长度: ${this.formatDistance(dist)}`
+          )
         }, false),
-        font: '14px sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        pixelOffset: new Cesium.Cartesian2(20, -20),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.7)')
-      }
-    })
+        new Cesium.CallbackProperty(
+          () => this.cursorPosition || staticPositions[staticPositions.length - 1],
+          false
+        ),
+        'hint'
+      )
+    )
     this.previewEntities.push(distanceLabel)
   }
 
@@ -353,7 +358,6 @@ export class ProfileTool extends BaseTool {
 
       // 回调
       this.onComplete?.(result)
-
     } catch (error) {
       console.error('Profile sampling failed:', error)
     } finally {
@@ -367,10 +371,7 @@ export class ProfileTool extends BaseTool {
    */
   private async sampleTerrain(pathPositions: Cesium.Cartesian3[]): Promise<ProfileSample[]> {
     const totalDistance = this.calculatePathDistance(pathPositions)
-    const numSamples = Math.min(
-      Math.ceil(totalDistance / this.sampleInterval) + 1,
-      this.maxSamples
-    )
+    const numSamples = Math.min(Math.ceil(totalDistance / this.sampleInterval) + 1, this.maxSamples)
 
     // 沿路径插值采样点
     const samplePositions: Cesium.Cartographic[] = []
@@ -403,7 +404,12 @@ export class ProfileTool extends BaseTool {
       // 线性插值位置
       const start = pathPositions[segmentIndex]
       const end = pathPositions[segmentIndex + 1] || pathPositions[segmentIndex]
-      const interpolated = Cesium.Cartesian3.lerp(start, end, localProgress, new Cesium.Cartesian3())
+      const interpolated = Cesium.Cartesian3.lerp(
+        start,
+        end,
+        localProgress,
+        new Cesium.Cartesian3()
+      )
       const cartographic = Cesium.Cartographic.fromCartesian(interpolated)
       samplePositions.push(cartographic)
 
@@ -449,7 +455,7 @@ export class ProfileTool extends BaseTool {
         elevation: cartographic.height,
         longitude: Cesium.Math.toDegrees(cartographic.longitude),
         latitude: Cesium.Math.toDegrees(cartographic.latitude),
-        position
+        position,
       })
 
       // 进度回调
@@ -463,7 +469,7 @@ export class ProfileTool extends BaseTool {
    * 计算分析结果统计
    */
   private calculateResult(samples: ProfileSample[]): ProfileAnalysisResult {
-    const elevations = samples.map(s => s.elevation)
+    const elevations = samples.map((s) => s.elevation)
     const maxElevation = Math.max(...elevations)
     const minElevation = Math.min(...elevations)
     const avgElevation = elevations.reduce((a, b) => a + b, 0) / elevations.length
@@ -491,14 +497,14 @@ export class ProfileTool extends BaseTool {
       startPoint: {
         longitude: firstSample.longitude,
         latitude: firstSample.latitude,
-        height: firstSample.elevation
+        height: firstSample.elevation,
       },
       endPoint: {
         longitude: lastSample.longitude,
         latitude: lastSample.latitude,
-        height: lastSample.elevation
+        height: lastSample.elevation,
       },
-      createdAt: new Date()
+      createdAt: new Date(),
     }
   }
 
@@ -506,15 +512,15 @@ export class ProfileTool extends BaseTool {
    * 显示结果可视化
    */
   private showResultVisualization(result: ProfileAnalysisResult): void {
-    // 剖面线
-    const linePositions = result.samples.map(s => s.position)
+    // 剖面线（带发光效果）
+    const linePositions = result.samples.map((s) => s.position)
     const profileLine = this.viewer.entities.add({
       polyline: {
         positions: linePositions,
-        width: this.style.lineWidth + 1,
-        material: Cesium.Color.fromCssColorString(this.style.lineColor),
-        clampToGround: true
-      }
+        width: this.style.lineWidth,
+        material: createGlowLineMaterial(this.style.lineColor, 0.3),
+        clampToGround: true,
+      },
     })
     this.resultEntities.push(profileLine)
 
@@ -526,7 +532,7 @@ export class ProfileTool extends BaseTool {
         color: Cesium.Color.GREEN,
         outlineColor: Cesium.Color.WHITE,
         outlineWidth: 2,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
         text: '起点',
@@ -536,8 +542,8 @@ export class ProfileTool extends BaseTool {
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, -25),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
     })
     this.resultEntities.push(startMarker)
 
@@ -548,7 +554,7 @@ export class ProfileTool extends BaseTool {
         color: Cesium.Color.RED,
         outlineColor: Cesium.Color.WHITE,
         outlineWidth: 2,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
         text: '终点',
@@ -556,49 +562,20 @@ export class ProfileTool extends BaseTool {
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        pixelOffset: new Cesium.Cartesian2(0, -25),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+      },
     })
     this.resultEntities.push(endMarker)
 
-    // 中点信息标签
+    // 添加分析结果到store
+    const gisStore = useGISStore()
     const midIndex = Math.floor(result.samples.length / 2)
-    const midPoint = result.samples[midIndex]
-    const infoLabel = this.viewer.entities.add({
-      position: midPoint.position,
-      label: {
-        text: this.formatResultText(result),
-        font: '14px sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.8)'),
-        backgroundPadding: new Cesium.Cartesian2(10, 8),
-        pixelOffset: new Cesium.Cartesian2(0, -60)
-      }
+    const midPoint = result.samples[midIndex].position
+    gisStore.addAnalysisResult({
+      type: 'profile',
+      name: `剖面分析 #${gisStore.analysisResults.length + 1}`,
+      data: result,
+      position: midPoint,
     })
-    this.resultEntities.push(infoLabel)
-  }
-
-  /**
-   * 格式化结果文本
-   */
-  private formatResultText(result: ProfileAnalysisResult): string {
-    return [
-      `📊 剖面分析`,
-      `━━━━━━━━━━━━`,
-      `长度: ${this.formatDistance(result.totalDistance)}`,
-      `最高: ${result.maxElevation.toFixed(1)} m`,
-      `最低: ${result.minElevation.toFixed(1)} m`,
-      `爬升: ${result.totalAscent.toFixed(1)} m`,
-      `下降: ${result.totalDescent.toFixed(1)} m`,
-      `采样: ${result.samples.length} 点`
-    ].join('\n')
   }
 
   /**
@@ -633,16 +610,7 @@ export class ProfileTool extends BaseTool {
    * 添加顶点标记
    */
   private addMarker(position: Cesium.Cartesian3): void {
-    const marker = this.viewer.entities.add({
-      position,
-      point: {
-        pixelSize: 10,
-        color: Cesium.Color.fromCssColorString(this.style.pointColor),
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 2,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
-    })
+    const marker = this.viewer.entities.add(createPointMarker(position, 'vertex'))
     this.markerEntities.push(marker)
   }
 
@@ -662,7 +630,7 @@ export class ProfileTool extends BaseTool {
     this.positions = []
     this.cursorPosition = null
     this.lastPreviewCount = 0
-    this.markerEntities.forEach(e => this.viewer.entities.remove(e))
+    this.markerEntities.forEach((e) => this.viewer.entities.remove(e))
     this.markerEntities = []
   }
 
@@ -670,7 +638,7 @@ export class ProfileTool extends BaseTool {
    * 清除预览实体
    */
   private clearPreviewEntities(): void {
-    this.previewEntities.forEach(e => this.viewer.entities.remove(e))
+    this.previewEntities.forEach((e) => this.viewer.entities.remove(e))
     this.previewEntities = []
   }
 
@@ -679,7 +647,7 @@ export class ProfileTool extends BaseTool {
    */
   private clearPreview(): void {
     this.clearPreviewEntities()
-    this.markerEntities.forEach(e => this.viewer.entities.remove(e))
+    this.markerEntities.forEach((e) => this.viewer.entities.remove(e))
     this.markerEntities = []
   }
 
@@ -687,7 +655,7 @@ export class ProfileTool extends BaseTool {
    * 清除结果可视化
    */
   public clearResult(): void {
-    this.resultEntities.forEach(e => this.viewer.entities.remove(e))
+    this.resultEntities.forEach((e) => this.viewer.entities.remove(e))
     this.resultEntities = []
     this.lastResult = null
   }
@@ -721,9 +689,12 @@ export class ProfileTool extends BaseTool {
     if (!data) return ''
 
     const header = 'Distance(m),Elevation(m),Longitude,Latitude\n'
-    const rows = data.samples.map(s =>
-      `${s.distance.toFixed(2)},${s.elevation.toFixed(2)},${s.longitude.toFixed(6)},${s.latitude.toFixed(6)}`
-    ).join('\n')
+    const rows = data.samples
+      .map(
+        (s) =>
+          `${s.distance.toFixed(2)},${s.elevation.toFixed(2)},${s.longitude.toFixed(6)},${s.latitude.toFixed(6)}`
+      )
+      .join('\n')
 
     return header + rows
   }

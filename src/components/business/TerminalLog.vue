@@ -1,8 +1,6 @@
 <template>
   <div class="terminal-container">
-    <div class="terminal-header">
-      <i class="fa-solid fa-terminal"></i> 协议日志终端
-    </div>
+    <div class="terminal-header"><i class="fa-solid fa-terminal"></i> 协议日志终端</div>
     <div class="log-scroll" ref="scrollRef">
       <div v-for="log in logs" :key="log.id" class="log-line">
         <span class="log-time">[{{ log.timestamp }}]</span>
@@ -15,32 +13,42 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue';
-import { storeToRefs } from 'pinia';
-import { useDeviceStore } from '@/stores/device';
-import type { LogEntry } from '@/stores/device';
+import { ref, watch, nextTick } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useDeviceStore } from '@/stores/device'
+import type { LogEntry } from '@/stores/device'
 
-const store = useDeviceStore();
-const { logs } = storeToRefs(store);
-const scrollRef = ref<HTMLElement | null>(null);
+const store = useDeviceStore()
+const { logs } = storeToRefs(store)
+const scrollRef = ref<HTMLElement | null>(null)
 
 // Auto-scroll to bottom
-watch(logs, () => {
-  nextTick(() => {
-    if (scrollRef.value) {
-      scrollRef.value.scrollTop = scrollRef.value.scrollHeight;
-    }
-  });
-}, { deep: true });
+watch(
+  logs,
+  () => {
+    nextTick(() => {
+      if (scrollRef.value) {
+        scrollRef.value.scrollTop = scrollRef.value.scrollHeight
+      }
+    })
+  },
+  { deep: true }
+)
 
 function getTypeClass(type: LogEntry['type']) {
   switch (type) {
-    case 'RX': return 'text-neon';
-    case 'TX': return 'text-blue';
-    case 'DATA': return 'text-success';
-    case 'ERR': return 'text-alert';
-    case 'SYS': return 'text-sub';
-    default: return '';
+    case 'RX':
+      return 'text-neon'
+    case 'TX':
+      return 'text-blue'
+    case 'DATA':
+      return 'text-success'
+    case 'ERR':
+      return 'text-alert'
+    case 'SYS':
+      return 'text-sub'
+    default:
+      return ''
   }
 }
 </script>
@@ -85,9 +93,19 @@ function getTypeClass(type: LogEntry['type']) {
   white-space: nowrap;
 }
 
-.text-neon { color: $neon-cyan; }
-.text-blue { color: $neon-blue; }
-.text-success { color: $success-green; }
-.text-alert { color: $alert-red; }
-.text-sub { color: $text-sub; }
+.text-neon {
+  color: $neon-cyan;
+}
+.text-blue {
+  color: $neon-blue;
+}
+.text-success {
+  color: $success-green;
+}
+.text-alert {
+  color: $alert-red;
+}
+.text-sub {
+  color: $text-sub;
+}
 </style>

@@ -31,10 +31,10 @@ $ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 $transition-base: 0.3s $ease-out;
 
 // Z-Index Strategy
-$z-layer-0: 0;    // CesiumViewer
-$z-layer-1: 1;    // MeteoSplitLayer
-$z-layer-2: 10;   // RouterView (UI Layer)
-$z-layer-3: 40;   // SplitSlider
-$z-layer-4: 50;   // TopRibbon
-$z-layer-5: 60;   // FloodPanel
-$z-layer-6: 100;  // BottomDock
+$z-layer-0: 0; // CesiumViewer
+$z-layer-1: 1; // MeteoSplitLayer
+$z-layer-2: 10; // RouterView (UI Layer)
+$z-layer-3: 40; // SplitSlider
+$z-layer-4: 50; // TopRibbon
+$z-layer-5: 60; // FloodPanel
+$z-layer-6: 100; // BottomDock

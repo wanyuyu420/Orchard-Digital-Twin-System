@@ -14,7 +14,11 @@
 // 模拟 Cesium 基础类型
 namespace MockCesium {
   export class Cartesian3 {
-    constructor(public x: number, public y: number, public z: number) {}
+    constructor(
+      public x: number,
+      public y: number,
+      public z: number
+    ) {}
 
     static distance(p1: Cartesian3, p2: Cartesian3): number {
       const dx = p1.x - p2.x
@@ -25,19 +29,26 @@ namespace MockCesium {
 
     static fromDegrees(lon: number, lat: number, height: number = 0): Cartesian3 {
       // 简化的 WGS84 转换（实际更复杂）
-      const x = 6378137 * Math.cos(lat * Math.PI / 180) * Math.cos(lon * Math.PI / 180)
-      const y = 6378137 * Math.cos(lat * Math.PI / 180) * Math.sin(lon * Math.PI / 180)
-      const z = 6378137 * Math.sin(lat * Math.PI / 180)
+      const x = 6378137 * Math.cos((lat * Math.PI) / 180) * Math.cos((lon * Math.PI) / 180)
+      const y = 6378137 * Math.cos((lat * Math.PI) / 180) * Math.sin((lon * Math.PI) / 180)
+      const z = 6378137 * Math.sin((lat * Math.PI) / 180)
       return new Cartesian3(x, y, z)
     }
   }
 
   export class Cartesian2 {
-    constructor(public x: number, public y: number) {}
+    constructor(
+      public x: number,
+      public y: number
+    ) {}
   }
 
   export class Cartographic {
-    constructor(public longitude: number, public latitude: number, public height: number = 0) {}
+    constructor(
+      public longitude: number,
+      public latitude: number,
+      public height: number = 0
+    ) {}
 
     static fromCartesian(cartesian: Cartesian3): Cartographic {
       // 简化的逆转换
@@ -51,7 +62,7 @@ namespace MockCesium {
     LEFT_CLICK,
     RIGHT_CLICK,
     LEFT_DOUBLE_CLICK,
-    MOUSE_MOVE
+    MOUSE_MOVE,
   }
 
   export class ScreenSpaceEventHandler {
@@ -83,26 +94,26 @@ namespace MockCesium {
       add: (entity: any) => entity,
       remove: (entity: any) => {},
       getById: (id: string) => null,
-      values: []
+      values: [],
     }
 
     public scene = {
       canvas: {},
       globe: {
         pick: () => null,
-        getHeight: () => 0
-      }
+        getHeight: () => 0,
+      },
     }
 
     public camera = {
       getPickRay: () => null,
-      pickEllipsoid: () => null
+      pickEllipsoid: () => null,
     }
   }
 
   export const Math = {
-    toDegrees: (radians: number) => radians * 180 / Math.PI,
-    toRadians: (degrees: number) => degrees * Math.PI / 180
+    toDegrees: (radians: number) => (radians * 180) / Math.PI,
+    toRadians: (degrees: number) => (degrees * Math.PI) / 180,
   }
 }
 
@@ -118,7 +129,7 @@ import { is3D, is2D, to3D, to2D } from '@/types/geometry'
 // 2D 坐标
 const coord2D: Coordinate2D = {
   longitude: 120.0,
-  latitude: 30.0
+  latitude: 30.0,
 }
 
 console.log('✓ 2D Coordinate:', coord2D)
@@ -130,7 +141,7 @@ const coord3D: Coordinate3D = {
   longitude: 120.0,
   latitude: 30.0,
   height: 100.0,
-  heightReference: 'ABSOLUTE' as HeightReference
+  heightReference: 'ABSOLUTE' as HeightReference,
 }
 
 console.log('✓ 3D Coordinate:', coord3D)
@@ -237,7 +248,7 @@ class TestGISStore {
   }
 
   removeMeasurement(id: string) {
-    const index = this.measurements.findIndex(m => m.id === id)
+    const index = this.measurements.findIndex((m) => m.id === id)
     if (index !== -1) {
       this.measurements.splice(index, 1)
       console.log(`  ✓ Measurement removed (remaining: ${this.measurements.length})`)
