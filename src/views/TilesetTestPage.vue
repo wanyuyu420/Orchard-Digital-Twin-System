@@ -20,6 +20,21 @@
 			</button>
 		</div>
 
+		<!-- DOM 正射影像 -->
+		<div class="control-section">
+			<h3>🗺️ DOM 正射影像</h3>
+			<div class="status-row">
+				<span>状态：</span>
+				<span :class="domStatus.class">{{ domStatus.text }}</span>
+			</div>
+			<button @click="loadDOM" :disabled="domLoading" class="btn-primary">
+				{{ domLoading ? '加载中...' : '加载 DOM' }}
+			</button>
+			<button @click="removeDOM" :disabled="!domReady" class="btn-danger">
+				移除 DOM
+			</button>
+		</div>
+
 		<!-- BIM 对齐控制 -->
 		<div class="control-section">
 			<h3>🏗️ BIM 模型对齐</h3>
@@ -116,6 +131,8 @@ const osgbLoading = ref(false)
 const osgbReady = ref(false)
 const bimLoading = ref(false)
 const bimReady = ref(false)
+const domLoading = ref(false)
+const domReady = ref(false)
 const isDrawing = ref(false)
 const flatHeight = ref(-10)
 
@@ -126,6 +143,9 @@ const bimParams = reactive<AlignmentParams>(BIMAlignment.getDefaultParams())
 let osgbTileset: any = null
 let bimTileset: any = null
 let flattenInstance: TilesetFlatten | null = null
+
+// DOM 影像层引用
+let domImageryLayer: any = null
 
 // 绘制相关
 let drawingHandler: any = null
@@ -146,11 +166,89 @@ const bimStatus = computed(() => ({
 	class: bimReady.value ? 'status-ok' : 'status-pending',
 }))
 
+const domStatus = computed(() => ({
+	text: domLoading.value ? '加载中' : domReady.value ? '已加载' : '未加载',
+	class: domReady.value ? 'status-ok' : 'status-pending',
+}))
+
 const drawingHint = computed(() => {
 	if (!osgbReady.value) return 'OSGB 模型需先加载完成'
 	if (isDrawing.value) return '左键添加点，右键完成绘制'
 	return '点击"开始绘制"在地图上绘制压平区域'
 })
+
+// DOM 边界信息 (从 tilemapresource.xml 获取)
+const DOM_BOUNDS = {
+	west: 78.38535297721101,
+	south: 39.72655175723501,
+	east: 78.47498082390356,
+	north: 39.79644281186187,
+}
+
+// DOM 正射影像加载
+function loadDOM() {
+	if (!cesiumStore.viewer) {
+		lastAction.value = '❌ Viewer 未就绪'
+		return
+	}
+
+	if (domImageryLayer) {
+		lastAction.value = '⚠️ DOM 已加载'
+		return
+	}
+
+	domLoading.value = true
+	try {
+		// 创建 TMS 影像提供者
+		const domProvider = new Cesium.UrlTemplateImageryProvider({
+			url: 'http://localhost:8000/tiles/dom/{z}/{x}/{reverseY}.png',
+			rectangle: Cesium.Rectangle.fromDegrees(
+				DOM_BOUNDS.west,
+				DOM_BOUNDS.south,
+				DOM_BOUNDS.east,
+				DOM_BOUNDS.north
+			),
+			minimumLevel: 10,
+			maximumLevel: 20,
+			credit: 'DOM 20cm 正射影像',
+		})
+
+		// 添加到影像层
+		domImageryLayer = cesiumStore.viewer.imageryLayers.addImageryProvider(domProvider)
+
+		// 设置白色背景透明 (colorToAlpha)
+		domImageryLayer.colorToAlpha = Cesium.Color.WHITE
+		domImageryLayer.colorToAlphaThreshold = 0.1
+
+		// 飞到 DOM 区域
+		cesiumStore.viewer.camera.flyTo({
+			destination: Cesium.Rectangle.fromDegrees(
+				DOM_BOUNDS.west,
+				DOM_BOUNDS.south,
+				DOM_BOUNDS.east,
+				DOM_BOUNDS.north
+			),
+			duration: 2,
+		})
+
+		domReady.value = true
+		lastAction.value = '✅ DOM 影像加载完成'
+	} catch (e: any) {
+		lastAction.value = `❌ DOM 加载失败: ${e.message}`
+		console.error(e)
+	} finally {
+		domLoading.value = false
+	}
+}
+
+function removeDOM() {
+	if (domImageryLayer && cesiumStore.viewer) {
+		cesiumStore.viewer.imageryLayers.remove(domImageryLayer)
+		domImageryLayer = null
+		domReady.value = false
+		lastAction.value = '✅ DOM 影像已移除'
+	}
+}
 
 // OSGB 模型加载
 async function loadOSGB() {
@@ -392,6 +490,11 @@ onUnmounted(() => {
 	if (bimTileset && cesiumStore.viewer) {
 		cesiumStore.viewer.scene.primitives.remove(bimTileset)
 		bimTileset.destroy()
+	}
+
+	// 清理 DOM 影像层
+	if (domImageryLayer && cesiumStore.viewer) {
+		cesiumStore.viewer.imageryLayers.remove(domImageryLayer)
 	}
 })
 </script>
