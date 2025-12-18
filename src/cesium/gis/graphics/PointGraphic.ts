@@ -87,6 +87,7 @@ export class PointGraphic extends BaseGraphic {
 
     const position = positions[0]
     const style = { ...PointGraphic.DEFAULT_STYLE, ...this.style }
+    const iconType = (this.style as any).iconType || 'dot'
 
     // 创建点实体配置
     const entityOptions: Cesium.Entity.ConstructorOptions = {
@@ -95,7 +96,7 @@ export class PointGraphic extends BaseGraphic {
       show: this.visible,
     }
 
-    // 如果有图标，使用 billboard
+    // 如果有自定义图标URL，使用 billboard
     if (this.iconUrl) {
       entityOptions.billboard = {
         image: this.iconUrl,
@@ -106,13 +107,27 @@ export class PointGraphic extends BaseGraphic {
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       }
-    } else {
-      // 否则使用简单的点
+    } else if (iconType === 'dot') {
+      // 圆点样式 - 使用 Cesium 原生点
       entityOptions.point = {
         pixelSize: style.pointSize,
         color: Cesium.Color.fromCssColorString(style.pointColor).withAlpha(style.opacity),
         outlineColor: Cesium.Color.fromCssColorString(style.strokeColor),
         outlineWidth: style.strokeWidth,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      }
+    } else {
+      // 使用 SVG 图标 billboard (pin/diamond/star)
+      const svgIcon = this.createSvgIcon(iconType, style.pointColor, style.strokeColor)
+      entityOptions.billboard = {
+        image: svgIcon,
+        width: style.pointSize * 2.5,
+        height: style.pointSize * 2.5,
+        verticalOrigin: iconType === 'pin' 
+          ? Cesium.VerticalOrigin.BOTTOM 
+          : Cesium.VerticalOrigin.CENTER,
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       }
@@ -136,6 +151,51 @@ export class PointGraphic extends BaseGraphic {
     // 添加实体到场景
     this.pointEntity = this.viewer.entities.add(entityOptions)
     this.entities.push(this.pointEntity)
+  }
+
+  /**
+   * 生成 SVG 图标 Data URI
+   */
+  private createSvgIcon(iconType: string, fillColor: string, strokeColor: string): string {
+    let svgContent = ''
+
+    switch (iconType) {
+      case 'pin':
+        // 图钉样式 - 倒水滴形状
+        svgContent = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="64" viewBox="0 0 48 64">
+            <path d="M24 0C10.7 0 0 10.7 0 24c0 18 24 40 24 40s24-22 24-40C48 10.7 37.3 0 24 0z" 
+                  fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
+            <circle cx="24" cy="24" r="8" fill="${strokeColor}"/>
+          </svg>`
+        break
+      case 'diamond':
+        // 菱形样式
+        svgContent = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+            <polygon points="24,2 46,24 24,46 2,24" 
+                     fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
+          </svg>`
+        break
+      case 'star':
+        // 星形样式
+        svgContent = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+            <polygon points="24,2 29.5,17.5 46,17.5 32.5,28 38,44 24,34 10,44 15.5,28 2,17.5 18.5,17.5" 
+                     fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
+          </svg>`
+        break
+      default:
+        // 默认圆点
+        svgContent = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+            <circle cx="16" cy="16" r="12" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
+          </svg>`
+    }
+
+    // 转换为 Data URI
+    const encoded = encodeURIComponent(svgContent.replace(/\s+/g, ' ').trim())
+    return `data:image/svg+xml,${encoded}`
   }
 
   /**

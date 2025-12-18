@@ -159,22 +159,48 @@
             </button>
           </div>
           <div class="style-config-body">
-            <!-- Stroke Color -->
-            <div class="style-row">
+            <!-- Point Color (only for point tool) -->
+            <div v-if="gisStore.toolType === 'point'" class="style-row">
+              <label>点颜色</label>
+              <input type="color" v-model="drawStyle.pointColor" class="color-input" />
+            </div>
+            <!-- Point Outline Color (only for point tool) -->
+            <div v-if="gisStore.toolType === 'point'" class="style-row">
+              <label>边框颜色</label>
+              <input type="color" v-model="drawStyle.strokeColor" class="color-input" />
+            </div>
+            <!-- Point Outline Width (only for point tool) -->
+            <div v-if="gisStore.toolType === 'point'" class="style-row">
+              <label>边框宽度</label>
+              <input type="range" v-model.number="drawStyle.strokeWidth" min="0" max="5" step="1" class="range-input" />
+              <span class="value-label">{{ drawStyle.strokeWidth }}px</span>
+            </div>
+            <!-- Point Size (only for point tool) -->
+            <div v-if="gisStore.toolType === 'point'" class="style-row">
+              <label>点大小</label>
+              <input type="range" v-model.number="drawStyle.pointSize" min="5" max="30" step="1" class="range-input" />
+              <span class="value-label">{{ drawStyle.pointSize }}px</span>
+            </div>
+            <!-- Point Icon Type (only for point tool) -->
+            <div v-if="gisStore.toolType === 'point'" class="style-row">
+              <label>图标样式</label>
+              <div class="icon-selector">
+                <button v-for="icon in pointIconOptions" :key="icon.id" class="icon-option"
+                  :class="{ active: drawStyle.iconType === icon.id }" :title="icon.name"
+                  @click="drawStyle.iconType = icon.id">
+                  <i :class="icon.icon"></i>
+                </button>
+              </div>
+            </div>
+            <!-- Stroke Color (for line/shapes) -->
+            <div v-if="gisStore.toolType !== 'point'" class="style-row">
               <label>线条颜色</label>
               <input type="color" v-model="drawStyle.strokeColor" class="color-input" />
             </div>
-            <!-- Stroke Width -->
-            <div class="style-row">
+            <!-- Stroke Width (for line/shapes) -->
+            <div v-if="gisStore.toolType !== 'point'" class="style-row">
               <label>线条宽度</label>
-              <input
-                type="range"
-                v-model.number="drawStyle.strokeWidth"
-                min="1"
-                max="10"
-                step="1"
-                class="range-input"
-              />
+              <input type="range" v-model.number="drawStyle.strokeWidth" min="1" max="10" step="1" class="range-input" />
               <span class="value-label">{{ drawStyle.strokeWidth }}px</span>
             </div>
             <!-- Line Type (only for line tool) -->
@@ -194,14 +220,7 @@
             <!-- Fill Opacity (for shapes) -->
             <div v-if="isShapeTool(gisStore.toolType)" class="style-row">
               <label>填充透明度</label>
-              <input
-                type="range"
-                v-model.number="drawStyle.fillOpacity"
-                min="0"
-                max="1"
-                step="0.1"
-                class="range-input"
-              />
+              <input type="range" v-model.number="drawStyle.fillOpacity" min="0" max="1" step="0.1" class="range-input" />
               <span class="value-label">{{ Math.round(drawStyle.fillOpacity * 100) }}%</span>
             </div>
           </div>
@@ -807,6 +826,14 @@ const showShortcutsHelp = ref(false)
 // Use store's drawStyle (shared with GISLayer.vue)
 const drawStyle = gisStore.drawStyle
 
+// Point icon options for point tool
+const pointIconOptions = [
+	{ id: 'dot' as const, name: '圆点', icon: 'fa-solid fa-circle' },
+	{ id: 'pin' as const, name: '图钉', icon: 'fa-solid fa-location-dot' },
+	{ id: 'diamond' as const, name: '菱形', icon: 'fa-solid fa-diamond' },
+	{ id: 'star' as const, name: '星形', icon: 'fa-solid fa-star' },
+]
+
 // Watch drawStyle changes and sync to current tool's toolStyles
 watch(
   () => [
@@ -817,6 +844,7 @@ watch(
     drawStyle.lineType,
     drawStyle.pointColor,
     drawStyle.pointSize,
+    drawStyle.iconType,
   ],
   () => {
     // Only sync if a drawing tool is active
@@ -826,8 +854,7 @@ watch(
         `[LayerControl] Syncing drawStyle changes to toolStyles for tool: ${currentToolType}`
       )
 
-      // Update toolStyles (persist to localStorage)
-      gisStore.updateToolStyle(currentToolType as any, {
+      const newStyle = {
         strokeColor: drawStyle.strokeColor,
         strokeWidth: drawStyle.strokeWidth,
         fillColor: drawStyle.fillColor,
@@ -835,14 +862,17 @@ watch(
         lineType: drawStyle.lineType,
         pointColor: drawStyle.pointColor,
         pointSize: drawStyle.pointSize,
-      })
+        iconType: drawStyle.iconType,
+      }
 
-      // Reactivate the tool to apply new styles immediately
-      // This ensures the next drawing uses the updated style
-      gisStore.setTool(null)
-      setTimeout(() => {
-        gisStore.setTool(currentToolType as any)
-      }, 50)
+      // Update toolStyles (persist to localStorage)
+      gisStore.updateToolStyle(currentToolType as any, newStyle)
+
+      // Directly update the current active tool's style (no reactivation needed)
+      const currentTool = gisStore.currentTool
+      if (currentTool && typeof currentTool.updateStyle === 'function') {
+        currentTool.updateStyle(newStyle)
+      }
     }
   },
   { deep: true }
@@ -950,6 +980,7 @@ watch(
         lineType: toolStyle.lineType || drawStyle.lineType,
         pointColor: toolStyle.pointColor || drawStyle.pointColor,
         pointSize: toolStyle.pointSize ?? drawStyle.pointSize,
+        iconType: toolStyle.iconType || drawStyle.iconType,
       })
     }
   },
@@ -1562,6 +1593,40 @@ function clearAllFeatures() {
       option {
         background: #1a1a2e;
         color: $text-main;
+      }
+    }
+
+    .icon-selector {
+      display: flex;
+      gap: 6px;
+
+      .icon-option {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        color: $text-sub;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+          border-color: $neon-cyan;
+          color: $text-main;
+        }
+
+        &.active {
+          background: rgba($neon-cyan, 0.2);
+          border-color: $neon-cyan;
+          color: $neon-cyan;
+        }
+
+        i {
+          font-size: 12px;
+        }
       }
     }
 

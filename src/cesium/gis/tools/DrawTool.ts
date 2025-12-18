@@ -48,6 +48,7 @@ export interface DrawToolOptions extends BaseToolOptions {
     pointSize?: number
     pointColor?: string
     lineType?: LineType
+    iconType?: string
   }
 }
 
@@ -87,6 +88,7 @@ export class DrawTool extends BaseTool {
     pointSize: 10,
     pointColor: '#22D3EE',
     lineType: 'solid' as LineType,
+    iconType: 'dot' as string,
   }
 
   /** 当前绘制的顶点 */
@@ -117,6 +119,14 @@ export class DrawTool extends BaseTool {
     this.onComplete = options.onComplete
     this.onCancel = options.onCancel
     this.style = { ...DrawTool.DEFAULT_STYLE, ...options.style }
+  }
+
+  /**
+   * 动态更新样式（无需重新激活工具）
+   * @param newStyle - 新的样式配置
+   */
+  public updateStyle(newStyle: Partial<typeof DrawTool.DEFAULT_STYLE>): void {
+    this.style = { ...this.style, ...newStyle }
   }
 
   /**
@@ -234,11 +244,15 @@ export class DrawTool extends BaseTool {
       name: '点标注',
       geometry: {
         type: 'Point',
-        coordinates: [coord.longitude, coord.latitude, coord.height || 0], // GeoJSON array format
+        coordinates: [coord.longitude, coord.latitude, (coord as any).height || 0], // GeoJSON array format
       },
       style: {
-        fillColor: this.style.pointColor,
+        pointColor: this.style.pointColor,
         pointSize: this.style.pointSize,
+        strokeColor: this.style.strokeColor,
+        strokeWidth: this.style.strokeWidth,
+        fillColor: this.style.pointColor, // Use pointColor as fillColor for consistency
+        iconType: this.style.iconType,
       },
       properties: {},
       visible: true,

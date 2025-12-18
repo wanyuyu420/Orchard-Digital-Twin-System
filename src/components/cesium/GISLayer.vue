@@ -734,6 +734,7 @@ function activateTool(toolType: DrawToolType) {
       lineType: toolStyle.lineType || gisStore.drawStyle.lineType,
       pointColor: toolStyle.pointColor || gisStore.drawStyle.pointColor,
       pointSize: toolStyle.pointSize ?? gisStore.drawStyle.pointSize,
+      iconType: toolStyle.iconType || gisStore.drawStyle.iconType,
     }
 
     const tool = new DrawTool(viewer, {
@@ -765,8 +766,9 @@ function activateTool(toolType: DrawToolType) {
     // Activate the tool
     tool.activate()
 
-    // Store tool instance
+    // Store tool instance (both locally and in store for style updates)
     currentTool.value = tool
+    gisStore.currentTool = tool
 
     // Update store state
     gisStore.startDrawing()
@@ -783,6 +785,7 @@ function deactivateTool() {
     try {
       currentTool.value.deactivate()
       currentTool.value = null
+      gisStore.currentTool = null
       gisStore.cancelDrawing()
     } catch (error) {
       console.error('Failed to deactivate tool:', error)

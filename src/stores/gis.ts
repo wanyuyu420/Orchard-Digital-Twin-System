@@ -118,6 +118,7 @@ export const useGISStore = defineStore('gis', () => {
     lineType: 'solid' as 'solid' | 'dashed' | 'dotted',
     pointColor: '#22D3EE',
     pointSize: 10,
+    iconType: 'dot' as 'dot' | 'pin' | 'diamond' | 'star',
   })
 
   /** Per-tool style configuration (persisted to localStorage) */
@@ -129,7 +130,7 @@ export const useGISStore = defineStore('gis', () => {
     lineType?: 'solid' | 'dashed' | 'dotted'
     pointColor?: string
     pointSize?: number
-    iconType?: 'pin' | 'marker' | 'dot' | 'star' // for point tools
+    iconType?: 'dot' | 'pin' | 'diamond' | 'star' // for point tools
   }
 
   interface ToolStyles {
@@ -147,7 +148,9 @@ export const useGISStore = defineStore('gis', () => {
     point: {
       pointColor: '#22D3EE',
       pointSize: 12,
-      iconType: 'pin',
+      strokeColor: '#FFFFFF',
+      strokeWidth: 2,
+      iconType: 'dot',
     },
     line: {
       strokeColor: '#22D3EE',

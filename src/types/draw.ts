@@ -107,6 +107,9 @@ export interface FeatureStyle {
   pointSize: number // 5-20
   opacity: number // 0-1
   lineType?: LineType // 线型（可选）
+  pointColor?: string // 点颜色（可选）
+  fillOpacity?: number // 填充透明度（可选）
+  iconType?: string // 图标类型（可选）
 }
 
 /**

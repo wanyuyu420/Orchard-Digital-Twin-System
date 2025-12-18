@@ -168,6 +168,15 @@ export abstract class BaseTool {
     return this.mode
   }
 
+  /**
+   * 动态更新样式（无需重新激活工具）
+   * 子类可覆盖以实现具体逻辑
+   * @param _newStyle - 新的样式配置
+   */
+  public updateStyle(_newStyle: Record<string, any>): void {
+    // 默认实现：子类可覆盖
+  }
+
   // ========== 抽象方法 - 子类必须实现 ==========
 
   /**
