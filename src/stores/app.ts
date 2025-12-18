@@ -7,7 +7,7 @@ export const useAppStore = defineStore('app', () => {
 
   // View Mode: Workstation (Clear) vs Focus (Blurred)
   const viewMode = computed(() => {
-    if (['dashboard', 'simulation', 'meteo'].includes(currentModule.value)) {
+    if (['dashboard', 'simulation', 'meteo', 'gis-test', 'tileset-test'].includes(currentModule.value)) {
       return 'workstation'
     }
     return 'focus'

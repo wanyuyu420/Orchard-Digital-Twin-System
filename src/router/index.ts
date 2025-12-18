@@ -6,6 +6,7 @@ import DataGovernance from '@/views/DataGovernance.vue'
 import DeviceManager from '@/views/DeviceManager.vue'
 import AiEngineering from '@/views/AiEngineering.vue'
 import GISTestPage from '@/views/GISTestPage.vue'
+import TilesetTestPage from '@/views/TilesetTestPage.vue'
 import { useAppStore } from '@/stores/app'
 
 const routes: RouteRecordRaw[] = [
@@ -17,6 +18,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/device', name: 'device', component: DeviceManager },
   { path: '/ai', name: 'ai', component: AiEngineering },
   { path: '/gis-test', name: 'gis-test', component: GISTestPage },
+  { path: '/tileset-test', name: 'tileset-test', component: TilesetTestPage },
 ]
 
 const router = createRouter({
