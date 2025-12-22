@@ -55,6 +55,30 @@ python -m scripts.seed_data  # 可选
 
 ---
 
+## GIS 数据目录配置
+
+为避免在项目根目录存放大规模 GIS 数据，可通过 `GIS_DATA_DIR` 环境变量配置独立的数据目录：
+
+```env
+# Windows
+GIS_DATA_DIR=D:\para\data\gis-data
+
+# macOS / Ubuntu
+GIS_DATA_DIR=/home/user/data/gis-data
+```
+
+**目录结构**（在 `GIS_DATA_DIR` 下）：
+
+```
+osgb/           # 倾斜摄影 3D Tiles
+bim/            # BIM 3D Tiles
+dom/tiles/      # DOM 正射影像
+```
+
+未设置时，回退到项目 `data/` 目录。
+
+---
+
 ## API 端点
 
 | 类别 | 端点 |

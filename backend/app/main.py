@@ -1,3 +1,4 @@
+from app.config import get_settings
 import os
 import asyncio
 import random
@@ -20,17 +21,29 @@ from app.tasks import realtime_push_task
 
 app = FastAPI(title="Water Digital Twin Backend", version="1.0.0")
 
+# --- GIS Data Path Configuration ---
+_settings = get_settings()
+
+
+def resolve_data_path(subpath: str) -> Path:
+    """Resolve data path from GIS_DATA_DIR or fallback to project data/"""
+    if _settings.gis_data_dir:
+        return Path(_settings.gis_data_dir) / subpath
+    # Fallback: project root / data / subpath
+    return Path(__file__).parent.parent.parent / "data" / subpath
+
+
 # --- OSGB 3D Tiles Static Files ---
-# Mount OSGB 3D Tiles data from frontend project's data directory
-OSGB_TILES_PATH = Path(__file__).parent.parent.parent / "data" / "OSGB"
+# Mount OSGB 3D Tiles data (倾斜摄影)
+OSGB_TILES_PATH = resolve_data_path("osgb")
 if OSGB_TILES_PATH.exists():
     app.mount("/tiles/osgb",
               StaticFiles(directory=str(OSGB_TILES_PATH)), name="osgb_tiles")
     print(
         f"[startup] OSGB 3D Tiles mounted at /tiles/osgb from {OSGB_TILES_PATH}")
 
-# Mount BIM 3D Tiles data from frontend project's data directory
-BIM_TILES_PATH = Path(__file__).parent.parent.parent / "data" / "bim"
+# Mount BIM 3D Tiles data
+BIM_TILES_PATH = resolve_data_path("bim")
 if BIM_TILES_PATH.exists():
     app.mount("/tiles/bim",
               StaticFiles(directory=str(BIM_TILES_PATH)), name="bim_tiles")
@@ -38,13 +51,20 @@ if BIM_TILES_PATH.exists():
         f"[startup] BIM 3D Tiles mounted at /tiles/bim from {BIM_TILES_PATH}")
 
 # --- DOM TMS Tiles Static Files ---
-# Mount DOM (Digital Orthophoto Map) TMS tiles
-DOM_TILES_PATH = Path(__file__).parent.parent.parent / "data" / "3DOM" / "tiles" / "dom20cm"
-if DOM_TILES_PATH.exists():
-    app.mount("/tiles/dom",
-              StaticFiles(directory=str(DOM_TILES_PATH)), name="dom_tiles")
+# Mount DOM (Digital Orthophoto Map) TMS tiles - multiple resolutions
+DOM_20CM_PATH = resolve_data_path("dom/tiles/dom20cm")
+if DOM_20CM_PATH.exists():
+    app.mount("/tiles/dom/20cm",
+              StaticFiles(directory=str(DOM_20CM_PATH)), name="dom_tiles_20cm")
     print(
-        f"[startup] DOM TMS Tiles mounted at /tiles/dom from {DOM_TILES_PATH}")
+        f"[startup] DOM 20cm Tiles mounted at /tiles/dom/20cm from {DOM_20CM_PATH}")
+
+DOM_8CM_PATH = resolve_data_path("dom/tiles/dom8cm")
+if DOM_8CM_PATH.exists():
+    app.mount("/tiles/dom/8cm",
+              StaticFiles(directory=str(DOM_8CM_PATH)), name="dom_tiles_8cm")
+    print(
+        f"[startup] DOM 8cm Tiles mounted at /tiles/dom/8cm from {DOM_8CM_PATH}")
 
 # Background task reference
 _realtime_task = None

@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     enable_seed_data: bool = True  # Auto-seed demo data on startup
     debug: bool = True
 
+    # GIS data directory - platform-specific absolute path
+    # Windows:  D:\para\data\gis-data
+    # macOS:    ~/data/gis-data
+    # Ubuntu:   /home/user/data/gis-data
+    gis_data_dir: str | None = None
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

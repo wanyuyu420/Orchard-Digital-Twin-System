@@ -27,8 +27,15 @@
 				<span>状态：</span>
 				<span :class="domStatus.class">{{ domStatus.text }}</span>
 			</div>
+			<div class="param-row">
+				<label>分辨率：</label>
+				<select v-model="domResolution" class="resolution-select">
+					<option value="20cm">20cm (5,976 瓦片)</option>
+					<option value="8cm">8cm (93,356 瓦片)</option>
+				</select>
+			</div>
 			<button @click="loadDOM" :disabled="domLoading" class="btn-primary">
-				{{ domLoading ? '加载中...' : '加载 DOM' }}
+				{{ domLoading ? '加载中...' : `加载 DOM (${domResolution})` }}
 			</button>
 			<button @click="removeDOM" :disabled="!domReady" class="btn-danger">
 				移除 DOM
@@ -133,6 +140,7 @@ const bimLoading = ref(false)
 const bimReady = ref(false)
 const domLoading = ref(false)
 const domReady = ref(false)
+const domResolution = ref<'20cm' | '8cm'>('20cm')
 const isDrawing = ref(false)
 const flatHeight = ref(-10)
 
@@ -192,16 +200,20 @@ function loadDOM() {
 		return
 	}
 
+	// 如果已有 DOM 层，先移除（支持切换分辨率）
 	if (domImageryLayer) {
-		lastAction.value = '⚠️ DOM 已加载'
-		return
+		cesiumStore.viewer.imageryLayers.remove(domImageryLayer)
+		domImageryLayer = null
 	}
 
 	domLoading.value = true
 	try {
+		// 根据分辨率设置最大级别
+		const maxLevel = domResolution.value === '8cm' ? 20 : 18
+		
 		// 创建 TMS 影像提供者
 		const domProvider = new Cesium.UrlTemplateImageryProvider({
-			url: 'http://localhost:8000/tiles/dom/{z}/{x}/{reverseY}.png',
+			url: `http://localhost:8000/tiles/dom/${domResolution.value}/{z}/{x}/{reverseY}.png`,
 			rectangle: Cesium.Rectangle.fromDegrees(
 				DOM_BOUNDS.west,
 				DOM_BOUNDS.south,
@@ -209,8 +221,8 @@ function loadDOM() {
 				DOM_BOUNDS.north
 			),
 			minimumLevel: 10,
-			maximumLevel: 20,
-			credit: 'DOM 20cm 正射影像',
+			maximumLevel: maxLevel,
+			credit: `DOM ${domResolution.value} 正射影像`,
 		})
 
 		// 添加到影像层
@@ -220,19 +232,19 @@ function loadDOM() {
 		domImageryLayer.colorToAlpha = Cesium.Color.WHITE
 		domImageryLayer.colorToAlphaThreshold = 0.1
 
-		// 飞到 DOM 区域
+		// 飞到 DOM 区域中心（更近距离以看清高分辨率）
+		const centerLng = (DOM_BOUNDS.west + DOM_BOUNDS.east) / 2
+		const centerLat = (DOM_BOUNDS.south + DOM_BOUNDS.north) / 2
+		const height = domResolution.value === '8cm' ? 500 : 2000 // 8cm 飞更近
+		
 		cesiumStore.viewer.camera.flyTo({
-			destination: Cesium.Rectangle.fromDegrees(
-				DOM_BOUNDS.west,
-				DOM_BOUNDS.south,
-				DOM_BOUNDS.east,
-				DOM_BOUNDS.north
-			),
+			destination: Cesium.Cartesian3.fromDegrees(centerLng, centerLat, height),
 			duration: 2,
 		})
 
 		domReady.value = true
-		lastAction.value = '✅ DOM 影像加载完成'
+		const hint = domResolution.value === '8cm' ? ' (放大可见更多细节)' : ''
+		lastAction.value = `✅ DOM ${domResolution.value} 加载完成${hint}`
 	} catch (e: any) {
 		lastAction.value = `❌ DOM 加载失败: ${e.message}`
 		console.error(e)
@@ -598,6 +610,27 @@ onUnmounted(() => {
 		&:focus {
 			outline: none;
 			border-color: #22d3ee;
+		}
+	}
+
+	select {
+		flex: 1;
+		padding: 6px 8px;
+		background: rgba(0, 0, 0, 0.3);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 4px;
+		color: #e0e7ff;
+		font-size: 12px;
+		cursor: pointer;
+
+		&:focus {
+			outline: none;
+			border-color: #22d3ee;
+		}
+
+		option {
+			background: #14142a;
+			color: #e0e7ff;
 		}
 	}
 }
