@@ -1,3 +1,4 @@
+import mimetypes
 from app.config import get_settings
 import os
 import asyncio
@@ -66,6 +67,30 @@ if DOM_8CM_PATH.exists():
     print(
         f"[startup] DOM 8cm Tiles mounted at /tiles/dom/8cm from {DOM_8CM_PATH}")
 
+# --- Local Terrain Tiles Static Files ---
+# Mount local terrain tiles (quantized-mesh format from CTB)
+LOCAL_TERRAIN_PATH = resolve_data_path("terrain/xinjiang")
+
+# Add custom MIME type for .terrain
+mimetypes.add_type('application/vnd.quantized-mesh', '.terrain')
+mimetypes.add_type('application/octet-stream', '.terrain')
+
+
+@app.middleware("http")
+async def add_terrain_headers(request, call_next):
+    response = await call_next(request)
+    if request.url.path.endswith(".terrain"):
+        # Cesium expects quantized-mesh headers
+        response.headers["Content-Encoding"] = "gzip"
+        response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
+
+if LOCAL_TERRAIN_PATH.exists() and (LOCAL_TERRAIN_PATH / "layer.json").exists():
+    app.mount("/terrain/local",
+              StaticFiles(directory=str(LOCAL_TERRAIN_PATH)), name="terrain_local")
+    print(
+        f"[startup] Local Terrain mounted at /terrain/local from {LOCAL_TERRAIN_PATH}")
+
 # Background task reference
 _realtime_task = None
 
@@ -90,6 +115,12 @@ async def startup_event():
             from app.database import AsyncSessionLocal
             async with AsyncSessionLocal() as session:
                 await seed_database(session)
+
+    # Always seed default layers (idempotent)
+    from scripts.seed_layers import seed_default_layers
+    from app.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as session:
+        await seed_default_layers(session)
 
     _realtime_task = asyncio.create_task(realtime_push_task())
     print("[startup] Real-time push task started")

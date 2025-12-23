@@ -9,10 +9,16 @@ from app.models import Sensor, SensorMetric, SensorReading
 from app.websocket import manager
 
 
+import random
+
+# Track random walk state for sensors to ensure smooth transitions
+_sensor_walk_state: dict[str, float] = {}
+
+
 async def get_latest_readings():
-    """Fetch latest sensor readings from database."""
+    """Fetch latest sensor readings from database and add small fluctuations."""
     async with AsyncSessionLocal() as session:
-        # Get all metrics with their sensors (including flow_rate, velocity for hydrological stations)
+        # Get all metrics with their sensors
         stmt = (
             select(SensorMetric)
             .options(selectinload(SensorMetric.sensor))
@@ -35,11 +41,29 @@ async def get_latest_readings():
             reading = (await session.execute(reading_stmt)).scalars().first()
 
             if reading and metric.sensor:
+                val = reading.value_num
+
+                # Add pseudo-realtime fluctuation (Random Walk)
+                # This makes static mock data look "alive" on charts
+                key = f"{metric.sensor.id}:{metric.metric_key}"
+                current_drift = _sensor_walk_state.get(key, 0.0)
+
+                # Small step (-0.05% to 0.05% of base value)
+                step = val * random.uniform(-0.0005, 0.0005)
+                new_drift = current_drift + step
+
+                # Clamp drift to stay within 1% of original value
+                limit = val * 0.01
+                new_drift = max(-limit, min(limit, new_drift))
+
+                _sensor_walk_state[key] = new_drift
+                fluctuated_value = val + new_drift
+
                 readings.append({
                     "sensor_id": metric.sensor.id,
                     "station_name": metric.sensor.point_code,
                     "metric": metric.metric_key,
-                    "value": reading.value_num,
+                    "value": round(fluctuated_value, 4),
                     "unit": metric.unit,
                     "timestamp": reading.reading_time.isoformat() if reading.reading_time else None,
                 })
@@ -54,7 +78,8 @@ async def check_warnings():
             select(SensorMetric)
             .options(selectinload(SensorMetric.sensor))
             .where(
-                (SensorMetric.warn_low.is_not(None)) | (SensorMetric.warn_high.is_not(None))
+                (SensorMetric.warn_low.is_not(None)) | (
+                    SensorMetric.warn_high.is_not(None))
             )
         )
         metrics = (await session.execute(stmt)).scalars().all()

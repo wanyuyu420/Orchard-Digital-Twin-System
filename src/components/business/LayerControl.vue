@@ -22,53 +22,21 @@
 
 		<!-- Tab Content -->
 		<div class="tab-content">
-			<!-- Tab 1: Resource Layers (Original) -->
+			<!-- Tab 1: Resource Layers (Dynamic from Backend) -->
 			<div v-show="activeTab === 'resources'" class="layer-list">
-				<!-- Terrain Toggle (Special) -->
-				<div class="layer-item terrain-layer" :class="{ active: cesiumStore.terrainEnabled }" @click="toggleTerrain">
-					<div class="layer-info">
-						<i class="fa-solid fa-mountain layer-icon"></i>
-						<span>3D 地形</span>
-						<span v-if="cesiumStore.terrainLoading" class="loading-indicator">
-							<i class="fa-solid fa-spinner fa-spin"></i>
-						</span>
+				<!-- All Layers from Store (grouped) -->
+				<template v-for="(layers, groupName) in layerStore.layersByGroup" :key="groupName">
+					<div class="layer-group-header" v-if="layers.length > 0">{{ getGroupDisplayName(groupName) }}</div>
+					<div v-for="layer in layers" :key="layer.id" class="layer-item"
+						:class="{ active: layerStore.isLayerActive(layer.id) }" @click="onLayerToggle(layer)">
+						<div class="layer-info">
+							<i :class="layer.icon || 'fa-solid fa-layer-group'" class="layer-icon"></i>
+							<span>{{ layer.name }}</span>
+						</div>
+						<i class="fa-solid toggle-icon"
+							:class="layerStore.isLayerActive(layer.id) ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
 					</div>
-					<i class="fa-solid toggle-icon" :class="cesiumStore.terrainEnabled ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
-				</div>
-
-				<!-- OSGB 3D Tiles Toggle -->
-				<div class="layer-item osgb-layer" :class="{ active: cesiumStore.osgbEnabled }" @click="toggleOSGB">
-					<div class="layer-info">
-						<i class="fa-solid fa-city layer-icon"></i>
-						<span>倾斜摄影</span>
-						<span v-if="cesiumStore.osgbLoading" class="loading-indicator">
-							<i class="fa-solid fa-spinner fa-spin"></i>
-						</span>
-					</div>
-					<i class="fa-solid toggle-icon" :class="cesiumStore.osgbEnabled ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
-				</div>
-
-				<!-- BIM 3D Tiles Toggle -->
-				<div class="layer-item bim-layer" :class="{ active: cesiumStore.bimEnabled }" @click="toggleBIM">
-					<div class="layer-info">
-						<i class="fa-solid fa-cubes layer-icon"></i>
-						<span>BIM 模型</span>
-						<span v-if="cesiumStore.bimLoading" class="loading-indicator">
-							<i class="fa-solid fa-spinner fa-spin"></i>
-						</span>
-					</div>
-					<i class="fa-solid toggle-icon" :class="cesiumStore.bimEnabled ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
-				</div>
-
-				<!-- Other Resource Layers -->
-				<div v-for="layer in layers" :key="layer.id" class="layer-item" :class="{ active: layer.active }"
-					@click="toggleLayer(layer)">
-					<div class="layer-info">
-						<i :class="layer.icon" class="layer-icon"></i>
-						<span>{{ layer.name }}</span>
-					</div>
-					<i class="fa-solid toggle-icon" :class="layer.active ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
-				</div>
+				</template>
 			</div>
 
 			<!-- Tab 2: GIS Features (New) -->
@@ -92,15 +60,17 @@
 				</div>
 
 				<!-- Drawing Style Configuration Panel -->
-				<div v-if="gisStore.toolType && isDrawingTool(gisStore.toolType)" class="style-config-panel">
-					<div class="style-config-header">
+				<div v-if="gisStore.toolType && isDrawingTool(gisStore.toolType)" class="style-config-panel"
+					:class="{ collapsed: drawStyleCollapsed }">
+					<div class="style-config-header" @click="drawStyleCollapsed = !drawStyleCollapsed">
+						<i class="fa-solid" :class="drawStyleCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'"></i>
 						<span>绘制样式</span>
-						<button class="reset-btn" title="恢复默认样式" @click="resetCurrentToolStyle">
+						<button class="reset-btn" title="恢复默认样式" @click.stop="resetCurrentToolStyle">
 							<i class="fa-solid fa-rotate-left"></i>
 							恢复默认
 						</button>
 					</div>
-					<div class="style-config-body">
+					<div v-show="!drawStyleCollapsed" class="style-config-body">
 						<!-- Point Color (only for point tool) -->
 						<div v-if="gisStore.toolType === 'point'" class="style-row">
 							<label>点颜色</label>
@@ -261,14 +231,15 @@
 				<input ref="fileInput" type="file" accept=".geojson,.json" style="display: none" @change="handleFileImport" />
 
 				<!-- Style Configuration Panel -->
-				<div v-if="gisStore.selectedCount > 0" class="style-panel">
-					<div class="style-header">
+				<div v-if="gisStore.selectedCount > 0" class="style-panel" :class="{ collapsed: selectionStyleCollapsed }">
+					<div class="style-header" @click="selectionStyleCollapsed = !selectionStyleCollapsed">
+						<i class="fa-solid" :class="selectionStyleCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'"></i>
 						<i class="fa-solid fa-palette"></i>
 						<span>样式配置</span>
 						<span class="selected-count">{{ gisStore.selectedCount }} 个选中</span>
 					</div>
 
-					<div class="style-content">
+					<div v-show="!selectionStyleCollapsed" class="style-content">
 						<!-- Fill Color -->
 						<div class="style-row">
 							<label>填充颜色</label>
@@ -393,6 +364,7 @@ import GlassPanel from '@/components/common/GlassPanel.vue'
 import AnalysisResultsList from '@/components/cesium/analysis/AnalysisResultsList.vue'
 import { useGISStore } from '@/stores/gis'
 import { useCesiumStore } from '@/stores/cesium'
+import { useLayerStore, type GISLayer } from '@/stores/layers'
 import type { GISToolType } from '@/types/draw'
 
 interface Layer {
@@ -617,13 +589,15 @@ function updateFeatureProperty(key: 'name' | 'description', value: string) {
 
 // UI State
 const activeTab = ref<'resources' | 'features' | 'analysis'>('resources')
+const drawStyleCollapsed = ref(true) // Collapsed by default to save space
+const selectionStyleCollapsed = ref(false)
+const propertiesPanelCollapsed = ref(false)
 
-// Resource layers (original) - BIM now has dedicated toggle above
-const layers = ref<Layer[]>([
-	{ id: 'base', name: '基础地理', icon: 'fa-solid fa-map', active: true },
-	{ id: 'cctv', name: '视频点位', icon: 'fa-solid fa-video', active: false },
-	{ id: 'stations', name: '水雨情站', icon: 'fa-solid fa-location-dot', active: true },
-])
+// Dynamic layers from store (data-driven)
+const layerStore = useLayerStore()
+const dynamicLayers = computed(() =>
+	layerStore.layers.filter(l => l.layer_type === 'api_point' && l.is_enabled)
+)
 
 // Draw tools configuration with tooltips
 const drawTools: Array<{ id: GISToolType; name: string; icon: string; tooltip: string }> = [
@@ -779,15 +753,85 @@ function isShapeTool(toolType: string | null): boolean {
 // File input ref for import
 const fileInput = ref<HTMLInputElement | null>(null)
 
-// === Resource Layer Functions (Original) ===
-function toggleLayer(layer: Layer) {
-	layer.active = !layer.active
+declare const Cesium: any
 
-	if (layer.id === 'stations') {
-		cesiumStore.stationsEnabled = layer.active
-	} else if (layer.id === 'cctv') {
-		cesiumStore.videoEnabled = layer.active
+// === Resource Layer Functions (Dynamic) ===
+async function onLayerToggle(layer: any) {
+	const config = layer.config || {}
+	const exclusiveGroup = config.exclusive_group
+	const isActivating = !layerStore.isLayerActive(layer.id)
+
+	// Handle exclusive groups (e.g., terrain - only one can be active)
+	if (exclusiveGroup && isActivating) {
+		// Find and deactivate all other layers in the same exclusive group
+		const sameGroupLayers = layerStore.layers.filter(
+			l => l.config?.exclusive_group === exclusiveGroup && l.id !== layer.id
+		)
+		for (const otherLayer of sameGroupLayers) {
+			if (layerStore.isLayerActive(otherLayer.id)) {
+				layerStore.toggleLayer(otherLayer.id)
+			}
+		}
 	}
+
+	// Toggle the layer state
+	layerStore.toggleLayer(layer.id)
+
+	// Special handling for terrain layers
+	if (layer.layer_type === 'terrain') {
+		await applyTerrain(layer, isActivating)
+	}
+}
+
+/**
+ * Apply terrain provider based on layer config
+ */
+async function applyTerrain(layer: any, isActivating: boolean) {
+	const viewer = cesiumStore.viewer
+	if (!viewer) return
+
+	const config = layer.config || {}
+
+	if (!isActivating) {
+		// Deactivating - switch back to ellipsoid (no terrain)
+		viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider()
+		cesiumStore.terrainEnabled = false
+		console.log('[LayerControl] Terrain disabled, using ellipsoid')
+		return
+	}
+
+	try {
+		if (config.provider === 'cesium_world_terrain') {
+			viewer.terrainProvider = await Cesium.createWorldTerrainAsync()
+			console.log('[LayerControl] Loaded Cesium World Terrain')
+		} else if (config.provider === 'ion' && config.assetId) {
+			viewer.terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(config.assetId)
+			console.log(`[LayerControl] Loaded ion terrain asset: ${config.assetId}`)
+		} else if (config.provider === 'custom' && layer.url) {
+			viewer.terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(layer.url)
+			console.log(`[LayerControl] Loaded custom terrain: ${layer.url}`)
+		}
+		cesiumStore.terrainEnabled = true
+	} catch (e) {
+		console.error('[LayerControl] Failed to load terrain:', e)
+		viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider()
+		cesiumStore.terrainEnabled = false
+	}
+}
+
+/**
+ * Get display name for layer group
+ */
+function getGroupDisplayName(groupName: string): string {
+	const groupNames: Record<string, string> = {
+		'Base': '基础图层',
+		'Terrain': '地形数据',
+		'Imagery': '正射影像',
+		'3D Models': '三维模型',
+		'Sensors': '监测数据',
+		'Other': '其他'
+	}
+	return groupNames[groupName] || groupName
 }
 
 /**
@@ -1130,13 +1174,9 @@ function clearAllFeatures() {
 		gisStore.clearFeatures()
 	}
 }
-onMounted(() => {
-	// Sync local state with store
-	const stationLayer = layers.value.find(l => l.id === 'stations')
-	if (stationLayer) stationLayer.active = cesiumStore.stationsEnabled
-
-	const videoLayer = layers.value.find(l => l.id === 'cctv')
-	if (videoLayer) videoLayer.active = cesiumStore.videoEnabled
+onMounted(async () => {
+	// Fetch layer configuration from backend
+	await layerStore.fetchLayers()
 })
 </script>
 
@@ -1208,6 +1248,21 @@ onMounted(() => {
 	flex: 1;
 	overflow-y: auto;
 	@include custom-scrollbar;
+}
+
+.layer-group-header {
+	font-size: 10px;
+	font-weight: 600;
+	color: $text-sub;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	padding: 8px 10px 4px;
+	margin-top: 4px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+	&:first-child {
+		margin-top: 0;
+	}
 }
 
 .layer-item {
@@ -1377,6 +1432,7 @@ onMounted(() => {
 	border: 1px solid rgba(255, 255, 255, 0.1);
 	border-radius: 6px;
 	overflow: hidden;
+	transition: all 0.3s ease;
 
 	.style-config-header {
 		padding: 8px 10px;
@@ -1385,8 +1441,18 @@ onMounted(() => {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		cursor: pointer;
+		user-select: none;
+		transition: background 0.2s;
+
+		&:hover {
+			background: rgba(255, 255, 255, 0.1);
+		}
 
 		span {
+			display: flex;
+			align-items: center;
+			gap: 8px;
 			font-size: 11px;
 			font-weight: 500;
 			color: $text-main;
@@ -1838,6 +1904,7 @@ onMounted(() => {
 .style-panel {
 	border-top: 1px solid rgba(255, 255, 255, 0.05);
 	margin-top: 8px;
+	transition: all 0.3s ease;
 }
 
 .style-header {
@@ -1849,8 +1916,15 @@ onMounted(() => {
 	color: $text-main;
 	font-size: 12px;
 	font-weight: 500;
+	cursor: pointer;
+	user-select: none;
+	transition: background 0.2s;
 
-	i {
+	&:hover {
+		background: rgba(255, 255, 255, 0.05);
+	}
+
+	i.fa-palette {
 		color: $neon-cyan;
 	}
 

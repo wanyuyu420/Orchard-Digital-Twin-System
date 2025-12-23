@@ -6,6 +6,7 @@ from .alert import AlertRule, Alert
 from .product import RasterProduct, VectorProduct, ModelProduct
 from .hydrological import HydrologicalStation
 from .flood import FloodScenario, FloodFrame
+from .gis_layer import GISLayer
 
 __all__ = [
     "Base",
@@ -26,4 +27,5 @@ __all__ = [
     "HydrologicalStation",
     "FloodScenario",
     "FloodFrame",
+    "GISLayer",
 ]

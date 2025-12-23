@@ -15,7 +15,7 @@ declare const Cesium: any
 // Register at: https://cesium.com/ion/tokens
 const CESIUM_ION_TOKEN =
   import.meta.env.VITE_CESIUM_ION_TOKEN ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlY2ViYjQyYy0xMzIyLTRlYjAtODdhOS1lMTM2ZTFhYjdhYjAiLCJpZCI6MzQ3OTk2LCJpYXQiOjE3NTk4MjkzODR9.dCi1uXY8ZD6Fym41vwc4-aTTeCdMR1EXM27V82Fp0ZI'
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI1MzU2ZjNiOS0yZjdhLTRhNjItOTA0Yi1kZjJkZWQ1M2M1MDgiLCJpZCI6MzcxMzczLCJpYXQiOjE3NjYyMTg0OTV9.Z4phXbo_PCMshtIfmyQj1kgXT5yDDFRZiylIFJxFMCQ'
 
 // Set Ion default access token
 Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN

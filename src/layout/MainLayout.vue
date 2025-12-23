@@ -6,19 +6,8 @@
 		<!-- GIS Layer (handles all drawing and analysis tools) -->
 		<GISLayer />
 
-		<!-- OSGB 3D Tiles Layer (conditional) -->
-		<OSGBLayer v-if="cesiumStore.osgbEnabled" :visible="cesiumStore.osgbEnabled" :url="projectConfig.osgb.url"
-			:ellipsoid-offset="projectConfig.osgb.ellipsoidOffset" :terrain-offset="projectConfig.osgb.terrainOffset" />
-
-		<!-- BIM 3D Tiles Layer (conditional) -->
-		<BIMLayer v-if="cesiumStore.bimEnabled" :visible="cesiumStore.bimEnabled" :url="projectConfig.bim.url"
-			:alignment="projectConfig.bim.alignment" />
-
-		<!-- Stations Layer -->
-		<StationLayer />
-
-		<!-- Video Points Layer -->
-		<VideoLayer />
+		<!-- Dynamic Layers (data-driven: 3D Tiles, Point Data, etc.) -->
+		<DynamicLayerRenderer />
 
 		<!-- Layer 2: UI Layer (Router View) -->
 		<div class="ui-layer">
@@ -37,15 +26,8 @@
 <script setup lang="ts">
 import TopRibbon from '@/components/common/TopRibbon.vue'
 import GISLayer from '@/components/cesium/GISLayer.vue'
-import OSGBLayer from '@/components/cesium/OSGBLayer.vue'
-import BIMLayer from '@/components/cesium/BIMLayer.vue'
-import StationLayer from '@/components/cesium/StationLayer.vue'
-import VideoLayer from '@/components/cesium/VideoLayer.vue'
+import DynamicLayerRenderer from '@/components/cesium/DynamicLayerRenderer.vue'
 import BottomDock from '@/layout/BottomDock.vue'
-import { useCesiumStore } from '@/stores/cesium'
-import { projectConfig } from '@/config/layers'
-
-const cesiumStore = useCesiumStore()
 </script>
 
 <style scoped lang="scss">
