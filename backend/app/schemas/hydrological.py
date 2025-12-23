@@ -11,7 +11,10 @@ class HydrologicalStationOut(BaseModel):
     station_name: str
     river_name: Optional[str] = None
     basin_name: Optional[str] = None
+    basin_name: Optional[str] = None
     datum_elevation: Optional[float] = None
+    lng: Optional[float] = None
+    lat: Optional[float] = None
     is_simulated: bool
     # 最新读数
     latest_flow_rate: Optional[float] = None

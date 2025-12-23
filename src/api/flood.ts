@@ -1,7 +1,7 @@
 /**
  * Flood Visualization API Client
  */
-import apiClient from './client'
+import { apiClient } from './client'
 
 // ============ Flood Scenarios ============
 
@@ -33,7 +33,7 @@ export interface FloodScenarioDetail extends FloodScenario {
  * Get list of all flood scenarios
  */
 export const getFloodScenarios = async (): Promise<FloodScenario[]> => {
-  const response = await apiClient.get<FloodScenario[]>('/v1/flood/scenarios')
+  const response = await apiClient.get<FloodScenario[]>('/flood/scenarios')
   return response.data
 }
 
@@ -41,7 +41,7 @@ export const getFloodScenarios = async (): Promise<FloodScenario[]> => {
  * Get detailed flood scenario with all frames
  */
 export const getFloodScenarioDetail = async (scenarioId: number): Promise<FloodScenarioDetail> => {
-  const response = await apiClient.get<FloodScenarioDetail>(`/v1/flood/scenarios/${scenarioId}`)
+  const response = await apiClient.get<FloodScenarioDetail>(`/flood/scenarios/${scenarioId}`)
   return response.data
 }
 
@@ -49,7 +49,7 @@ export const getFloodScenarioDetail = async (scenarioId: number): Promise<FloodS
  * Get interpolated flood frame at specific progress
  */
 export const getFloodFrame = async (scenarioId: number, progress: number): Promise<FloodFrame> => {
-  const response = await apiClient.get<FloodFrame>(`/v1/flood/scenarios/${scenarioId}/frame`, {
+  const response = await apiClient.get<FloodFrame>(`/flood/scenarios/${scenarioId}/frame`, {
     params: { progress },
   })
   return response.data

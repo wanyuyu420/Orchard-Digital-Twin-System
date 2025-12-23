@@ -141,19 +141,19 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-@app.get("/api/events")
+@app.get("/api/v1/events")
 async def get_events():
     """获取洪水事件列表"""
     return get_mock_flood_events()
 
 
-@app.get("/api/rain_frames")
+@app.get("/api/v1/rain_frames")
 async def get_rain_frames():
     """获取降雨格网帧列表"""
     return get_mock_rain_grid_frames()
 
 
-@app.get("/api/iot_devices")
+@app.get("/api/v1/iot_devices")
 async def get_iot_devices(is_simulated: bool | None = None, session: AsyncSession = Depends(get_session)):
     """获取IoT设备列表（数据库，如果无记录则回退模拟数据）"""
     from app.models.sensor import SimulatedDevice
@@ -181,7 +181,7 @@ async def get_iot_devices(is_simulated: bool | None = None, session: AsyncSessio
     return get_mock_iot_devices()
 
 
-@app.get("/api/models")
+@app.get("/api/v1/models")
 async def get_3d_models():
     """获取三维资源列表"""
     return get_mock_3d_resources()
@@ -221,7 +221,7 @@ async def _latest_readings_for_metric(
     return results
 
 
-@app.get("/api/water_levels", response_model=list[WaterLevelOut])
+@app.get("/api/v1/water_levels", response_model=list[WaterLevelOut])
 async def api_water_levels(is_simulated: bool | None = None, session: AsyncSession = Depends(get_session)):
     """获取水位数据（数据库）"""
     rows = await _latest_readings_for_metric(session, ["water_level"], is_simulated)
@@ -238,7 +238,7 @@ async def api_water_levels(is_simulated: bool | None = None, session: AsyncSessi
     ]
 
 
-@app.get("/api/rainfall_data", response_model=list[RainfallOut])
+@app.get("/api/v1/rainfall_data", response_model=list[RainfallOut])
 async def api_rainfall(is_simulated: bool | None = None, session: AsyncSession = Depends(get_session)):
     """获取雨量数据（数据库）"""
     rows = await _latest_readings_for_metric(session, ["rainfall"], is_simulated)
@@ -255,7 +255,7 @@ async def api_rainfall(is_simulated: bool | None = None, session: AsyncSession =
     ]
 
 
-@app.get("/api/model_products")
+@app.get("/api/v1/model_products")
 async def api_model_products(is_simulated: bool | None = None, session: AsyncSession = Depends(get_session)):
     stmt = select(ModelProduct)
     if is_simulated is not None:
@@ -278,7 +278,7 @@ async def api_model_products(is_simulated: bool | None = None, session: AsyncSes
     ]
 
 
-@app.get("/api/raster_products")
+@app.get("/api/v1/raster_products")
 async def api_raster_products(is_simulated: bool | None = None, session: AsyncSession = Depends(get_session)):
     stmt = select(RasterProduct)
     if is_simulated is not None:
@@ -302,7 +302,7 @@ async def api_raster_products(is_simulated: bool | None = None, session: AsyncSe
     ]
 
 
-@app.get("/api/vector_products")
+@app.get("/api/v1/vector_products")
 async def api_vector_products(is_simulated: bool | None = None, session: AsyncSession = Depends(get_session)):
     stmt = select(VectorProduct)
     if is_simulated is not None:
@@ -325,7 +325,7 @@ async def api_vector_products(is_simulated: bool | None = None, session: AsyncSe
     ]
 
 
-@app.get("/api/pore_pressures", response_model=list[MetricLatestOut])
+@app.get("/api/v1/pore_pressures", response_model=list[MetricLatestOut])
 async def api_pore_pressures(is_simulated: bool | None = None, session: AsyncSession = Depends(get_session)):
     """获取渗压计最新读数"""
     rows = await _latest_readings_for_metric(session, ["pore_pressure"], is_simulated)
@@ -343,7 +343,7 @@ async def api_pore_pressures(is_simulated: bool | None = None, session: AsyncSes
     ]
 
 
-@app.get("/api/stress_data", response_model=list[MetricLatestOut])
+@app.get("/api/v1/stress_data", response_model=list[MetricLatestOut])
 async def api_stress(is_simulated: bool | None = None, session: AsyncSession = Depends(get_session)):
     """获取应力计最新读数"""
     rows = await _latest_readings_for_metric(session, ["stress"], is_simulated)
@@ -382,7 +382,7 @@ async def root():
     return {"message": "Water Digital Twin API is running", "status": "ok"}
 
 
-@app.get("/api/health")
+@app.get("/api/v1/health")
 async def health_check():
     return {"status": "healthy", "service": "fastapi"}
 
@@ -391,7 +391,7 @@ async def _latest_by_metric(session: AsyncSession, metric_key: str):
     return await _latest_readings_for_metric(session, [metric_key], is_simulated=None)
 
 
-@app.get("/api/stats", response_model=StatsOut)
+@app.get("/api/v1/stats", response_model=StatsOut)
 async def get_overview_stats(is_simulated: bool | None = None, session: AsyncSession = Depends(get_session)):
     """获取项目总览统计数据（优先 DB，无数据时回退旧逻辑）"""
     water_rows = await _latest_readings_for_metric(session, ["water_level"], is_simulated)
@@ -419,7 +419,7 @@ async def get_overview_stats(is_simulated: bool | None = None, session: AsyncSes
     return stats
 
 
-@app.get("/api/warnings", response_model=list[WarningOut])
+@app.get("/api/v1/warnings", response_model=list[WarningOut])
 async def get_all_warnings(is_simulated: bool | None = None, session: AsyncSession = Depends(get_session)):
     """获取所有告警信息（依据 warn_low/warn_high，包含渗压/应力/水位/雨量等设置了阈值的指标）"""
     rows = await _latest_readings_for_metric(session, None, is_simulated, warn_only=True)

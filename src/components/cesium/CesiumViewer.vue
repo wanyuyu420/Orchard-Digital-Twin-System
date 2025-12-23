@@ -1,9 +1,6 @@
 <template>
-  <div
-    id="cesiumContainer"
-    class="cesium-container"
-    :class="{ 'is-blurred': viewMode === 'focus', 'is-hidden': isMeteoPage }"
-  ></div>
+	<div id="cesiumContainer" class="cesium-container"
+		:class="{ 'is-blurred': viewMode === 'focus', 'is-hidden': isMeteoPage }"></div>
 </template>
 
 <script setup lang="ts">
@@ -22,53 +19,54 @@ const viewMode = computed(() => appStore.viewMode)
 const isMeteoPage = computed(() => appStore.currentModule === 'meteo')
 
 onMounted(() => {
-  // Get configurations
-  const baseMapConfig = getBaseMapConfig()
-  const imageryList = getBaseMapImageryList()
+	// Get configurations
+	const baseMapConfig = getBaseMapConfig()
+	const imageryList = getBaseMapImageryList()
 
-  // Initialize Cesium viewer
-  const viewer = GController.init(baseMapConfig, imageryList)
+	// Initialize Cesium viewer
+	const viewer = GController.init(baseMapConfig, imageryList)
 
-  // Store viewer in store and globally
-  cesiumStore.setViewer(viewer)
-  ;(window as any).Gviewer = viewer
+	// Store viewer in store and globally
+	cesiumStore.setViewer(viewer)
+		; (window as any).Gviewer = viewer
 
-  // Set initial view directly (no fly animation for faster startup)
-  const { lon, lat, height } = cesiumStore.DEFAULT_VIEW
-  viewer.camera.setView({
-    destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
-    orientation: {
-      heading: 0,
-      pitch: Cesium.Math.toRadians(-60), // 俯视角度
-      roll: 0,
-    },
-  })
+	// Set initial view directly (no fly animation for faster startup)
+	// Set initial view directly (no fly animation for faster startup)
+	const { lon, lat, height, heading, pitch, roll } = cesiumStore.defaultView
+	viewer.camera.setView({
+		destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
+		orientation: {
+			heading: Cesium.Math.toRadians(heading),
+			pitch: Cesium.Math.toRadians(pitch),
+			roll: Cesium.Math.toRadians(roll),
+		},
+	})
 })
 
 onUnmounted(() => {
-  GController.destroy()
-  ;(window as any).Gviewer = null
+	GController.destroy()
+		; (window as any).Gviewer = null
 })
 </script>
 
 <style scoped>
 .cesium-container {
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 0;
-  background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+	width: 100%;
+	height: 100%;
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 0;
+	background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
 }
 
 .cesium-container.is-blurred {
-  filter: blur(2px);
+	filter: blur(2px);
 }
 
 /* 气象页面时隐藏主Cesium，让MeteoSplitLayer的Cesium接收事件 */
 .cesium-container.is-hidden {
-  visibility: hidden;
-  pointer-events: none;
+	visibility: hidden;
+	pointer-events: none;
 }
 </style>

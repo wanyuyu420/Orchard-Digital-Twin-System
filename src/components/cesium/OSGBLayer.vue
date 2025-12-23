@@ -26,9 +26,15 @@ import { BIMAlignment } from '@/cesium/gis/tools/BIMAlignment'
 declare const Cesium: any
 
 // Props
-const props = defineProps<{
+const props = withDefaults(defineProps<{
 	visible?: boolean
-}>()
+	url: string
+	ellipsoidOffset?: number
+	terrainOffset?: number
+}>(), {
+	ellipsoidOffset: 12,
+	terrainOffset: 8
+})
 
 // Emits
 const emit = defineEmits<{
@@ -46,9 +52,6 @@ const tilesetReady = ref(false)
 
 // Tileset reference
 let tileset: any = null
-
-// API endpoint for OSGB 3D Tiles
-const TILESET_URL = 'http://localhost:8000/tiles/osgb/tileset.json'
 
 /**
  * Load the 3D Tileset
@@ -70,11 +73,11 @@ const loadTileset = async () => {
 	error.value = null
 
 	try {
-		console.log('[OSGBLayer] Loading 3D Tiles from:', TILESET_URL)
+		console.log('[OSGBLayer] Loading 3D Tiles from:', props.url)
 
 		// Use Cesium3DTileset.fromUrl for async loading
 		// Note: fromUrl returns a ready tileset, no need for readyPromise
-		tileset = await Cesium.Cesium3DTileset.fromUrl(TILESET_URL, {
+		tileset = await Cesium.Cesium3DTileset.fromUrl(props.url, {
 			// Performance options
 			maximumScreenSpaceError: 16, // Higher = faster loading, lower quality
 			maximumMemoryUsage: 512, // MB - limit memory usage
@@ -193,9 +196,9 @@ onMounted(() => {
 	const applyGrounding = async () => {
 		if (tileset && cesiumStore.viewer) {
 			// 智能贴地策略：
-			// 无地形(椭球)：12m (用户验证的最佳高度)
-			// 有地形(Smart)：5m (在最高点之上抬升5米，用户请求的初始偏移)
-			const offset = cesiumStore.terrainEnabled ? 8 : 12
+			// 无地形(椭球)：使用配置的 ellipsoidOffset
+			// 有地形(Smart)：使用配置的 terrainOffset
+			const offset = cesiumStore.terrainEnabled ? props.terrainOffset : props.ellipsoidOffset
 
 			console.log(`[OSGBLayer] Smart Grounding with base offset ${offset}m (Terrain: ${cesiumStore.terrainEnabled})`)
 

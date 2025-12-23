@@ -14,6 +14,7 @@ from app.models.sensor import Sensor, SensorMetric
 from app.models.facility import MonitoringFacility, MonitoringSection, SensorType
 from app.models.reading import SensorReading
 from app.models.hydrological import HydrologicalStation
+from geoalchemy2.shape import to_shape
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -112,6 +113,8 @@ class FacilityAdminOut(BaseModel):
     name: str
     facility_type: Optional[str] = None
     location_desc: Optional[str] = None
+    lng: Optional[float] = None
+    lat: Optional[float] = None
     is_simulated: bool
     section_count: int = 0
 
@@ -199,7 +202,8 @@ async def list_sensors(
 
     # Apply sorting
     sort_col = getattr(Sensor, sort_by, Sensor.id)
-    query = query.order_by(desc(sort_col) if sort_order == "desc" else asc(sort_col))
+    query = query.order_by(desc(sort_col) if sort_order ==
+                           "desc" else asc(sort_col))
 
     # Apply pagination
     query = query.offset((page - 1) * page_size).limit(page_size)
@@ -337,7 +341,8 @@ async def list_readings(
     if sensor_id:
         query = query.where(SensorReading.sensor_id == sensor_id)
     if metric_key:
-        query = query.join(SensorMetric).where(SensorMetric.metric_key == metric_key)
+        query = query.join(SensorMetric).where(
+            SensorMetric.metric_key == metric_key)
     if start_time:
         query = query.where(SensorReading.reading_time >= start_time)
     if end_time:
@@ -353,7 +358,8 @@ async def list_readings(
 
     # Apply sorting
     sort_col = getattr(SensorReading, sort_by, SensorReading.reading_time)
-    query = query.order_by(desc(sort_col) if sort_order == "desc" else asc(sort_col))
+    query = query.order_by(desc(sort_col) if sort_order ==
+                           "desc" else asc(sort_col))
 
     # Apply pagination
     query = query.offset((page - 1) * page_size).limit(page_size)
@@ -415,7 +421,8 @@ async def list_hydrological_stations(
     db: AsyncSession = Depends(get_session),
 ):
     """List hydrological stations with pagination."""
-    query = select(HydrologicalStation).options(selectinload(HydrologicalStation.facility))
+    query = select(HydrologicalStation).options(
+        selectinload(HydrologicalStation.facility))
 
     # Apply filters
     if search:
@@ -434,7 +441,8 @@ async def list_hydrological_stations(
 
     # Apply sorting
     sort_col = getattr(HydrologicalStation, sort_by, HydrologicalStation.id)
-    query = query.order_by(desc(sort_col) if sort_order == "desc" else asc(sort_col))
+    query = query.order_by(desc(sort_col) if sort_order ==
+                           "desc" else asc(sort_col))
 
     # Apply pagination
     query = query.offset((page - 1) * page_size).limit(page_size)
@@ -564,7 +572,8 @@ async def list_facilities(
     db: AsyncSession = Depends(get_session),
 ):
     """List monitoring facilities with pagination."""
-    query = select(MonitoringFacility).options(selectinload(MonitoringFacility.sections))
+    query = select(MonitoringFacility).options(
+        selectinload(MonitoringFacility.sections))
 
     # Apply filters
     if search:
@@ -585,7 +594,8 @@ async def list_facilities(
 
     # Apply sorting
     sort_col = getattr(MonitoringFacility, sort_by, MonitoringFacility.id)
-    query = query.order_by(desc(sort_col) if sort_order == "desc" else asc(sort_col))
+    query = query.order_by(desc(sort_col) if sort_order ==
+                           "desc" else asc(sort_col))
 
     # Apply pagination
     query = query.offset((page - 1) * page_size).limit(page_size)
@@ -600,6 +610,8 @@ async def list_facilities(
             name=f.name,
             facility_type=f.facility_type,
             location_desc=f.location_desc,
+            lng=to_shape(f.location).x if f.location is not None else None,
+            lat=to_shape(f.location).y if f.location is not None else None,
             is_simulated=f.is_simulated,
             section_count=len(f.sections) if f.sections else 0,
         )
@@ -739,7 +751,8 @@ async def list_sections(
 
     # Apply sorting
     sort_col = getattr(MonitoringSection, sort_by, MonitoringSection.id)
-    query = query.order_by(desc(sort_col) if sort_order == "desc" else asc(sort_col))
+    query = query.order_by(desc(sort_col) if sort_order ==
+                           "desc" else asc(sort_col))
 
     # Apply pagination
     query = query.offset((page - 1) * page_size).limit(page_size)

@@ -15,6 +15,7 @@ from app.schemas.hydrological import (
     StationReadingOut,
     StationReadingsResponse,
 )
+from geoalchemy2.shape import to_shape
 
 router = APIRouter(prefix="/hydrological_stations", tags=["hydrological"])
 
@@ -22,7 +23,8 @@ router = APIRouter(prefix="/hydrological_stations", tags=["hydrological"])
 async def get_latest_readings(session: AsyncSession, station_id: int) -> dict:
     """获取站点最新读数"""
     # 查找该站点关联的传感器
-    sensor_stmt = select(Sensor).where(Sensor.hydrological_station_id == station_id)
+    sensor_stmt = select(Sensor).where(
+        Sensor.hydrological_station_id == station_id)
     sensors = (await session.execute(sensor_stmt)).scalars().all()
 
     latest = {
@@ -51,9 +53,11 @@ async def get_latest_readings(session: AsyncSession, station_id: int) -> dict:
                 if reading:
                     latest[metric_key] = reading.value_num
                     if latest["time"] is None or (
-                        reading.reading_time and reading.reading_time.isoformat() > latest["time"]
+                        reading.reading_time and reading.reading_time.isoformat(
+                        ) > latest["time"]
                     ):
-                        latest["time"] = reading.reading_time.isoformat() if reading.reading_time else None
+                        latest["time"] = reading.reading_time.isoformat(
+                        ) if reading.reading_time else None
 
     return latest
 
@@ -81,6 +85,10 @@ async def list_stations(
                 river_name=station.river_name,
                 basin_name=station.basin_name,
                 datum_elevation=station.datum_elevation,
+                lng=to_shape(
+                    station.location).x if station.location is not None else None,
+                lat=to_shape(
+                    station.location).y if station.location is not None else None,
                 is_simulated=station.is_simulated,
                 latest_flow_rate=latest["flow_rate"],
                 latest_velocity=latest["velocity"],
@@ -98,7 +106,8 @@ async def get_station(
     session: AsyncSession = Depends(get_session),
 ):
     """获取单个水文站详情"""
-    stmt = select(HydrologicalStation).where(HydrologicalStation.id == station_id)
+    stmt = select(HydrologicalStation).where(
+        HydrologicalStation.id == station_id)
     station = (await session.execute(stmt)).scalars().first()
     if not station:
         from fastapi import HTTPException
@@ -112,6 +121,10 @@ async def get_station(
         river_name=station.river_name,
         basin_name=station.basin_name,
         datum_elevation=station.datum_elevation,
+        lng=to_shape(
+            station.location).x if station.location is not None else None,
+        lat=to_shape(
+            station.location).y if station.location is not None else None,
         is_simulated=station.is_simulated,
         latest_flow_rate=latest["flow_rate"],
         latest_velocity=latest["velocity"],
@@ -125,20 +138,23 @@ async def get_station_readings(
     station_id: int,
     start_time: Optional[datetime] = Query(None, description="开始时间"),
     end_time: Optional[datetime] = Query(None, description="结束时间"),
-    metric: Optional[str] = Query(None, description="指标类型: flow_rate, velocity, water_level"),
+    metric: Optional[str] = Query(
+        None, description="指标类型: flow_rate, velocity, water_level"),
     limit: int = Query(100, le=1000, description="返回数量限制"),
     session: AsyncSession = Depends(get_session),
 ):
     """获取站点历史读数"""
     # 获取站点
-    stmt = select(HydrologicalStation).where(HydrologicalStation.id == station_id)
+    stmt = select(HydrologicalStation).where(
+        HydrologicalStation.id == station_id)
     station = (await session.execute(stmt)).scalars().first()
     if not station:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Station not found")
 
     # 获取传感器
-    sensor_stmt = select(Sensor).where(Sensor.hydrological_station_id == station_id)
+    sensor_stmt = select(Sensor).where(
+        Sensor.hydrological_station_id == station_id)
     sensors = (await session.execute(sensor_stmt)).scalars().all()
     sensor_ids = [s.id for s in sensors]
 
@@ -152,7 +168,8 @@ async def get_station_readings(
         )
 
     # 获取指标
-    metric_stmt = select(SensorMetric).where(SensorMetric.sensor_id.in_(sensor_ids))
+    metric_stmt = select(SensorMetric).where(
+        SensorMetric.sensor_id.in_(sensor_ids))
     if metric:
         metric_stmt = metric_stmt.where(SensorMetric.metric_key == metric)
     metrics = (await session.execute(metric_stmt)).scalars().all()
@@ -175,9 +192,11 @@ async def get_station_readings(
         .limit(limit)
     )
     if start_time:
-        reading_stmt = reading_stmt.where(SensorReading.reading_time >= start_time)
+        reading_stmt = reading_stmt.where(
+            SensorReading.reading_time >= start_time)
     if end_time:
-        reading_stmt = reading_stmt.where(SensorReading.reading_time <= end_time)
+        reading_stmt = reading_stmt.where(
+            SensorReading.reading_time <= end_time)
 
     readings = (await session.execute(reading_stmt)).scalars().all()
 

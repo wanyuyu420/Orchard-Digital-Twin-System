@@ -25,9 +25,21 @@ import { BIMAlignment } from '@/cesium/gis/tools/BIMAlignment'
 declare const Cesium: any
 
 // Props
-const props = defineProps<{
+const props = withDefaults(defineProps<{
 	visible?: boolean
-}>()
+	url: string
+	alignment?: {
+		longitude: number
+		latitude: number
+		height: number
+		rotationX?: number
+		rotationY?: number
+		rotationZ?: number
+		scale?: number
+	}
+}>(), {
+	alignment: () => BIMAlignment.getDefaultParams() // Fallback if not provided
+})
 
 // Emits
 const emit = defineEmits<{
@@ -45,9 +57,6 @@ const tilesetReady = ref(false)
 
 // Tileset reference
 let tileset: any = null
-
-// API endpoint for BIM 3D Tiles
-const TILESET_URL = 'http://localhost:8000/tiles/bim/tileset.json'
 
 /**
  * Load the 3D Tileset
@@ -69,11 +78,11 @@ const loadTileset = async () => {
 	error.value = null
 
 	try {
-		console.log('[BIMLayer] Loading 3D Tiles from:', TILESET_URL)
+		console.log('[BIMLayer] Loading 3D Tiles from:', props.url)
 
 		// Use Cesium3DTileset.fromUrl for async loading
 		// Note: fromUrl returns a ready tileset, no need for readyPromise
-		tileset = await Cesium.Cesium3DTileset.fromUrl(TILESET_URL, {
+		tileset = await Cesium.Cesium3DTileset.fromUrl(props.url, {
 			// Performance options
 			maximumScreenSpaceError: 16,
 			maximumMemoryUsage: 512,
@@ -84,7 +93,9 @@ const loadTileset = async () => {
 		})
 
 		// Use BIMAlignment utility to apply correct position and rotation
-		BIMAlignment.applyToTileset(tileset, BIMAlignment.getDefaultParams())
+		// Use props.alignment if provided, otherwise default
+		const params = props.alignment || BIMAlignment.getDefaultParams()
+		BIMAlignment.applyToTileset(tileset, params)
 
 		// Add to scene
 		viewer.scene.primitives.add(tileset)

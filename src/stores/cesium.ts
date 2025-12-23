@@ -4,15 +4,12 @@ import { GController } from '@/utils/ctrlCesium/Controller'
 
 declare const Cesium: any
 
-// Default view for the project (Xinjiang area)
-const DEFAULT_VIEW = {
-  lon: 87.57,
-  lat: 43.82,
-  height: 80000,
-}
+import { defaultView } from '@/config/view'
 
 export const useCesiumStore = defineStore('cesium', () => {
+  // ... (state definitions remain same)
   const viewer = shallowRef<any>(null)
+  /* Layer Visibility State */
   const is2D = ref(false)
   const terrainEnabled = ref(false)
   const terrainLoading = ref(false)
@@ -22,6 +19,10 @@ export const useCesiumStore = defineStore('cesium', () => {
   // BIM 3D Tiles state
   const bimEnabled = ref(false)
   const bimLoading = ref(false)
+  const stationsEnabled = ref(false)
+  const stationsLoading = ref(false)
+  const videoEnabled = ref(false)
+  const videoLoading = ref(false)
 
   // Store the last 3D camera position and orientation before switching to 2D
   const savedCameraState = ref<{
@@ -89,14 +90,14 @@ export const useCesiumStore = defineStore('cesium', () => {
     if (!viewer.value) return
     viewer.value.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(
-        DEFAULT_VIEW.lon,
-        DEFAULT_VIEW.lat,
-        DEFAULT_VIEW.height
+        defaultView.lon,
+        defaultView.lat,
+        defaultView.height
       ),
       orientation: {
-        heading: 0,
-        pitch: Cesium.Math.toRadians(-60),
-        roll: 0,
+        heading: Cesium.Math.toRadians(defaultView.heading),
+        pitch: Cesium.Math.toRadians(defaultView.pitch),
+        roll: Cesium.Math.toRadians(defaultView.roll),
       },
       duration,
     })
@@ -149,16 +150,19 @@ export const useCesiumStore = defineStore('cesium', () => {
   }
 
   return {
+    // State
     viewer,
     is2D,
     terrainEnabled,
     terrainLoading,
-    // OSGB 3D Tiles
     osgbEnabled,
     osgbLoading,
-    // BIM 3D Tiles
     bimEnabled,
     bimLoading,
+    stationsEnabled,
+    stationsLoading,
+    videoEnabled,
+    videoLoading,
     savedCameraState,
     setViewer,
     toggle2D3D,
@@ -169,6 +173,6 @@ export const useCesiumStore = defineStore('cesium', () => {
     enableTerrain,
     disableTerrain,
     toggleTerrain,
-    DEFAULT_VIEW,
+    defaultView,
   }
 })

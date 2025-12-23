@@ -1,8 +1,8 @@
 import axios from 'axios'
 
 // Create an axios instance
-const apiClient = axios.create({
-  baseURL: 'http://localhost:8000/api', // Default FastAPI port
+export const apiClient = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 5000, // 5 seconds timeout
   headers: {
     'Content-Type': 'application/json',
@@ -34,4 +34,16 @@ apiClient.interceptors.response.use(
   }
 )
 
-export default apiClient
+// Define API methods using the apiClient instance
+const api = {
+  getHydrologicalData: () => apiClient.get('/hydrological/data'),
+  
+  // New Generalization Endpoints
+  getHydrologicalStations: (params?: { is_simulated?: boolean }) => 
+    apiClient.get<any[]>('/hydrological_stations', { params }),
+
+  getFacilities: (params?: { facility_type?: string; is_simulated?: boolean; page?: number; page_size?: number }) => 
+    apiClient.get<any>('/admin/facilities', { params }),
+}
+
+export default api
