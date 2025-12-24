@@ -118,9 +118,11 @@ async def startup_event():
 
     # Always seed default layers (idempotent)
     from scripts.seed_layers import seed_default_layers
+    from scripts.seed_hec_ras import seed_hec_ras_scenarios
     from app.database import AsyncSessionLocal
     async with AsyncSessionLocal() as session:
         await seed_default_layers(session)
+        await seed_hec_ras_scenarios(session)
 
     _realtime_task = asyncio.create_task(realtime_push_task())
     print("[startup] Real-time push task started")

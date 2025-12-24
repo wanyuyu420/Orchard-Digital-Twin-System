@@ -43,6 +43,11 @@ export default defineConfig(({ mode }) => {
         '/terrain/': {
           target: env.VITE_API_TARGET || 'http://127.0.0.1:8000',
           changeOrigin: true
+        },
+        // HEC-RAS simulation frames served from local Nginx
+        '/simulation/': {
+          target: 'http://127.0.0.1:8081',
+          changeOrigin: true
         }
       }
     }

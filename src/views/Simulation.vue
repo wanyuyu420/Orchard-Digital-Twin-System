@@ -1,57 +1,51 @@
 <template>
-  <div class="simulation-layout">
-    <!-- Flood Visualization Layer (rendered when engine is flood/hydro) -->
-    <FloodLayer v-if="isFloodEngine" />
+	<div class="simulation-layout">
+		<!-- Flood Visualization Layer (rendered when engine is flood/hydro) -->
+		<FloodLayer v-if="isFloodEngine" />
 
-    <!-- Left Sidebar: Config -->
-    <transition name="sidebar-left">
-      <aside v-show="!isUiHidden" class="sidebar left">
-        <SimConfig />
-      </aside>
-    </transition>
+		<!-- HEC-RAS Visualization Layer -->
+		<HecRasLayer v-if="isHecRasEngine" />
+		<MapLegend v-if="isHecRasEngine && simulationStore.selectedHecRasScenario"
+			:title="simulationStore.selectedHecRasScenario.legend?.title || '水深范围 (m)'"
+			:minDepth="simulationStore.selectedHecRasScenario.legend?.min || 0"
+			:maxDepth="simulationStore.selectedHecRasScenario.legend?.max || 5" position="bottom-left" />
 
-    <!-- Right Sidebar: Results -->
-    <transition name="sidebar-right">
-      <aside v-show="!isUiHidden" class="sidebar right">
-        <SimResult />
-      </aside>
-    </transition>
+		<!-- Left Sidebar: Config -->
+		<transition name="sidebar-left">
+			<aside v-show="!isUiHidden" class="sidebar left">
+				<SimConfig />
+			</aside>
+		</transition>
 
-    <!-- Analysis Result Panel (3D Tools) -->
-    <AnalysisResultPanel />
+		<!-- Right Sidebar: Results -->
+		<transition name="sidebar-right">
+			<aside v-show="!isUiHidden" class="sidebar right">
+				<SimResult />
+			</aside>
+		</transition>
 
-    <!-- Cesium HTML Overlay (Modern) -->
-    <CesiumInfoOverlay
-      :visible="overlayStore.visible"
-      :tool-type="overlayStore.toolType"
-      :screen-position="overlayStore.screenPosition"
-      @close="overlayStore.hideOverlay()"
-    >
-      <VolumeResultContent
-        v-if="overlayStore.toolType === 'volume' && overlayStore.data"
-        :data="overlayStore.data"
-      />
-      <Measure3DResultContent
-        v-else-if="overlayStore.toolType === 'measure3d' && overlayStore.data"
-        :data="overlayStore.data"
-      />
-      <ProfileResultContent
-        v-else-if="overlayStore.toolType === 'profile' && overlayStore.data"
-        :data="overlayStore.data"
-      />
-      <FloodResultContent
-        v-else-if="overlayStore.toolType === 'flood' && overlayStore.data"
-        :data="overlayStore.data"
-      />
-    </CesiumInfoOverlay>
+		<!-- Analysis Result Panel (3D Tools) -->
+		<AnalysisResultPanel />
 
-    <!-- Bottom Dock: Timeline -->
-    <transition name="slide-up">
-      <div v-show="!isUiHidden" class="bottom-timeline-container">
-        <TimelineControl />
-      </div>
-    </transition>
-  </div>
+		<!-- Cesium HTML Overlay (Modern) -->
+		<CesiumInfoOverlay :visible="overlayStore.visible" :tool-type="overlayStore.toolType"
+			:screen-position="overlayStore.screenPosition" @close="overlayStore.hideOverlay()">
+			<VolumeResultContent v-if="overlayStore.toolType === 'volume' && overlayStore.data" :data="overlayStore.data" />
+			<Measure3DResultContent v-else-if="overlayStore.toolType === 'measure3d' && overlayStore.data"
+				:data="overlayStore.data" />
+			<ProfileResultContent v-else-if="overlayStore.toolType === 'profile' && overlayStore.data"
+				:data="overlayStore.data" />
+			<FloodResultContent v-else-if="overlayStore.toolType === 'flood' && overlayStore.data"
+				:data="overlayStore.data" />
+		</CesiumInfoOverlay>
+
+		<!-- Bottom Dock: Timeline -->
+		<transition name="slide-up">
+			<div v-show="!isUiHidden" class="bottom-timeline-container">
+				<TimelineControl />
+			</div>
+		</transition>
+	</div>
 </template>
 
 <script setup lang="ts">
@@ -69,6 +63,8 @@ import VolumeResultContent from '@/components/cesium/results/VolumeResultContent
 import Measure3DResultContent from '@/components/cesium/results/Measure3DResultContent.vue'
 import ProfileResultContent from '@/components/cesium/results/ProfileResultContent.vue'
 import FloodResultContent from '@/components/cesium/results/FloodResultContent.vue'
+import HecRasLayer from '@/components/cesium/HecRasLayer.vue'
+import MapLegend from '@/components/common/MapLegend.vue'
 
 const appStore = useAppStore()
 const simulationStore = useSimulationStore()
@@ -77,48 +73,57 @@ const isUiHidden = computed(() => appStore.isUiHidden)
 
 // Show flood layer when engine is flood or hydro
 const isFloodEngine = computed(() => {
-  const engine = simulationStore.state.engine
-  return engine === 'flood' || engine === 'hydro'
+	const engine = simulationStore.state.engine
+	return engine === 'flood' || engine === 'hydro'
+})
+
+// Show HEC-RAS layer when engine is hec-ras
+const isHecRasEngine = computed(() => {
+	return simulationStore.state.engine === 'hec-ras'
 })
 
 onMounted(() => {
-  simulationStore.fetchData()
+	simulationStore.fetchData()
 })
 </script>
 
 <style scoped lang="scss">
 .simulation-layout {
-  display: flex;
-  justify-content: space-between;
-  height: 100%;
-  padding: 20px;
-  pointer-events: none;
+	display: flex;
+	justify-content: space-between;
+	height: 100%;
+	padding: 20px;
+	pointer-events: none;
 }
 
 .sidebar {
-  width: 340px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  pointer-events: auto;
+	width: 340px;
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	pointer-events: auto;
 }
 
 .bottom-timeline-container {
-  position: absolute;
-  bottom: 100px; /* Above dock */
-  left: 380px; /* Clear left sidebar */
-  right: 380px; /* Clear right sidebar */
-  pointer-events: auto;
+	position: absolute;
+	bottom: 100px;
+	/* Above dock */
+	left: 380px;
+	/* Clear left sidebar */
+	right: 380px;
+	/* Clear right sidebar */
+	pointer-events: auto;
 }
 
 // Transition for bottom panel
 .slide-up-enter-active,
 .slide-up-leave-active {
-  transition: all 0.3s $ease-out;
+	transition: all 0.3s $ease-out;
 }
+
 .slide-up-enter-from,
 .slide-up-leave-to {
-  transform: translateY(20px);
-  opacity: 0;
+	transform: translateY(20px);
+	opacity: 0;
 }
 </style>
