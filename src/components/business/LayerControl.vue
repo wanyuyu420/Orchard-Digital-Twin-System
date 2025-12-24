@@ -9,6 +9,10 @@
 			<button class="tab-btn" :class="{ active: activeTab === 'features' }" @click="activeTab = 'features'">
 				<i class="fa-solid fa-draw-polygon"></i>
 				绘制要素
+			</button>
+			<button class="tab-btn" :class="{ active: activeTab === 'management' }" @click="activeTab = 'management'">
+				<i class="fa-solid fa-folder-open"></i>
+				要素管理
 				<span v-if="gisStore.featureCount > 0" class="badge">{{ gisStore.featureCount }}</span>
 			</button>
 			<button class="tab-btn" :class="{ active: activeTab === 'analysis' }" @click="activeTab = 'analysis'">
@@ -60,8 +64,9 @@
 				</div>
 
 				<!-- Drawing Style Configuration Panel -->
-				<div v-if="gisStore.toolType && isDrawingTool(gisStore.toolType)" class="style-config-panel"
-					:class="{ collapsed: drawStyleCollapsed }">
+				<div
+					v-if="gisStore.toolType && ['point', 'line', 'circle', 'rectangle', 'polygon'].includes(gisStore.toolType as string)"
+					class="style-config-panel" :class="{ collapsed: drawStyleCollapsed }">
 					<div class="style-config-header" @click="drawStyleCollapsed = !drawStyleCollapsed">
 						<i class="fa-solid" :class="drawStyleCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'"></i>
 						<span>绘制样式</span>
@@ -156,79 +161,50 @@
 					</div>
 				</div>
 
-				<!-- Search Bar -->
-				<div class="search-bar">
-					<i class="fa-solid fa-search"></i>
-					<input v-model="searchQuery" type="text" placeholder="搜索要素..." />
-				</div>
-
-				<!-- Performance Warning -->
-				<div v-if="isHighFeatureCount" class="performance-warning">
-					<i class="fa-solid fa-exclamation-triangle"></i>
-					<span>要素数量较多 ({{ gisStore.featureCount }})，可能影响性能</span>
-				</div>
-
-				<!-- Feature List -->
-				<div class="feature-list">
-					<template v-if="filteredFeatures.length === 0">
-						<div class="empty-state">
-							<i class="fa-solid fa-inbox"></i>
-							<p>{{ searchQuery ? '无匹配要素' : '暂无绘制要素' }}</p>
-							<small>点击上方工具按钮开始绘制</small>
-						</div>
-					</template>
-
-					<template v-else>
-						<div v-for="group in groupedFeatures" :key="group.type" class="feature-group">
-							<div class="group-header">
-								<i :class="group.icon"></i>
-								<span>{{ group.name }}</span>
-								<span class="count">({{ group.features.length }})</span>
+				<!-- Quick Templates Panel -->
+				<div class="quick-templates-panel">
+					<div class="section-header">
+						<i class="fa-solid fa-swatchbook"></i>
+						<span>快速模板</span>
+					</div>
+					<div class="template-grid">
+						<button v-for="template in quickTemplates" :key="template.id" class="template-btn" :title="template.name"
+							@click="applyQuickTemplate(template)">
+							<div class="template-preview" :style="getTemplatePreviewStyle(template)">
+								<i :class="template.icon"></i>
 							</div>
-							<div v-for="feature in group.features" :key="feature.id" class="feature-item"
-								:class="{ selected: gisStore.selectedFeatureIds.has(feature.id) }">
-								<div class="feature-info" @click="selectFeature(feature.id)">
-									<span class="feature-name">{{ feature.name }}</span>
-									<span class="feature-meta">{{ formatFeatureMeta(feature) }}</span>
-								</div>
-								<div class="feature-actions">
-									<button class="action-btn" title="显示/隐藏" @click="toggleFeatureVisibility(feature.id)">
-										<i class="fa-solid" :class="isFeatureVisible(feature.id) ? 'fa-eye' : 'fa-eye-slash'"></i>
-									</button>
-									<button class="action-btn" title="定位" @click="locateFeature(feature.id)">
-										<i class="fa-solid fa-location-crosshairs"></i>
-									</button>
-									<button class="action-btn danger" title="删除" @click="deleteFeature(feature.id)">
-										<i class="fa-solid fa-trash"></i>
-									</button>
-								</div>
-							</div>
+							<span class="template-name">{{ template.name }}</span>
+						</button>
+					</div>
+				</div>
+
+				<!-- Coordinate Input Panel -->
+				<div class="coord-input-panel">
+					<div class="section-header">
+						<i class="fa-solid fa-crosshairs"></i>
+						<span>坐标输入</span>
+					</div>
+					<div class="coord-form">
+						<div class="coord-row">
+							<label>经度</label>
+							<input type="number" v-model.number="coordInput.lng" step="0.000001" placeholder="87.5" />
 						</div>
-					</template>
+						<div class="coord-row">
+							<label>纬度</label>
+							<input type="number" v-model.number="coordInput.lat" step="0.000001" placeholder="43.8" />
+						</div>
+						<div class="coord-actions">
+							<button class="coord-btn primary" @click="addPointAtCoord" :disabled="!isValidCoord">
+								<i class="fa-solid fa-plus"></i>
+								添加点
+							</button>
+							<button class="coord-btn" @click="flyToCoord" :disabled="!isValidCoord">
+								<i class="fa-solid fa-plane"></i>
+								飞行至
+							</button>
+						</div>
+					</div>
 				</div>
-
-				<!-- Batch Actions -->
-				<div class="batch-actions">
-					<button class="batch-btn" @click="triggerImport">
-						<i class="fa-solid fa-upload"></i>
-						导入
-					</button>
-					<button class="batch-btn" @click="exportFeatures" :disabled="gisStore.featureCount === 0">
-						<i class="fa-solid fa-download"></i>
-						导出
-					</button>
-					<button class="batch-btn" @click="selectAllFeatures" :disabled="gisStore.featureCount === 0">
-						<i class="fa-solid fa-check-double"></i>
-						全选
-					</button>
-					<button class="batch-btn danger" @click="clearAllFeatures" :disabled="gisStore.featureCount === 0">
-						<i class="fa-solid fa-broom"></i>
-						清空
-					</button>
-				</div>
-
-				<!-- Hidden file input for import -->
-				<input ref="fileInput" type="file" accept=".geojson,.json" style="display: none" @change="handleFileImport" />
 
 				<!-- Style Configuration Panel -->
 				<div v-if="gisStore.selectedCount > 0" class="style-panel" :class="{ collapsed: selectionStyleCollapsed }">
@@ -350,7 +326,84 @@
 				</div>
 			</div>
 
-			<!-- Tab 3: Analysis Results (New) -->
+			<!-- Tab 3: Feature Management (Separated) -->
+			<div v-show="activeTab === 'management'" class="features-panel">
+				<!-- Search Bar -->
+				<div class="search-bar">
+					<i class="fa-solid fa-search"></i>
+					<input v-model="searchQuery" type="text" placeholder="搜索要素..." />
+				</div>
+
+				<!-- Performance Warning -->
+				<div v-if="isHighFeatureCount" class="performance-warning">
+					<i class="fa-solid fa-exclamation-triangle"></i>
+					<span>要素数量较多 ({{ gisStore.featureCount }})，可能影响性能</span>
+				</div>
+
+				<!-- Feature List -->
+				<div class="feature-list">
+					<template v-if="filteredFeatures.length === 0">
+						<div class="empty-state">
+							<i class="fa-solid fa-inbox"></i>
+							<p>{{ searchQuery ? '无匹配要素' : '暂无绘制要素' }}</p>
+							<small>点击"绘制要素"页开始绘制</small>
+						</div>
+					</template>
+
+					<template v-else>
+						<div v-for="group in groupedFeatures" :key="group.type" class="feature-group">
+							<div class="group-header">
+								<i :class="group.icon"></i>
+								<span>{{ group.name }}</span>
+								<span class="count">({{ group.features.length }})</span>
+							</div>
+							<div v-for="feature in group.features" :key="feature.id" class="feature-item"
+								:class="{ selected: gisStore.selectedFeatureIds.has(feature.id) }">
+								<div class="feature-info" @click="selectFeature(feature.id)">
+									<span class="feature-name">{{ feature.name }}</span>
+									<span class="feature-meta">{{ formatFeatureMeta(feature) }}</span>
+								</div>
+								<div class="feature-actions">
+									<button class="action-btn" title="显示/隐藏" @click="toggleFeatureVisibility(feature.id)">
+										<i class="fa-solid" :class="isFeatureVisible(feature.id) ? 'fa-eye' : 'fa-eye-slash'"></i>
+									</button>
+									<button class="action-btn" title="定位" @click="locateFeature(feature.id)">
+										<i class="fa-solid fa-location-crosshairs"></i>
+									</button>
+									<button class="action-btn danger" title="删除" @click="deleteFeature(feature.id)">
+										<i class="fa-solid fa-trash"></i>
+									</button>
+								</div>
+							</div>
+						</div>
+					</template>
+				</div>
+
+				<!-- Batch Actions -->
+				<div class="batch-actions">
+					<button class="batch-btn" @click="triggerImport">
+						<i class="fa-solid fa-upload"></i>
+						导入
+					</button>
+					<button class="batch-btn" @click="exportFeatures" :disabled="gisStore.featureCount === 0">
+						<i class="fa-solid fa-download"></i>
+						导出
+					</button>
+					<button class="batch-btn" @click="selectAllFeatures" :disabled="gisStore.featureCount === 0">
+						<i class="fa-solid fa-check-double"></i>
+						全选
+					</button>
+					<button class="batch-btn danger" @click="clearAllFeatures" :disabled="gisStore.featureCount === 0">
+						<i class="fa-solid fa-broom"></i>
+						清空
+					</button>
+				</div>
+
+				<!-- Hidden file input for import -->
+				<input ref="fileInput" type="file" accept=".geojson,.json" style="display: none" @change="handleFileImport" />
+			</div>
+
+			<!-- Tab 4: Analysis Results -->
 			<div v-show="activeTab === 'analysis'" class="analysis-panel">
 				<AnalysisResultsList />
 			</div>
@@ -588,8 +641,8 @@ function updateFeatureProperty(key: 'name' | 'description', value: string) {
 }
 
 // UI State
-const activeTab = ref<'resources' | 'features' | 'analysis'>('resources')
-const drawStyleCollapsed = ref(true) // Collapsed by default to save space
+const activeTab = ref<'resources' | 'features' | 'management' | 'analysis'>('resources')
+const drawStyleCollapsed = ref(false) // Expanded by default
 const selectionStyleCollapsed = ref(false)
 const propertiesPanelCollapsed = ref(false)
 
@@ -672,6 +725,128 @@ const keyboardShortcuts = [
 	{ key: '双击', action: '编辑顶点' },
 	{ key: 'Shift+点击', action: '删除顶点' },
 ]
+
+// Quick Templates
+interface QuickTemplate {
+	id: string
+	name: string
+	icon: string
+	toolType: GISToolType
+	style: {
+		fillColor: string
+		strokeColor: string
+		fillOpacity: number
+		strokeWidth: number
+		pointColor?: string
+		pointSize?: number
+	}
+}
+
+const quickTemplates: QuickTemplate[] = [
+	{
+		id: 'warning-zone',
+		name: '警戒区',
+		icon: 'fa-solid fa-triangle-exclamation',
+		toolType: 'polygon',
+		style: { fillColor: '#EF4444', strokeColor: '#FFFFFF', fillOpacity: 0.4, strokeWidth: 2 },
+	},
+	{
+		id: 'safe-zone',
+		name: '安全区',
+		icon: 'fa-solid fa-shield-halved',
+		toolType: 'polygon',
+		style: { fillColor: '#22C55E', strokeColor: '#FFFFFF', fillOpacity: 0.4, strokeWidth: 2 },
+	},
+	{
+		id: 'water-body',
+		name: '水体',
+		icon: 'fa-solid fa-water',
+		toolType: 'polygon',
+		style: { fillColor: '#3B82F6', strokeColor: '#60A5FA', fillOpacity: 0.5, strokeWidth: 2 },
+	},
+	{
+		id: 'pipeline',
+		name: '管道',
+		icon: 'fa-solid fa-arrows-left-right',
+		toolType: 'line',
+		style: { fillColor: '#F97316', strokeColor: '#F97316', fillOpacity: 1, strokeWidth: 4 },
+	},
+	{
+		id: 'monitoring-point',
+		name: '监测点',
+		icon: 'fa-solid fa-location-dot',
+		toolType: 'point',
+		style: { fillColor: '#A855F7', strokeColor: '#FFFFFF', fillOpacity: 1, strokeWidth: 2, pointColor: '#A855F7', pointSize: 12 },
+	},
+	{
+		id: 'dam-line',
+		name: '坝线',
+		icon: 'fa-solid fa-grip-lines',
+		toolType: 'line',
+		style: { fillColor: '#78716C', strokeColor: '#78716C', fillOpacity: 1, strokeWidth: 6 },
+	},
+]
+
+// Apply quick template
+function applyQuickTemplate(template: QuickTemplate) {
+	// Apply style to drawStyle
+	drawStyle.fillColor = template.style.fillColor
+	drawStyle.strokeColor = template.style.strokeColor
+	drawStyle.fillOpacity = template.style.fillOpacity
+	drawStyle.strokeWidth = template.style.strokeWidth
+	if (template.style.pointColor) drawStyle.pointColor = template.style.pointColor
+	if (template.style.pointSize) drawStyle.pointSize = template.style.pointSize
+
+	gisStore.setTool(template.toolType)
+}
+
+// Get template preview style for CSS
+function getTemplatePreviewStyle(template: QuickTemplate) {
+	return {
+		backgroundColor: template.style.fillColor,
+		borderColor: template.style.strokeColor,
+		opacity: template.style.fillOpacity + 0.3,
+	}
+}
+
+// Coordinate Input
+const coordInput = reactive({
+	lng: null as number | null,
+	lat: null as number | null,
+})
+
+// Validate coordinate input
+const isValidCoord = computed(() => {
+	return (
+		coordInput.lng !== null &&
+		coordInput.lat !== null &&
+		coordInput.lng >= -180 &&
+		coordInput.lng <= 180 &&
+		coordInput.lat >= -90 &&
+		coordInput.lat <= 90
+	)
+})
+
+// Add point at specified coordinate
+function addPointAtCoord() {
+	if (!isValidCoord.value || !cesiumStore.viewer) return
+
+	// Fly to the location and activate point tool
+	flyToCoord()
+
+	// Activate point tool so user can click to place
+	gisStore.setTool('point')
+}
+
+// Fly to specified coordinate
+function flyToCoord() {
+	if (!isValidCoord.value || !cesiumStore.viewer) return
+
+	cesiumStore.viewer.camera.flyTo({
+		destination: Cesium.Cartesian3.fromDegrees(coordInput.lng!, coordInput.lat!, 5000),
+		duration: 1.5,
+	})
+}
 
 // Search query
 const searchQuery = ref('')
@@ -2159,5 +2334,167 @@ onMounted(async () => {
 	height: 1px;
 	background: rgba(255, 255, 255, 0.05);
 	margin: 12px 0;
+}
+
+// Section Header
+.section-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 12px;
+	color: $text-sub;
+	margin-bottom: 10px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+
+	i {
+		color: $neon-cyan;
+	}
+}
+
+// Quick Templates Panel
+.quick-templates-panel {
+	margin-top: 8px;
+	padding-top: 8px;
+	border-top: 1px solid rgba(255, 255, 255, 0.05);
+
+	.template-grid {
+		display: grid;
+		grid-template-columns: repeat(6, 1fr);
+		gap: 4px;
+	}
+
+	.template-btn {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 2px;
+		padding: 6px 2px;
+		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		border-radius: 4px;
+		cursor: pointer;
+		transition: all 0.2s;
+
+		&:hover {
+			background: rgba(255, 255, 255, 0.08);
+			border-color: $neon-cyan;
+		}
+
+		.template-preview {
+			width: 20px;
+			height: 20px;
+			border-radius: 3px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			border: 1px solid;
+
+			i {
+				font-size: 9px;
+				color: #fff;
+			}
+		}
+
+		.template-name {
+			font-size: 8px;
+			color: $text-sub;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			max-width: 100%;
+		}
+	}
+}
+
+// Coordinate Input Panel
+.coord-input-panel {
+	margin-top: 8px;
+	padding-top: 8px;
+	border-top: 1px solid rgba(255, 255, 255, 0.05);
+
+	.coord-form {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.coord-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+
+		label {
+			font-size: 11px;
+			color: $text-sub;
+			width: 32px;
+		}
+
+		input {
+			flex: 1;
+			background: rgba(0, 0, 0, 0.3);
+			border: 1px solid rgba(255, 255, 255, 0.1);
+			border-radius: 4px;
+			padding: 6px 10px;
+			font-size: 12px;
+			color: $text-main;
+			font-family: 'JetBrains Mono', monospace;
+
+			&:focus {
+				border-color: $neon-cyan;
+				outline: none;
+			}
+
+			&::placeholder {
+				color: rgba(255, 255, 255, 0.3);
+			}
+		}
+	}
+
+	.coord-actions {
+		display: flex;
+		gap: 8px;
+		margin-top: 4px;
+	}
+
+	.coord-btn {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		padding: 8px;
+		border-radius: 4px;
+		font-size: 11px;
+		cursor: pointer;
+		transition: all 0.2s;
+		background: rgba(255, 255, 255, 0.05);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		color: $text-sub;
+
+		&:hover:not(:disabled) {
+			background: rgba(255, 255, 255, 0.1);
+			color: $text-main;
+		}
+
+		&:disabled {
+			opacity: 0.4;
+			cursor: not-allowed;
+		}
+
+		&.primary {
+			background: rgba($neon-cyan, 0.15);
+			border-color: rgba($neon-cyan, 0.3);
+			color: $neon-cyan;
+
+			&:hover:not(:disabled) {
+				background: rgba($neon-cyan, 0.25);
+			}
+		}
+
+		i {
+			font-size: 10px;
+		}
+	}
 }
 </style>

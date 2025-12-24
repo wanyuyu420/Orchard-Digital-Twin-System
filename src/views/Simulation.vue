@@ -106,7 +106,7 @@ onMounted(() => {
 
 .bottom-timeline-container {
 	position: absolute;
-	bottom: 100px;
+	bottom: 110px;
 	/* Above dock */
 	left: 380px;
 	/* Clear left sidebar */

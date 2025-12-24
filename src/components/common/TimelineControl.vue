@@ -136,6 +136,8 @@ onUnmounted(() => {
 	position: relative;
 	cursor: pointer;
 	border-radius: 2px;
+	margin-left: 10px;
+	/* 防止滑块与播放按钮重叠 */
 }
 
 .progress-bar {

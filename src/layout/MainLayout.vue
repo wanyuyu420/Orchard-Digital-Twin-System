@@ -49,6 +49,7 @@ import BottomDock from '@/layout/BottomDock.vue'
 	left: 0;
 	width: 100%;
 	height: calc(100% - 70px);
+	/* Ribbon Height */
 	z-index: $z-layer-2;
 	pointer-events: none;
 	/* Layout container is transparent */

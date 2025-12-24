@@ -122,9 +122,21 @@ const trendText = computed(() => {
 	transition: all 0.3s ease;
 
 	&.highlight {
-		background: linear-gradient(135deg, rgba(66, 185, 131, 0.15), rgba(0, 162, 255, 0.15));
-		border-color: rgba(66, 185, 131, 0.4);
-		box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+		background: linear-gradient(135deg, rgba(0, 255, 234, 0.1), rgba(0, 136, 255, 0.1));
+		border: 1px solid rgba(0, 255, 234, 0.3);
+		box-shadow: 0 0 15px rgba(0, 255, 234, 0.15), inset 0 0 20px rgba(0, 255, 234, 0.05);
+		position: relative;
+		overflow: hidden;
+
+		&::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 2px;
+			background: linear-gradient(90deg, transparent, #00ffea, transparent);
+		}
 	}
 }
 
@@ -140,9 +152,10 @@ const trendText = computed(() => {
 	color: #fff;
 
 	small {
-		font-size: 12px;
+		font-size: 14px;
 		font-weight: normal;
 		color: #999;
+		margin-left: 4px;
 	}
 }
 

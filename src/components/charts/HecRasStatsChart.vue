@@ -6,7 +6,7 @@
 import { computed } from 'vue'
 import type { EChartsOption } from 'echarts'
 import BaseChart from './BaseChart.vue'
-import { NEON_CYAN, NEON_GREEN, createGradient, TEXT_SECONDARY } from './theme'
+import { NEON_CYAN, NEON_GREEN, NEON_PURPLE, createGradient, TEXT_SECONDARY, GRID_LINE } from './theme'
 
 const props = withDefaults(
 	defineProps<{
@@ -31,8 +31,8 @@ const props = withDefaults(
 
 // KB scenario config (water level + flow)
 const kbSeriesConfig = [
-	{ key: 'elevation（m）', name: '水位', color: NEON_GREEN, yAxisIndex: 0, unit: 'm' },
-	{ key: 'flow（cms）', name: '出库流量', color: NEON_CYAN, yAxisIndex: 1, unit: 'm³/s' },
+	{ key: 'elevation（m）', name: '水位', color: NEON_CYAN, yAxisIndex: 0, unit: 'm' },
+	{ key: 'flow（cms）', name: '出库流量', color: NEON_PURPLE, yAxisIndex: 1, unit: 'm³/s' },
 ]
 
 // Constants for unit conversion
@@ -85,10 +85,11 @@ const chartOptions = computed<EChartsOption>(() => {
 		}),
 		smooth: true,
 		showSymbol: false,
-		lineStyle: { color: cfg.color, width: 2 },
-		areaStyle: idx === 0 ? {
-			color: createGradient(`${cfg.color}33`, `${cfg.color}00`),
-		} : undefined,
+		lineStyle: { color: cfg.color, width: 2, shadowColor: cfg.color, shadowBlur: 4 },
+		areaStyle: {
+			color: createGradient(`${cfg.color}66`, `${cfg.color}00`), // Stronger gradient
+			opacity: 0.6
+		},
 	}))
 
 	// Add markLine to first series for current frame indicator
@@ -109,11 +110,33 @@ const chartOptions = computed<EChartsOption>(() => {
 						if (isFlowScenario.value) val *= ACRE_FEET_TO_10K_M3
 						return `${c.name}: ${val.toFixed(2)}`
 					}).join('\n')
-				}
+				},
+				lineHeight: 14 // Better spacing for multi-line label
 			},
 			silent: true,
 			animation: false,
-			data: [{ xAxis: props.currentFrame, lineStyle: { color: '#ff4d4f', width: 2 } }]
+			data: [{
+				xAxis: props.currentFrame,
+				lineStyle: {
+					color: '#ff4d4f',
+					width: 1,
+					type: 'dashed'
+				},
+				label: {
+					show: true,
+					position: 'middle', // Move to middle to avoid title overlap
+					rotate: 0, // Force horizontal text
+					backgroundColor: 'rgba(0,0,0,0.6)',
+					formatter: () => {
+						return config.map(c => {
+							let val = Math.abs(dataArray[props.currentFrame]?.[c.key] || 0)
+							if (isFlowScenario.value) val *= ACRE_FEET_TO_10K_M3
+							// Remove Chinese name, show only value
+							return `${val.toFixed(2)}`
+						}).join('\n')
+					}
+				}
+			}]
 		}
 	}
 
@@ -126,10 +149,24 @@ const chartOptions = computed<EChartsOption>(() => {
 				scale: true,
 				splitLine: {
 					show: cfg.yAxisIndex === 0,
-					lineStyle: { color: 'rgba(255,255,255,0.05)' }
+					lineStyle: {
+						color: GRID_LINE,
+						type: 'dashed',
+						opacity: 0.3
+					}
 				},
-				axisLabel: { color: cfg.color, fontSize: 9, formatter: `{value}` },
-				nameTextStyle: { color: cfg.color, fontSize: 9 },
+				axisLabel: {
+					color: TEXT_SECONDARY,
+					fontSize: 10,
+					formatter: (value: number) => {
+						// Align Water Level integers with floats (e.g. 1125.0)
+						if (!isFlowScenario.value && cfg.yAxisIndex === 0) {
+							return value.toFixed(1)
+						}
+						return value
+					}
+				},
+				nameTextStyle: { color: TEXT_SECONDARY, fontSize: 10, padding: [0, 0, 0, 10] },
 			}
 		}
 		return acc
@@ -153,12 +190,24 @@ const chartOptions = computed<EChartsOption>(() => {
 		},
 		tooltip: {
 			trigger: 'axis',
-			axisPointer: { type: 'cross' },
+			axisPointer: { type: 'line', lineStyle: { color: NEON_CYAN, width: 1, type: 'dashed' } },
+			backgroundColor: 'rgba(10, 22, 40, 0.95)',
+			borderColor: 'rgba(255, 255, 255, 0.1)',
+			textStyle: { color: '#fff', fontSize: 12 },
+			padding: [10, 15],
 			formatter: (params: any) => {
-				let res = `${params[0].name}`
+				let res = `<div style="font-weight:bold;margin-bottom:8px;color:#fff">${params[0].name}</div>`
 				params.forEach((p: any) => {
 					const unit = config[p.seriesIndex]?.unit || ''
-					res += `<br/>${p.marker} ${p.seriesName}: <b>${p.value.toFixed(2)}${unit}</b>`
+					const color = p.color
+					res += `
+					<div style="display:flex;justify-content:space-between;align-items:center;min-width:140px;margin-bottom:4px">
+						<span style="display:flex;align-items:center;">
+							<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px"></span>
+							<span style="color:#aaa">${p.seriesName}</span>
+						</span>
+						<span style="font-weight:bold;color:${color}">${p.value.toFixed(2)} <span style="font-size:10px;font-weight:normal">${unit}</span></span>
+					</div>`
 				})
 				return res
 			}
