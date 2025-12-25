@@ -63,265 +63,243 @@
 					</button>
 				</div>
 
-				<!-- Drawing Style Configuration Panel -->
-				<div
-					v-if="gisStore.toolType && ['point', 'line', 'circle', 'rectangle', 'polygon'].includes(gisStore.toolType as string)"
-					class="style-config-panel" :class="{ collapsed: drawStyleCollapsed }">
-					<div class="style-config-header" @click="drawStyleCollapsed = !drawStyleCollapsed">
-						<i class="fa-solid" :class="drawStyleCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'"></i>
-						<span>绘制样式</span>
-						<button class="reset-btn" title="恢复默认样式" @click.stop="resetCurrentToolStyle">
-							<i class="fa-solid fa-rotate-left"></i>
-							恢复默认
-						</button>
-					</div>
-					<div v-show="!drawStyleCollapsed" class="style-config-body">
-						<!-- Point Color (only for point tool) -->
-						<div v-if="gisStore.toolType === 'point'" class="style-row">
-							<label>点颜色</label>
-							<input type="color" v-model="drawStyle.pointColor" class="color-input" />
-						</div>
-						<!-- Point Outline Color (only for point tool) -->
-						<div v-if="gisStore.toolType === 'point'" class="style-row">
-							<label>边框颜色</label>
-							<input type="color" v-model="drawStyle.strokeColor" class="color-input" />
-						</div>
-						<!-- Point Outline Width (only for point tool) -->
-						<div v-if="gisStore.toolType === 'point'" class="style-row">
-							<label>边框宽度</label>
-							<input type="range" v-model.number="drawStyle.strokeWidth" min="0" max="5" step="1" class="range-input" />
-							<span class="value-label">{{ drawStyle.strokeWidth }}px</span>
-						</div>
-						<!-- Point Size (only for point tool) -->
-						<div v-if="gisStore.toolType === 'point'" class="style-row">
-							<label>点大小</label>
-							<input type="range" v-model.number="drawStyle.pointSize" min="5" max="30" step="1" class="range-input" />
-							<span class="value-label">{{ drawStyle.pointSize }}px</span>
-						</div>
-						<!-- Point Icon Type (only for point tool) -->
-						<div v-if="gisStore.toolType === 'point'" class="style-row">
-							<label>图标样式</label>
-							<div class="icon-selector">
-								<button v-for="icon in pointIconOptions" :key="icon.id" class="icon-option"
-									:class="{ active: drawStyle.iconType === icon.id }" :title="icon.name"
-									@click="drawStyle.iconType = icon.id">
-									<i :class="icon.icon"></i>
-								</button>
-							</div>
-						</div>
-						<!-- Stroke Color (for line/shapes) -->
-						<div v-if="gisStore.toolType !== 'point'" class="style-row">
-							<label>线条颜色</label>
-							<input type="color" v-model="drawStyle.strokeColor" class="color-input" />
-						</div>
-						<!-- Stroke Width (for line/shapes) -->
-						<div v-if="gisStore.toolType !== 'point'" class="style-row">
-							<label>线条宽度</label>
-							<input type="range" v-model.number="drawStyle.strokeWidth" min="1" max="10" step="1"
-								class="range-input" />
-							<span class="value-label">{{ drawStyle.strokeWidth }}px</span>
-						</div>
-						<!-- Line Type (only for line tool) -->
-						<div v-if="gisStore.toolType === 'line'" class="style-row">
-							<label>线型</label>
-							<select v-model="drawStyle.lineType" class="select-input">
-								<option value="solid">实线</option>
-								<option value="dashed">虚线</option>
-								<option value="dotted">点线</option>
-							</select>
-						</div>
-						<!-- Fill Color (for shapes) -->
-						<div v-if="isShapeTool(gisStore.toolType)" class="style-row">
-							<label>填充颜色</label>
-							<input type="color" v-model="drawStyle.fillColor" class="color-input" />
-						</div>
-						<!-- Fill Opacity (for shapes) -->
-						<div v-if="isShapeTool(gisStore.toolType)" class="style-row">
-							<label>填充透明度</label>
-							<input type="range" v-model.number="drawStyle.fillOpacity" min="0" max="1" step="0.1"
-								class="range-input" />
-							<span class="value-label">{{ Math.round(drawStyle.fillOpacity * 100) }}%</span>
-						</div>
-					</div>
-				</div>
+				<div class="features-scroll-content">
 
-				<!-- Keyboard Shortcuts Help Panel -->
-				<div v-if="showShortcutsHelp" class="shortcuts-help">
-					<div class="shortcuts-header">
-						<span>快捷键</span>
-						<button class="close-btn" @click="showShortcutsHelp = false">
-							<i class="fa-solid fa-times"></i>
-						</button>
-					</div>
-					<div class="shortcuts-list">
-						<div v-for="shortcut in keyboardShortcuts" :key="shortcut.key" class="shortcut-item">
-							<kbd>{{ shortcut.key }}</kbd>
-							<span>{{ shortcut.action }}</span>
-						</div>
-					</div>
-				</div>
-
-				<!-- Quick Templates Panel -->
-				<div class="quick-templates-panel">
-					<div class="section-header">
-						<i class="fa-solid fa-swatchbook"></i>
-						<span>快速模板</span>
-					</div>
-					<div class="template-grid">
-						<button v-for="template in quickTemplates" :key="template.id" class="template-btn" :title="template.name"
-							@click="applyQuickTemplate(template)">
-							<div class="template-preview" :style="getTemplatePreviewStyle(template)">
-								<i :class="template.icon"></i>
-							</div>
-							<span class="template-name">{{ template.name }}</span>
-						</button>
-					</div>
-				</div>
-
-				<!-- Coordinate Input Panel -->
-				<div class="coord-input-panel">
-					<div class="section-header">
-						<i class="fa-solid fa-crosshairs"></i>
-						<span>坐标输入</span>
-					</div>
-					<div class="coord-form">
-						<div class="coord-row">
-							<label>经度</label>
-							<input type="number" v-model.number="coordInput.lng" step="0.000001" placeholder="87.5" />
-						</div>
-						<div class="coord-row">
-							<label>纬度</label>
-							<input type="number" v-model.number="coordInput.lat" step="0.000001" placeholder="43.8" />
-						</div>
-						<div class="coord-actions">
-							<button class="coord-btn primary" @click="addPointAtCoord" :disabled="!isValidCoord">
-								<i class="fa-solid fa-plus"></i>
-								添加点
+					<!-- Drawing Style Configuration Panel -->
+					<div v-if="gisStore.toolType && isDrawingTool(gisStore.toolType)" class="style-config-panel"
+						:class="{ collapsed: drawStyleCollapsed }">
+						<div class="style-config-header" @click="drawStyleCollapsed = !drawStyleCollapsed">
+							<i class="fa-solid" :class="drawStyleCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'"></i>
+							<span>绘制样式</span>
+							<button class="reset-btn" title="恢复默认样式" @click.stop="resetCurrentToolStyle">
+								<i class="fa-solid fa-rotate-left"></i>
+								恢复默认
 							</button>
-							<button class="coord-btn" @click="flyToCoord" :disabled="!isValidCoord">
-								<i class="fa-solid fa-plane"></i>
-								飞行至
+						</div>
+						<div v-show="!drawStyleCollapsed" class="style-config-body">
+							<!-- Point Color (only for point tool) -->
+							<div v-if="gisStore.toolType === 'draw-point'" class="style-row">
+								<label>点颜色</label>
+								<input type="color" v-model="drawStyle.pointColor" class="color-input" />
+							</div>
+							<!-- Point Outline Color (only for point tool) -->
+							<div v-if="gisStore.toolType === 'draw-point'" class="style-row">
+								<label>边框颜色</label>
+								<input type="color" v-model="drawStyle.strokeColor" class="color-input" />
+							</div>
+							<!-- Point Outline Width (only for point tool) -->
+							<div v-if="gisStore.toolType === 'draw-point'" class="style-row">
+								<label>边框宽度</label>
+								<input type="range" v-model.number="drawStyle.strokeWidth" min="0" max="5" step="1"
+									class="range-input" />
+								<span class="value-label">{{ drawStyle.strokeWidth }}px</span>
+							</div>
+							<!-- Point Size (only for point tool) -->
+							<div v-if="gisStore.toolType === 'draw-point'" class="style-row">
+								<label>点大小</label>
+								<input type="range" v-model.number="drawStyle.pointSize" min="5" max="30" step="1"
+									class="range-input" />
+								<span class="value-label">{{ drawStyle.pointSize }}px</span>
+							</div>
+							<!-- Point Icon Type (only for point tool) -->
+							<div v-if="gisStore.toolType === 'draw-point'" class="style-row">
+								<label>图标样式</label>
+								<div class="icon-selector">
+									<button v-for="icon in pointIconOptions" :key="icon.id" class="icon-option"
+										:class="{ active: drawStyle.iconType === icon.id }" :title="icon.name"
+										@click="drawStyle.iconType = icon.id">
+										<i :class="icon.icon"></i>
+									</button>
+								</div>
+							</div>
+							<!-- Stroke Color (for line/shapes) -->
+							<div v-if="gisStore.toolType !== 'draw-point'" class="style-row">
+								<label>线条颜色</label>
+								<input type="color" v-model="drawStyle.strokeColor" class="color-input" />
+							</div>
+							<!-- Stroke Width (for line/shapes) -->
+							<div v-if="gisStore.toolType !== 'draw-point'" class="style-row">
+								<label>线条宽度</label>
+								<input type="range" v-model.number="drawStyle.strokeWidth" min="1" max="10" step="1"
+									class="range-input" />
+								<span class="value-label">{{ drawStyle.strokeWidth }}px</span>
+							</div>
+							<!-- Line Type (only for line tool) -->
+							<div v-if="gisStore.toolType === 'draw-line'" class="style-row">
+								<label>线型</label>
+								<select v-model="drawStyle.lineType" class="select-input">
+									<option value="solid">实线</option>
+									<option value="dashed">虚线</option>
+									<option value="dotted">点线</option>
+								</select>
+							</div>
+							<!-- Fill Color (for shapes) -->
+							<div v-if="isShapeTool(gisStore.toolType)" class="style-row">
+								<label>填充颜色</label>
+								<input type="color" v-model="drawStyle.fillColor" class="color-input" />
+							</div>
+							<!-- Fill Opacity (for shapes) -->
+							<div v-if="isShapeTool(gisStore.toolType)" class="style-row">
+								<label>填充透明度</label>
+								<input type="range" v-model.number="drawStyle.fillOpacity" min="0" max="1" step="0.1"
+									class="range-input" />
+								<span class="value-label">{{ Math.round(drawStyle.fillOpacity * 100) }}%</span>
+							</div>
+						</div>
+					</div>
+
+					<!-- Keyboard Shortcuts Help Panel -->
+					<div v-if="showShortcutsHelp" class="shortcuts-help">
+						<div class="shortcuts-header">
+							<span>快捷键</span>
+							<button class="close-btn" @click="showShortcutsHelp = false">
+								<i class="fa-solid fa-times"></i>
+							</button>
+						</div>
+						<div class="shortcuts-list">
+							<div v-for="shortcut in keyboardShortcuts" :key="shortcut.key" class="shortcut-item">
+								<kbd>{{ shortcut.key }}</kbd>
+								<span>{{ shortcut.action }}</span>
+							</div>
+						</div>
+					</div>
+
+					<!-- Quick Templates Panel -->
+					<div class="quick-templates-panel">
+						<div class="section-header">
+							<i class="fa-solid fa-swatchbook"></i>
+							<span>快速模板</span>
+						</div>
+						<div class="template-grid">
+							<button v-for="template in quickTemplates" :key="template.id" class="template-btn" :title="template.name"
+								@click="applyQuickTemplate(template)">
+								<div class="template-preview" :style="getTemplatePreviewStyle(template)">
+									<i :class="template.icon"></i>
+								</div>
+								<span class="template-name">{{ template.name }}</span>
 							</button>
 						</div>
 					</div>
-				</div>
 
-				<!-- Style Configuration Panel -->
-				<div v-if="gisStore.selectedCount > 0" class="style-panel" :class="{ collapsed: selectionStyleCollapsed }">
-					<div class="style-header" @click="selectionStyleCollapsed = !selectionStyleCollapsed">
-						<i class="fa-solid" :class="selectionStyleCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'"></i>
-						<i class="fa-solid fa-palette"></i>
-						<span>样式配置</span>
-						<span class="selected-count">{{ gisStore.selectedCount }} 个选中</span>
+
+
+					<!-- Style Configuration Panel -->
+					<div v-if="gisStore.selectedCount > 0" class="style-panel" :class="{ collapsed: selectionStyleCollapsed }">
+						<div class="style-header" @click="selectionStyleCollapsed = !selectionStyleCollapsed">
+							<i class="fa-solid" :class="selectionStyleCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'"></i>
+							<i class="fa-solid fa-palette"></i>
+							<span>样式配置</span>
+							<span class="selected-count">{{ gisStore.selectedCount }} 个选中</span>
+						</div>
+
+						<div v-show="!selectionStyleCollapsed" class="style-content">
+							<!-- Fill Color -->
+							<div class="style-row">
+								<label>填充颜色</label>
+								<div class="color-input-group">
+									<input type="color" v-model="styleConfig.fillColor" @input="applyStyleToSelected" />
+									<span class="color-value">{{ styleConfig.fillColor }}</span>
+								</div>
+							</div>
+
+							<!-- Stroke Color -->
+							<div class="style-row">
+								<label>边框颜色</label>
+								<div class="color-input-group">
+									<input type="color" v-model="styleConfig.strokeColor" @input="applyStyleToSelected" />
+									<span class="color-value">{{ styleConfig.strokeColor }}</span>
+								</div>
+							</div>
+
+							<!-- Fill Opacity -->
+							<div class="style-row">
+								<label>填充透明度</label>
+								<div class="slider-group">
+									<input type="range" v-model.number="styleConfig.fillOpacity" min="0" max="1" step="0.1"
+										@input="applyStyleToSelected" />
+									<span class="slider-value">{{ Math.round(styleConfig.fillOpacity * 100) }}%</span>
+								</div>
+							</div>
+
+							<!-- Stroke Width -->
+							<div class="style-row">
+								<label>边框宽度</label>
+								<div class="slider-group">
+									<input type="range" v-model.number="styleConfig.strokeWidth" min="1" max="10" step="1"
+										@input="applyStyleToSelected" />
+									<span class="slider-value">{{ styleConfig.strokeWidth }}px</span>
+								</div>
+							</div>
+
+							<!-- Point Size (for point features) -->
+							<div v-if="hasPointFeatureSelected" class="style-row">
+								<label>点大小</label>
+								<div class="slider-group">
+									<input type="range" v-model.number="styleConfig.pointSize" min="5" max="30" step="1"
+										@input="applyStyleToSelected" />
+									<span class="slider-value">{{ styleConfig.pointSize }}px</span>
+								</div>
+							</div>
+
+							<!-- Style Presets -->
+							<div class="style-presets">
+								<label>快速样式</label>
+								<div class="preset-buttons">
+									<button v-for="preset in stylePresets" :key="preset.name" class="preset-btn"
+										:style="{ '--preset-color': preset.fillColor }" :title="preset.name" @click="applyPreset(preset)">
+										<span class="preset-color"
+											:style="{ background: preset.fillColor, borderColor: preset.strokeColor }"></span>
+									</button>
+								</div>
+							</div>
+						</div>
 					</div>
 
-					<div v-show="!selectionStyleCollapsed" class="style-content">
-						<!-- Fill Color -->
-						<div class="style-row">
-							<label>填充颜色</label>
-							<div class="color-input-group">
-								<input type="color" v-model="styleConfig.fillColor" @input="applyStyleToSelected" />
-								<span class="color-value">{{ styleConfig.fillColor }}</span>
+					<!-- Properties Panel (single selection only) -->
+					<div v-if="gisStore.selectedCount === 1" class="properties-panel">
+						<div class="properties-header">
+							<i class="fa-solid fa-info-circle"></i>
+							<span>要素属性</span>
+						</div>
+
+						<div class="properties-content">
+							<!-- Name Input -->
+							<div class="property-row">
+								<label>名称</label>
+								<input type="text" v-model="featureProps.name" @input="updateFeatureProperty('name', featureProps.name)"
+									placeholder="输入要素名称" />
 							</div>
-						</div>
 
-						<!-- Stroke Color -->
-						<div class="style-row">
-							<label>边框颜色</label>
-							<div class="color-input-group">
-								<input type="color" v-model="styleConfig.strokeColor" @input="applyStyleToSelected" />
-								<span class="color-value">{{ styleConfig.strokeColor }}</span>
+							<!-- Description Input -->
+							<div class="property-row">
+								<label>描述</label>
+								<textarea v-model="featureProps.description"
+									@input="updateFeatureProperty('description', featureProps.description)" placeholder="输入描述信息"
+									rows="2"></textarea>
 							</div>
-						</div>
 
-						<!-- Fill Opacity -->
-						<div class="style-row">
-							<label>填充透明度</label>
-							<div class="slider-group">
-								<input type="range" v-model.number="styleConfig.fillOpacity" min="0" max="1" step="0.1"
-									@input="applyStyleToSelected" />
-								<span class="slider-value">{{ Math.round(styleConfig.fillOpacity * 100) }}%</span>
-							</div>
-						</div>
-
-						<!-- Stroke Width -->
-						<div class="style-row">
-							<label>边框宽度</label>
-							<div class="slider-group">
-								<input type="range" v-model.number="styleConfig.strokeWidth" min="1" max="10" step="1"
-									@input="applyStyleToSelected" />
-								<span class="slider-value">{{ styleConfig.strokeWidth }}px</span>
-							</div>
-						</div>
-
-						<!-- Point Size (for point features) -->
-						<div v-if="hasPointFeatureSelected" class="style-row">
-							<label>点大小</label>
-							<div class="slider-group">
-								<input type="range" v-model.number="styleConfig.pointSize" min="5" max="30" step="1"
-									@input="applyStyleToSelected" />
-								<span class="slider-value">{{ styleConfig.pointSize }}px</span>
-							</div>
-						</div>
-
-						<!-- Style Presets -->
-						<div class="style-presets">
-							<label>快速样式</label>
-							<div class="preset-buttons">
-								<button v-for="preset in stylePresets" :key="preset.name" class="preset-btn"
-									:style="{ '--preset-color': preset.fillColor }" :title="preset.name" @click="applyPreset(preset)">
-									<span class="preset-color"
-										:style="{ background: preset.fillColor, borderColor: preset.strokeColor }"></span>
-								</button>
-							</div>
-						</div>
-					</div>
-				</div>
-
-				<!-- Properties Panel (single selection only) -->
-				<div v-if="gisStore.selectedCount === 1" class="properties-panel">
-					<div class="properties-header">
-						<i class="fa-solid fa-info-circle"></i>
-						<span>要素属性</span>
-					</div>
-
-					<div class="properties-content">
-						<!-- Name Input -->
-						<div class="property-row">
-							<label>名称</label>
-							<input type="text" v-model="featureProps.name" @input="updateFeatureProperty('name', featureProps.name)"
-								placeholder="输入要素名称" />
-						</div>
-
-						<!-- Description Input -->
-						<div class="property-row">
-							<label>描述</label>
-							<textarea v-model="featureProps.description"
-								@input="updateFeatureProperty('description', featureProps.description)" placeholder="输入描述信息"
-								rows="2"></textarea>
-						</div>
-
-						<!-- Read-only Properties -->
-						<div class="property-divider"></div>
-
-						<div class="property-row readonly">
-							<label>类型</label>
-							<span class="property-value">{{ featureTypeLabel }}</span>
-						</div>
-
-						<div class="property-row readonly">
-							<label>创建时间</label>
-							<span class="property-value">{{ featureProps.createdAt }}</span>
-						</div>
-
-						<!-- Geometry Properties -->
-						<template v-if="geometryProps.length > 0">
+							<!-- Read-only Properties -->
 							<div class="property-divider"></div>
-							<div v-for="prop in geometryProps" :key="prop.label" class="property-row readonly">
-								<label>{{ prop.label }}</label>
-								<span class="property-value">{{ prop.value }}</span>
+
+							<div class="property-row readonly">
+								<label>类型</label>
+								<span class="property-value">{{ featureTypeLabel }}</span>
 							</div>
-						</template>
+
+							<div class="property-row readonly">
+								<label>创建时间</label>
+								<span class="property-value">{{ featureProps.createdAt }}</span>
+							</div>
+
+							<!-- Geometry Properties -->
+							<template v-if="geometryProps.length > 0">
+								<div class="property-divider"></div>
+								<div v-for="prop in geometryProps" :key="prop.label" class="property-row readonly">
+									<label>{{ prop.label }}</label>
+									<span class="property-value">{{ prop.value }}</span>
+								</div>
+							</template>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -527,7 +505,7 @@ const featureProps = reactive({
 
 // Feature type labels
 const featureTypeLabels: Record<string, string> = {
-	point: '点标注',
+	point: '点',
 	line: '线路径',
 	polygon: '多边形',
 	circle: '圆形',
@@ -646,6 +624,16 @@ const drawStyleCollapsed = ref(false) // Expanded by default
 const selectionStyleCollapsed = ref(false)
 const propertiesPanelCollapsed = ref(false)
 
+// Auto-switch to features tab when a drawing tool is activated from TopRibbon
+watch(
+	() => gisStore.toolType,
+	(newToolType) => {
+		if (newToolType && isDrawingTool(newToolType)) {
+			activeTab.value = 'features'
+		}
+	}
+)
+
 // Dynamic layers from store (data-driven)
 const layerStore = useLayerStore()
 const dynamicLayers = computed(() =>
@@ -654,27 +642,27 @@ const dynamicLayers = computed(() =>
 
 // Draw tools configuration with tooltips
 const drawTools: Array<{ id: GISToolType; name: string; icon: string; tooltip: string }> = [
-	{ id: 'point', name: '点标注', icon: 'fa-solid fa-location-dot', tooltip: '点标注 - 单击放置点' },
+	{ id: 'draw-point', name: '点', icon: 'fa-solid fa-location-dot', tooltip: '点 - 单击放置点' },
 	{
-		id: 'line',
+		id: 'draw-line',
 		name: '线绘制',
 		icon: 'fa-solid fa-minus',
 		tooltip: '线绘制 - 连续点击添加节点，双击完成',
 	},
 	{
-		id: 'circle',
+		id: 'draw-circle',
 		name: '圆形',
 		icon: 'fa-regular fa-circle',
 		tooltip: '圆形 - 点击设置圆心，拖动设置半径',
 	},
 	{
-		id: 'rectangle',
+		id: 'draw-rectangle',
 		name: '矩形',
 		icon: 'fa-regular fa-square',
 		tooltip: '矩形 - 点击对角两点绘制',
 	},
 	{
-		id: 'polygon',
+		id: 'draw-polygon',
 		name: '多边形',
 		icon: 'fa-solid fa-draw-polygon',
 		tooltip: '多边形 - 连续点击添加节点，双击完成',
@@ -727,6 +715,7 @@ const keyboardShortcuts = [
 ]
 
 // Quick Templates
+// Quick Templates
 interface QuickTemplate {
 	id: string
 	name: string
@@ -739,51 +728,110 @@ interface QuickTemplate {
 		strokeWidth: number
 		pointColor?: string
 		pointSize?: number
+		lineType?: 'solid' | 'dashed' | 'dotted'
+		iconType?: 'dot' | 'pin' | 'diamond' | 'star' | 'camera' | 'wifi'
+		centerIcon?: string
 	}
 }
 
 const quickTemplates: QuickTemplate[] = [
+	// === Safety & Emergency ===
 	{
 		id: 'warning-zone',
 		name: '警戒区',
 		icon: 'fa-solid fa-triangle-exclamation',
-		toolType: 'polygon',
-		style: { fillColor: '#EF4444', strokeColor: '#FFFFFF', fillOpacity: 0.4, strokeWidth: 2 },
+		toolType: 'draw-polygon',
+		style: {
+			fillColor: '#EF4444',
+			strokeColor: '#F87171',
+			fillOpacity: 0.35,
+			strokeWidth: 2,
+			lineType: 'dashed',
+			centerIcon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23EF4444'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z'/%3E%3C/svg%3E"
+		},
 	},
 	{
 		id: 'safe-zone',
 		name: '安全区',
 		icon: 'fa-solid fa-shield-halved',
-		toolType: 'polygon',
-		style: { fillColor: '#22C55E', strokeColor: '#FFFFFF', fillOpacity: 0.4, strokeWidth: 2 },
+		toolType: 'draw-polygon',
+		style: { fillColor: '#10B981', strokeColor: '#34D399', fillOpacity: 0.35, strokeWidth: 2 },
 	},
+	{
+		id: 'evacuation-route',
+		name: '撤离路线',
+		icon: 'fa-solid fa-person-running',
+		toolType: 'draw-line',
+		style: { fillColor: '#F59E0B', strokeColor: '#F59E0B', fillOpacity: 1, strokeWidth: 4, lineType: 'solid' },
+	},
+
+	// === Water & Environment ===
 	{
 		id: 'water-body',
 		name: '水体',
 		icon: 'fa-solid fa-water',
-		toolType: 'polygon',
-		style: { fillColor: '#3B82F6', strokeColor: '#60A5FA', fillOpacity: 0.5, strokeWidth: 2 },
+		toolType: 'draw-polygon',
+		style: { fillColor: '#3B82F6', strokeColor: '#60A5FA', fillOpacity: 0.4, strokeWidth: 1 },
 	},
+	{
+		id: 'vegetation',
+		name: '植被',
+		icon: 'fa-solid fa-tree',
+		toolType: 'draw-polygon',
+		style: { fillColor: '#22C55E', strokeColor: '#4ADE80', fillOpacity: 0.4, strokeWidth: 1 },
+	},
+	{
+		id: 'construction',
+		name: '施工区',
+		icon: 'fa-solid fa-trowel-bricks',
+		toolType: 'draw-rectangle',
+		style: { fillColor: '#EAB308', strokeColor: '#FDE047', fillOpacity: 0.2, strokeWidth: 2, lineType: 'dashed' },
+	},
+
+	// === Infrastructure ===
 	{
 		id: 'pipeline',
 		name: '管道',
 		icon: 'fa-solid fa-arrows-left-right',
-		toolType: 'line',
-		style: { fillColor: '#F97316', strokeColor: '#F97316', fillOpacity: 1, strokeWidth: 4 },
-	},
-	{
-		id: 'monitoring-point',
-		name: '监测点',
-		icon: 'fa-solid fa-location-dot',
-		toolType: 'point',
-		style: { fillColor: '#A855F7', strokeColor: '#FFFFFF', fillOpacity: 1, strokeWidth: 2, pointColor: '#A855F7', pointSize: 12 },
+		toolType: 'draw-line',
+		style: { fillColor: '#6366F1', strokeColor: '#6366F1', fillOpacity: 1, strokeWidth: 5, lineType: 'solid' },
 	},
 	{
 		id: 'dam-line',
 		name: '坝线',
 		icon: 'fa-solid fa-grip-lines',
-		toolType: 'line',
-		style: { fillColor: '#78716C', strokeColor: '#78716C', fillOpacity: 1, strokeWidth: 6 },
+		toolType: 'draw-line',
+		style: { fillColor: '#78716C', strokeColor: '#A8A29E', fillOpacity: 1, strokeWidth: 6, lineType: 'solid' },
+	},
+	{
+		id: 'pump-station',
+		name: '泵站',
+		icon: 'fa-solid fa-building',
+		toolType: 'draw-point',
+		style: { fillColor: '#0EA5E9', strokeColor: '#E0F2FE', fillOpacity: 1, strokeWidth: 2, pointColor: '#0EA5E9', pointSize: 14, iconType: 'diamond' },
+	},
+
+	// === Monitoring ===
+	{
+		id: 'sensor',
+		name: '传感器',
+		icon: 'fa-solid fa-wifi',
+		toolType: 'draw-point',
+		style: { fillColor: '#8B5CF6', strokeColor: '#DDD6FE', fillOpacity: 1, strokeWidth: 2, pointColor: '#8B5CF6', pointSize: 12, iconType: 'wifi' },
+	},
+	{
+		id: 'camera',
+		name: '监控',
+		icon: 'fa-solid fa-video',
+		toolType: 'draw-point',
+		style: { fillColor: '#64748B', strokeColor: '#F1F5F9', fillOpacity: 1, strokeWidth: 2, pointColor: '#64748B', pointSize: 12, iconType: 'camera' },
+	},
+	{
+		id: 'poi',
+		name: '关注点',
+		icon: 'fa-solid fa-location-dot',
+		toolType: 'draw-point',
+		style: { fillColor: '#F43F5E', strokeColor: '#FFE4E6', fillOpacity: 1, strokeWidth: 2, pointColor: '#F43F5E', pointSize: 16, iconType: 'pin' },
 	},
 ]
 
@@ -796,6 +844,9 @@ function applyQuickTemplate(template: QuickTemplate) {
 	drawStyle.strokeWidth = template.style.strokeWidth
 	if (template.style.pointColor) drawStyle.pointColor = template.style.pointColor
 	if (template.style.pointSize) drawStyle.pointSize = template.style.pointSize
+	if (template.style.lineType) drawStyle.lineType = template.style.lineType
+	if (template.style.iconType) drawStyle.iconType = template.style.iconType
+	drawStyle.centerIcon = template.style.centerIcon
 
 	gisStore.setTool(template.toolType)
 }
@@ -809,44 +860,7 @@ function getTemplatePreviewStyle(template: QuickTemplate) {
 	}
 }
 
-// Coordinate Input
-const coordInput = reactive({
-	lng: null as number | null,
-	lat: null as number | null,
-})
 
-// Validate coordinate input
-const isValidCoord = computed(() => {
-	return (
-		coordInput.lng !== null &&
-		coordInput.lat !== null &&
-		coordInput.lng >= -180 &&
-		coordInput.lng <= 180 &&
-		coordInput.lat >= -90 &&
-		coordInput.lat <= 90
-	)
-})
-
-// Add point at specified coordinate
-function addPointAtCoord() {
-	if (!isValidCoord.value || !cesiumStore.viewer) return
-
-	// Fly to the location and activate point tool
-	flyToCoord()
-
-	// Activate point tool so user can click to place
-	gisStore.setTool('point')
-}
-
-// Fly to specified coordinate
-function flyToCoord() {
-	if (!isValidCoord.value || !cesiumStore.viewer) return
-
-	cesiumStore.viewer.camera.flyTo({
-		destination: Cesium.Cartesian3.fromDegrees(coordInput.lng!, coordInput.lat!, 5000),
-		duration: 1.5,
-	})
-}
 
 // Search query
 const searchQuery = ref('')
@@ -909,20 +923,16 @@ watch(
 	{ deep: true }
 )
 
-/**
- * Check if tool is a drawing tool
- */
+// Check if tool is a drawing tool
 function isDrawingTool(toolType: string | null): boolean {
 	if (!toolType) return false
-	return ['point', 'line', 'circle', 'rectangle', 'polygon'].includes(toolType)
+	return ['draw-point', 'draw-line', 'draw-circle', 'draw-rectangle', 'draw-polygon'].includes(toolType)
 }
 
-/**
- * Check if tool is a shape tool (has fill)
- */
+// Check if tool is a shape tool (has fill)
 function isShapeTool(toolType: string | null): boolean {
 	if (!toolType) return false
-	return ['circle', 'rectangle', 'polygon'].includes(toolType)
+	return ['draw-circle', 'draw-rectangle', 'draw-polygon'].includes(toolType)
 }
 
 // File input ref for import
@@ -940,7 +950,7 @@ async function onLayerToggle(layer: any) {
 	if (exclusiveGroup && isActivating) {
 		// Find and deactivate all other layers in the same exclusive group
 		const sameGroupLayers = layerStore.layers.filter(
-			l => l.config?.exclusive_group === exclusiveGroup && l.id !== layer.id
+			l => (l.config as any)?.exclusive_group === exclusiveGroup && l.id !== layer.id
 		)
 		for (const otherLayer of sameGroupLayers) {
 			if (layerStore.isLayerActive(otherLayer.id)) {
@@ -1235,17 +1245,16 @@ function locateFeature(featureId: string) {
 	}
 
 	// Fly camera to center
+	// Fly camera to center
 	const viewer = gisStore.viewer
 	if (viewer && viewer.camera) {
 		viewer.camera.flyTo({
 			destination: center,
 			duration: 1.5,
-			offset: new (window as any).Cesium.HeadingPitchRange(
-				0,
-				-(window as any).Cesium.Math.toRadians(45), // Look down at 45 degrees
-				5000 // 5km distance
-			),
-		})
+			// Use orientation to look down if possible, but camera.flyTo with point destination moves camera TO point.
+			// Ideally we should use viewer.flyTo(entity) but we don't have easy access to the main entity here.
+			// validation error: offset is not a valid option for camera.flyTo
+		} as any)
 	}
 }
 
@@ -1510,6 +1519,13 @@ onMounted(async () => {
 	flex-direction: column;
 	height: 100%;
 	overflow: hidden;
+}
+
+.features-scroll-content {
+	flex: 1;
+	overflow-y: auto;
+	@include custom-scrollbar;
+	padding-bottom: 10px;
 }
 
 // Tool Buttons
@@ -2353,147 +2369,95 @@ onMounted(async () => {
 }
 
 // Quick Templates Panel
+// Quick Templates Panel
 .quick-templates-panel {
-	margin-top: 8px;
-	padding-top: 8px;
-	border-top: 1px solid rgba(255, 255, 255, 0.05);
+	margin: 12px 10px;
+	padding: 12px;
+	background: rgba(0, 0, 0, 0.2); // Subtle card background
+	border-radius: 8px;
+	border: 1px solid rgba(255, 255, 255, 0.05);
+
+	.section-header {
+		margin-bottom: 12px;
+		padding-bottom: 0;
+		border-bottom: none;
+
+		span {
+			font-size: 13px;
+			font-weight: 600;
+			letter-spacing: 0.5px;
+			color: $text-main;
+		}
+	}
 
 	.template-grid {
 		display: grid;
-		grid-template-columns: repeat(6, 1fr);
-		gap: 4px;
+		grid-template-columns: repeat(3, 1fr); // 3 cols for better spacing
+		gap: 8px;
 	}
 
 	.template-btn {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 2px;
-		padding: 6px 2px;
+		padding: 12px 8px;
 		background: rgba(255, 255, 255, 0.03);
 		border: 1px solid rgba(255, 255, 255, 0.08);
-		border-radius: 4px;
+		border-radius: 6px;
 		cursor: pointer;
-		transition: all 0.2s;
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		position: relative;
+		overflow: hidden;
 
 		&:hover {
-			background: rgba(255, 255, 255, 0.08);
-			border-color: $neon-cyan;
+			background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+			border-color: rgba(34, 211, 238, 0.5);
+			transform: translateY(-2px);
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+			.template-name {
+				color: $neon-cyan;
+			}
+
+			.template-preview {
+				transform: scale(1.05);
+				box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+			}
+		}
+
+		&:active {
+			transform: translateY(0);
 		}
 
 		.template-preview {
-			width: 20px;
-			height: 20px;
-			border-radius: 3px;
+			width: 36px; // Larger preview
+			height: 36px;
+			border-radius: 8px;
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			border: 1px solid;
+			border: 2px solid;
+			margin-bottom: 8px;
+			transition: all 0.3s ease;
+			box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+			background-color: rgba(0, 0, 0, 0.2); // Darker bg behind icon
 
 			i {
-				font-size: 9px;
+				font-size: 16px; // Larger icon
 				color: #fff;
+				filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.5));
 			}
 		}
 
 		.template-name {
-			font-size: 8px;
+			font-size: 11px; // Readable font size
+			font-weight: 500;
 			color: $text-sub;
 			white-space: nowrap;
 			overflow: hidden;
 			text-overflow: ellipsis;
 			max-width: 100%;
-		}
-	}
-}
-
-// Coordinate Input Panel
-.coord-input-panel {
-	margin-top: 8px;
-	padding-top: 8px;
-	border-top: 1px solid rgba(255, 255, 255, 0.05);
-
-	.coord-form {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-
-	.coord-row {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-
-		label {
-			font-size: 11px;
-			color: $text-sub;
-			width: 32px;
-		}
-
-		input {
-			flex: 1;
-			background: rgba(0, 0, 0, 0.3);
-			border: 1px solid rgba(255, 255, 255, 0.1);
-			border-radius: 4px;
-			padding: 6px 10px;
-			font-size: 12px;
-			color: $text-main;
-			font-family: 'JetBrains Mono', monospace;
-
-			&:focus {
-				border-color: $neon-cyan;
-				outline: none;
-			}
-
-			&::placeholder {
-				color: rgba(255, 255, 255, 0.3);
-			}
-		}
-	}
-
-	.coord-actions {
-		display: flex;
-		gap: 8px;
-		margin-top: 4px;
-	}
-
-	.coord-btn {
-		flex: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 6px;
-		padding: 8px;
-		border-radius: 4px;
-		font-size: 11px;
-		cursor: pointer;
-		transition: all 0.2s;
-		background: rgba(255, 255, 255, 0.05);
-		border: 1px solid rgba(255, 255, 255, 0.1);
-		color: $text-sub;
-
-		&:hover:not(:disabled) {
-			background: rgba(255, 255, 255, 0.1);
-			color: $text-main;
-		}
-
-		&:disabled {
-			opacity: 0.4;
-			cursor: not-allowed;
-		}
-
-		&.primary {
-			background: rgba($neon-cyan, 0.15);
-			border-color: rgba($neon-cyan, 0.3);
-			color: $neon-cyan;
-
-			&:hover:not(:disabled) {
-				background: rgba($neon-cyan, 0.25);
-			}
-		}
-
-		i {
-			font-size: 10px;
+			transition: color 0.2s;
 		}
 	}
 }

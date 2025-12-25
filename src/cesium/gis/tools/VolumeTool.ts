@@ -12,8 +12,9 @@
 
 import * as Cesium from 'cesium'
 import { BaseTool, type BaseToolOptions, type ToolType } from '../core/BaseTool'
-import { computeCutVolume, type VolumeResult } from '../utils/volume'
+import { computeCutVolume } from '../utils/volume'
 import type { Coordinate } from '@/types/geometry'
+import type { VolumeAnalysisData } from '@/types/analysis'
 import {
   TOOL_COLORS,
   POINT_STYLES,
@@ -22,14 +23,16 @@ import {
   createHintLabel,
   createPointMarker,
 } from '../utils/toolStyles'
+import {
+  calculateCentroid,
+  cartesianToCoordinate,
+} from '../utils/geo'
 import { useGISStore } from '@/stores/gis'
 
 /**
- * 体积分析结果
+ * 体积分析结果 (增强型，包含展示所需数据)
  */
-export interface VolumeAnalysisResult extends VolumeResult {
-  /** 基准高程 */
-  baseHeight: number
+export interface VolumeAnalysisResult extends VolumeAnalysisData {
   /** 分析多边形顶点 */
   positions: Cesium.Cartesian3[]
   /** 计算时间 */
@@ -130,7 +133,7 @@ export class VolumeTool extends BaseTool {
    * 构造函数
    */
   constructor(viewer: Cesium.Viewer, options: VolumeToolOptions = {}) {
-    super(viewer, { ...options, type: 'custom' as ToolType })
+    super(viewer, { ...options, type: 'volume' as ToolType, requiresTerrain: true })
     this.baseHeight = options.baseHeight ?? 0
     this.onComplete = options.onComplete
     this.onCancel = options.onCancel
@@ -183,6 +186,8 @@ export class VolumeTool extends BaseTool {
    */
   protected onActivate(): void {
     this.setCursor('crosshair')
+    // 禁用双击缩放，防止完成绘制时视角跳动
+    ;(this.viewer.scene.screenSpaceCameraController as any).zoomOnDoubleClick = false
   }
 
   /**
@@ -191,6 +196,8 @@ export class VolumeTool extends BaseTool {
   protected onDeactivate(): void {
     this.resetCursor()
     this.clearPreview()
+    // 恢复双击缩放
+    ;(this.viewer.scene.screenSpaceCameraController as any).zoomOnDoubleClick = true
   }
 
   /**
@@ -200,7 +207,7 @@ export class VolumeTool extends BaseTool {
     const cartesian = this.pickPosition(screenPosition)
     if (!cartesian) return
 
-    const coord = this.cartesianToCoordinate(cartesian)
+    const coord = this.cartesianToCoord(cartesian)
     this.vertices.push(coord)
     this.positions.push(cartesian)
     this.addMarker(cartesian)
@@ -241,7 +248,7 @@ export class VolumeTool extends BaseTool {
    * 更新实时预览
    */
   private updatePreview(): void {
-    if (!this.cursorPosition || this.positions.length === 0) return
+    if (!this.cursorPosition || this.positions.length === 0 || this.isCalculating) return
 
     const needsRecreate = this.positions.length !== this.lastPreviewVerticesCount
 
@@ -313,14 +320,19 @@ export class VolumeTool extends BaseTool {
     if (this.positions.length < 3 || this.isCalculating) return
 
     this.isCalculating = true
-    this.clearPreviewEntities()
+    this.clearPreview() // 清除预览线、提示标签和顶点标记
 
     try {
+      // 给浏览器和 Cesium 一点时间处理双击完成后的事件，防止主线程阻塞导致相机控制器状态异常
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
       // 计算体积
-      const volumeResult = computeCutVolume(this.viewer, this.positions, this.baseHeight)
+      const volumeResult = await computeCutVolume(this.viewer, this.positions, this.baseHeight)
 
       const result: VolumeAnalysisResult = {
         ...volumeResult,
+        fillVolume: 0, // TODO: 实现填方计算
+        cutVolume: volumeResult.volume,
         baseHeight: this.baseHeight,
         positions: [...this.positions],
         calculatedAt: new Date(),
@@ -384,20 +396,10 @@ export class VolumeTool extends BaseTool {
   }
 
   /**
-   * 计算多边形质心
+   * 计算多边形质心 - 使用共享工具函数
    */
   private calculateCentroid(positions: Cesium.Cartesian3[]): Cesium.Cartesian3 {
-    if (positions.length === 0) return Cesium.Cartesian3.ZERO
-
-    let x = 0,
-      y = 0,
-      z = 0
-    for (const pos of positions) {
-      x += pos.x
-      y += pos.y
-      z += pos.z
-    }
-    return new Cesium.Cartesian3(x / positions.length, y / positions.length, z / positions.length)
+    return calculateCentroid(positions)
   }
 
   /**
@@ -418,16 +420,13 @@ export class VolumeTool extends BaseTool {
   }
 
   /**
-   * 重置状态
+   * 重置状态（仅重置数据，不清除实体）
    */
   private reset(): void {
     this.vertices = []
     this.positions = []
     this.cursorPosition = null
     this.lastPreviewVerticesCount = 0
-    // 清除标记但保留结果可视化
-    this.markerEntities.forEach((entity) => this.viewer.entities.remove(entity))
-    this.markerEntities = []
   }
 
   /**
@@ -478,15 +477,10 @@ export class VolumeTool extends BaseTool {
   }
 
   /**
-   * 笛卡尔坐标转经纬度
+   * 笛卡尔坐标转经纬度 - 使用共享工具函数
    */
-  private cartesianToCoordinate(cartesian: Cesium.Cartesian3): Coordinate {
-    const cartographic = Cesium.Cartographic.fromCartesian(cartesian)
-    return {
-      longitude: Cesium.Math.toDegrees(cartographic.longitude),
-      latitude: Cesium.Math.toDegrees(cartographic.latitude),
-      height: cartographic.height,
-    }
+  private cartesianToCoord(cartesian: Cesium.Cartesian3): Coordinate {
+    return cartesianToCoordinate(cartesian)
   }
 
   /**

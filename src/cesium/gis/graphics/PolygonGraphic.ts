@@ -15,6 +15,8 @@ export interface PolygonGraphicOptions extends BaseGraphicOptions {
   showAreaLabel?: boolean
   /** 高度模式 */
   heightReference?: Cesium.HeightReference
+  /** 中心图标URL（可选） */
+  centerIcon?: string
 }
 
 /**
@@ -25,6 +27,7 @@ export interface PolygonGraphicOptions extends BaseGraphicOptions {
  * - 使用独立 PolylineGraphics 渲染边框（支持自定义宽度）
  * - 面积计算（大地测量）
  * - 面积标签显示
+ * - 中心图标显示
  * - 支持填充和边框样式
  * - 编辑模式（显示顶点标记）
  */
@@ -37,6 +40,9 @@ export class PolygonGraphic extends BaseGraphic {
 
   /** 面积标签实体 */
   private areaLabelEntity: Cesium.Entity | null = null
+  
+  /** 中心图标实体 */
+  private centerIconEntity: Cesium.Entity | null = null
 
   /** 顶点标记实体（编辑模式）*/
   private vertexMarkers: Cesium.Entity[] = []
@@ -46,6 +52,9 @@ export class PolygonGraphic extends BaseGraphic {
 
   /** 高度模式 */
   private heightReference: Cesium.HeightReference
+  
+  /** 中心图标URL */
+  private centerIcon?: string
 
   /** 顶点位置数组 */
   private positions: Cesium.Cartesian3[] = []
@@ -57,6 +66,7 @@ export class PolygonGraphic extends BaseGraphic {
     super(viewer, { ...options, type: 'polygon' })
     this.showAreaLabel = options.showAreaLabel ?? true
     this.heightReference = options.heightReference ?? Cesium.HeightReference.CLAMP_TO_GROUND
+    this.centerIcon = options.centerIcon
   }
 
   /**
@@ -82,6 +92,11 @@ export class PolygonGraphic extends BaseGraphic {
     // 创建面积标签
     if (this.showAreaLabel) {
       this.createAreaLabel()
+    }
+    
+    // 创建中心图标
+    if (this.centerIcon) {
+      this.createCenterIcon()
     }
 
     // Mark as created (using internal flag)
@@ -165,6 +180,32 @@ export class PolygonGraphic extends BaseGraphic {
     })
 
     this.entities.push(this.areaLabelEntity)
+  }
+
+  /**
+   * 创建中心图标
+   */
+  private createCenterIcon(): void {
+    if (this.positions.length < 3 || !this.centerIcon) return
+
+    const center = this.calculateCentroid(this.positions)
+    
+    this.centerIconEntity = this.viewer.entities.add({
+      position: center,
+      billboard: {
+        image: this.centerIcon,
+        width: 24,
+        height: 24,
+        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+        heightReference: this.heightReference,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+         // Ensure icon is above Polygon
+        eyeOffset: new Cesium.Cartesian3(0, 0, -50)
+      }
+    })
+    
+    this.entities.push(this.centerIconEntity)
   }
 
   /**

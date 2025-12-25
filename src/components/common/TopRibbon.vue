@@ -39,25 +39,25 @@
 
 			<!-- Drawing Tools -->
 			<div class="tool-group">
-				<button class="btn-icon-text" :class="{ active: drawTool === 'point' }" @click="toggleDrawTool('point')"
-					title="点标注">
+				<button class="btn-icon-text" :class="{ active: isDrawToolActive('point') }"
+					@click="toggleDrawTool('draw-point')" title="点标注">
 					<i class="fa-solid fa-map-pin"></i>
 				</button>
-				<button class="btn-icon-text" :class="{ active: drawTool === 'line' }" @click="toggleDrawTool('line')"
+				<button class="btn-icon-text" :class="{ active: isDrawToolActive('line') }" @click="toggleDrawTool('draw-line')"
 					title="线绘制">
 					<i class="fa-solid fa-route"></i>
 				</button>
-				<button class="btn-icon-text" :class="{ active: drawTool === 'polygon' }" @click="toggleDrawTool('polygon')"
-					title="多边形">
-					<i class="fa-solid fa-draw-polygon"></i>
-				</button>
-				<button class="btn-icon-text" :class="{ active: drawTool === 'circle' }" @click="toggleDrawTool('circle')"
-					title="圆形">
+				<button class="btn-icon-text" :class="{ active: isDrawToolActive('circle') }"
+					@click="toggleDrawTool('draw-circle')" title="圆形">
 					<i class="fa-solid fa-circle"></i>
 				</button>
-				<button class="btn-icon-text" :class="{ active: drawTool === 'rectangle' }" @click="toggleDrawTool('rectangle')"
-					title="矩形">
+				<button class="btn-icon-text" :class="{ active: isDrawToolActive('rectangle') }"
+					@click="toggleDrawTool('draw-rectangle')" title="矩形">
 					<i class="fa-solid fa-square"></i>
+				</button>
+				<button class="btn-icon-text" :class="{ active: isDrawToolActive('polygon') }"
+					@click="toggleDrawTool('draw-polygon')" title="多边形">
+					<i class="fa-solid fa-draw-polygon"></i>
 				</button>
 			</div>
 
@@ -150,22 +150,12 @@ const cesiumStore = useCesiumStore()
 const gisStore = useGISStore()
 const isUiHidden = computed(() => appStore.isUiHidden)
 
-// Use activeTool to determine which type of tool is active
-const drawTool = computed(() => {
-	const tool = gisStore.activeTool as string | null
-	return tool === 'draw-point' ||
-		tool === 'point' ||
-		tool === 'draw-line' ||
-		tool === 'line' ||
-		tool === 'draw-polygon' ||
-		tool === 'polygon' ||
-		tool === 'draw-circle' ||
-		tool === 'circle' ||
-		tool === 'draw-rectangle' ||
-		tool === 'rectangle'
-		? (tool as DrawToolType)
-		: null
-})
+// Check if a draw tool is active (supports both prefixed and non-prefixed)
+function isDrawToolActive(toolName: string): boolean {
+	const activeTool = gisStore.toolType as string | null
+	if (!activeTool) return false
+	return activeTool === `draw-${toolName}` || activeTool === toolName
+}
 
 const timeStr = ref('')
 const isFullscreen = ref(false)
@@ -326,13 +316,14 @@ function toggleAnalysisTool(tool: AnalysisToolType) {
 	}
 }
 
-function toggleDrawTool(tool: DrawToolType) {
+function toggleDrawTool(tool: string) {
 	// Toggle: if clicking the same tool, deactivate it; otherwise, activate it
-	if (gisStore.activeTool === tool) {
+	const currentTool = gisStore.toolType
+	if (currentTool === tool) {
 		gisStore.setTool(null)
 	} else {
 		// Activate the selected tool (will automatically deactivate other tools)
-		gisStore.setTool(tool)
+		gisStore.setTool(tool as any)
 	}
 }
 

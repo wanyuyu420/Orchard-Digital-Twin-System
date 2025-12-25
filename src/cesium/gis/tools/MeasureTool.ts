@@ -636,6 +636,15 @@ export class MeasureTool extends BaseTool {
   }
 
   /**
+   * 激活时初始化
+   */
+  protected onActivate(): void {
+    this.setCursor('crosshair')
+    // 禁用双击缩放
+    ;(this.viewer.scene.screenSpaceCameraController as any).zoomOnDoubleClick = false
+  }
+
+  /**
    * 停用时清理
    */
   protected onDeactivate(): void {
@@ -643,6 +652,8 @@ export class MeasureTool extends BaseTool {
     this.clearMarkers()
     this.resetPoints()
     this.resetCursor()
+    // 恢复双击缩放
+    ;(this.viewer.scene.screenSpaceCameraController as any).zoomOnDoubleClick = true
   }
 
   /**

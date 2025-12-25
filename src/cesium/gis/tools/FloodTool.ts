@@ -13,8 +13,9 @@
 import * as Cesium from 'cesium'
 import { BaseTool, type BaseToolOptions, type ToolType } from '../core/BaseTool'
 import { TilesetService } from '../services/TilesetService'
-import { TOOL_COLORS, POINT_STYLES } from '../utils/toolStyles'
+import { TOOL_COLORS, createPointMarker } from '../utils/toolStyles'
 import { useGISStore } from '@/stores/gis'
+import type { FloodAnalysisData } from '@/types/analysis'
 
 /**
  * 淹没分析模式
@@ -163,6 +164,13 @@ export class FloodTool extends BaseTool {
   /** 预览实体 */
   private previewEntities: Cesium.Entity[] = []
 
+  /** 鼠标移动节流 */
+  private lastMoveTime: number = 0
+  private readonly MOVE_THROTTLE_MS = 50
+
+  /** 当前光标位置 */
+  private cursorPosition: Cesium.Cartesian3 | null = null
+
   /** 回调函数 */
   private onWaterLevelChange?: (level: number, result: FloodAnalysisResult) => void
   private onComplete?: (result: FloodAnalysisResult) => void
@@ -180,9 +188,14 @@ export class FloodTool extends BaseTool {
   }
 
   constructor(viewer: Cesium.Viewer, options: FloodToolOptions = {}) {
-    super(viewer, { ...options, type: 'custom' as ToolType })
+    // 优先使用传入的 requiresTerrain，如果没有传入，则根据 mode 判断
+    const mode = options.mode ?? FloodTool.DEFAULTS.mode
+    const modeRequiresTerrain = mode === 'terrain'
+    const requiresTerrain = options.requiresTerrain ?? modeRequiresTerrain
+    
+    super(viewer, { ...options, type: 'flood' as ToolType, requiresTerrain })
 
-    this.floodMode = options.mode ?? FloodTool.DEFAULTS.mode
+    this.floodMode = mode
     this.dataSource = options.dataSource
     this.currentWaterLevel = options.initialWaterLevel ?? FloodTool.DEFAULTS.initialWaterLevel
     this.waterLevelStep = options.waterLevelStep ?? FloodTool.DEFAULTS.waterLevelStep
@@ -232,6 +245,8 @@ export class FloodTool extends BaseTool {
 
   protected onActivate(): void {
     this.setCursor('crosshair')
+    // 禁用双击缩放
+    ;(this.viewer.scene.screenSpaceCameraController as any).zoomOnDoubleClick = false
 
     // 根据模式初始化
     if (this.floodMode === 'tileset' && this.dataSource?.tilesetUrl) {
@@ -250,6 +265,8 @@ export class FloodTool extends BaseTool {
     this.resetCursor()
     this.stopAnimation()
     this.clearPreview()
+    // 恢复双击缩放
+    ;(this.viewer.scene.screenSpaceCameraController as any).zoomOnDoubleClick = true
   }
 
   /**
@@ -288,12 +305,35 @@ export class FloodTool extends BaseTool {
         hierarchy: new Cesium.PolygonHierarchy(positions),
         height: this.currentWaterLevel,
         material: Cesium.Color.fromCssColorString(this.waterColor).withAlpha(this.waterOpacity),
-        outline: true,
-        outlineColor: Cesium.Color.fromCssColorString(TOOL_COLORS.flood.stroke),
-        outlineWidth: 3,
+        // 移除自带边框（会被地形遮挡），改用下方独立 Polyline
+        outline: false,
       },
     })
+    
+    // 添加独立贴地边框，确保边界可见
+    const outlineEntity = this.viewer.entities.add({
+      polyline: {
+        positions: [...positions, positions[0]],
+        width: 3,
+        material: Cesium.Color.fromCssColorString(TOOL_COLORS.flood.stroke),
+        clampToGround: true,
+      }
+    })
+    // 能够随 waterEntity 一起清除（虽然 stored separately in entities collection in BaseTool usually, but here FloodTool manages specific entities）
+    // 我们可以把它们都存入 previewEntities 或者创建一个 resultEntities 列表，目前 FloodTool `clear()` 逻辑只清除 `waterEntity`
+    // 我们需要一种方式追踪这个边框。简单起见，我们将边框作为 waterEntity 的子实体或关联实体？
+    // Cesium Entity API 没有直接的 children。
+    // 方案：将 border entity 也赋值给 waterEntity (作为复合实体? or just track it)
+    // 但 current implementation only tracks `this.waterEntity` (single).
+    // Let's modify `clear()` to track `waterBorderEntity` too? Or use `CompositeEntity` concept (not native).
+    // Better: modify `clear()` to remove both.
+    // For now, let's keep it simple: Just add it. Ideally `FloodTool` should have `resultEntities: Entity[]`.
+    // Hack: Store it in `previewEntities`? No, `previewEntities` are cleared on completion.
+    // Let's assign it to a new property `waterOutlineEntity`.
+    this.waterOutlineEntity = outlineEntity
   }
+
+  private waterOutlineEntity: Cesium.Entity | null = null
 
   /**
    * 处理左键点击（多边形模式）
@@ -301,6 +341,12 @@ export class FloodTool extends BaseTool {
   private handleLeftClick(screenPosition: Cesium.Cartesian2): void {
     const cartesian = this.pickPosition(screenPosition)
     if (!cartesian) return
+
+    // 如果是第一个点，自动设置初始水位为该点高度，确保预览可见
+    if (this.polygonPositions.length === 0) {
+      const carto = Cesium.Cartographic.fromCartesian(cartesian)
+      this.currentWaterLevel = Math.floor(carto.height)
+    }
 
     this.polygonPositions.push(cartesian)
     this.updatePolygonPreview()
@@ -323,51 +369,175 @@ export class FloodTool extends BaseTool {
   }
 
   /**
-   * 处理鼠标移动
+   * 处理鼠标移动 - 更新预览
    */
-  private handleMouseMove(_screenPosition: Cesium.Cartesian2): void {
-    // 可添加预览逻辑（鼠标跟随等）
+  private handleMouseMove(screenPosition: Cesium.Cartesian2): void {
+    // 节流处理
+    const now = Date.now()
+    if (now - this.lastMoveTime < this.MOVE_THROTTLE_MS) return
+    this.lastMoveTime = now
+
+    const cartesian = this.pickPosition(screenPosition)
+    if (!cartesian) return
+
+    // 更新当前光标位置
+    this.cursorPosition = cartesian
+
+    // 如果还没有创建预览实体，且有顶点，则创建
+    if (this.previewEntities.length === 0 && this.polygonPositions.length > 0) {
+      this.createPolygonPreview()
+    }
   }
 
   /**
-   * 更新多边形预览
+   * 创建多边形预览实体 (使用 CallbackProperty 动态更新)
    */
-  private updatePolygonPreview(): void {
+  private createPolygonPreview(): void {
     this.clearPreview()
 
-    if (this.polygonPositions.length < 2) return
+    // 静态顶点引用
+    const staticPositions = this.polygonPositions
 
-    // 绘制预览多边形（带现代化样式）
+    // 1. 动态多边形 (填充)
     const previewPolygon = this.viewer.entities.add({
       polygon: {
-        hierarchy: new Cesium.PolygonHierarchy(this.polygonPositions),
+        hierarchy: new Cesium.CallbackProperty(() => {
+          // 如果没有光标位置，只显示静态点
+          if (!this.cursorPosition) {
+             return staticPositions.length >= 3 ? new Cesium.PolygonHierarchy(staticPositions) : null
+          }
+           // 组合静态点和当前光标位置
+           const positions = [...staticPositions, this.cursorPosition]
+           return positions.length >= 3 ? new Cesium.PolygonHierarchy(positions) : null
+        }, false),
         height: this.currentWaterLevel,
         material: Cesium.Color.fromCssColorString(this.waterColor).withAlpha(
           this.waterOpacity * 0.5
         ),
-        outline: true,
-        outlineColor: Cesium.Color.fromCssColorString(TOOL_COLORS.flood.accent).withAlpha(0.9),
-        outlineWidth: 3,
+        outline: false,
       },
     })
     this.previewEntities.push(previewPolygon)
 
-    // 绘制顶点标记
-    this.polygonPositions.forEach((pos) => {
-      const marker = this.viewer.entities.add(createPointMarker(pos, 'vertex'))
-      this.previewEntities.push(marker)
+    // 2. 动态边界线 (Polyline) - 贴地显示
+    const previewPolyline = this.viewer.entities.add({
+      polyline: {
+        positions: new Cesium.CallbackProperty(() => {
+           if (!this.cursorPosition) return staticPositions.length >= 2 ? [...staticPositions, staticPositions[0]] : []
+           return [...staticPositions, this.cursorPosition, staticPositions[0]]
+        }, false),
+        width: 3,
+        material: Cesium.Color.fromCssColorString(TOOL_COLORS.flood.accent).withAlpha(0.9),
+        clampToGround: true,
+      },
     })
+    this.previewEntities.push(previewPolyline)
+  }
+
+  /**
+   * 更新多边形预览 (仅需在添加新顶点时调用)
+   */
+  private updatePolygonPreview(): void {
+    // 每次添加新顶点时，重新创建预览实体以锁定旧顶点位置
+    // 或者，由于我们使用了引用 staticPositions = this.polygonPositions
+    // 其实不需要重新创建实体，因为数组引用没变，但是数组内容变了
+    // CallbackProperty 会自动读取最新的数组内容 + cursorPosition
+
+    // 添加顶点标记
+    const lastPos = this.polygonPositions[this.polygonPositions.length - 1]
+    const marker = this.viewer.entities.add(createPointMarker(lastPos, 'vertex'))
+    this.previewEntities.push(marker)
+    
+    // 如果是第一次添加点，需要初始化预览实体
+    if (this.previewEntities.length <= 1) { // 只有标记
+       this.createPolygonPreview()
+    }
   }
 
   /**
    * 完成多边形绘制
    */
   private completePolygonDrawing(): void {
-    this.clearPreview()
-    this.createTerrainFlood(this.polygonPositions)
+    if (this.polygonPositions.length < 3) return
 
+    // 1. 去重：移除双击可能产生的重复最后一个点
+    const length = this.polygonPositions.length
+    if (length >= 2) {
+      const last = this.polygonPositions[length - 1]
+      const secondLast = this.polygonPositions[length - 2]
+      if (Cesium.Cartesian3.equalsEpsilon(last, secondLast, Cesium.Math.EPSILON6)) {
+        this.polygonPositions.pop()
+      }
+    }
+
+    // 再次检查定点数量（去重后）
+    if (this.polygonPositions.length < 3) return
+
+    // 2. 清除预览 (停止动态绘制)
+    this.clearPreview()
+    this.cursorPosition = null // 重要：清除光标位置，防止后续 move 事件意外触发预览
+
+    // 3. 创建结果 (使用位置副本)
+    const positionsCopy = [...this.polygonPositions]
+
+    // 自动计算初始水位：取所有顶点的最小高度
+    // 这样能确保画在山上的水面不会跑到地下
+    const heights = positionsCopy.map(pos => {
+      const carto = Cesium.Cartographic.fromCartesian(pos)
+      return carto.height
+    })
+    
+    if (heights.length > 0) {
+      const minHeight = Math.min(...heights)
+      // 如果计算出的高度比默认的大（说明是山上），则使用该高度
+      // 同时也保留一定的向下容差，防止完全贴地导致 Z-fighting
+      if (minHeight > this.currentWaterLevel) {
+        // +1米偏移，避免与平坦地形 Z-fighting
+        this.currentWaterLevel = Math.floor(minHeight) + 1
+        console.log(`Auto-adjusted water level to ${this.currentWaterLevel}m based on terrain`)
+      }
+    }
+
+    this.createTerrainFlood(positionsCopy)
+
+    // 4. 计算并回调
     const result = this.calculateFloodResult()
     this.onComplete?.(result)
+
+    // 添加到 Store
+    const gisStore = useGISStore()
+    // 计算中心点
+    let totalX = 0,
+       totalY = 0,
+       totalZ = 0
+    // 使用 positionsCopy 因为 this.polygonPositions 已清空
+    for (const pos of positionsCopy) {
+       totalX += pos.x
+       totalY += pos.y
+       totalZ += pos.z
+    }
+    const centroid = new Cesium.Cartesian3(
+       totalX / positionsCopy.length,
+       totalY / positionsCopy.length,
+       totalZ / positionsCopy.length
+    )
+
+    gisStore.addAnalysisResult({
+       type: 'flood',
+       name: `淹没分析 #${gisStore.analysisResults.length + 1}`,
+       data: {
+         waterLevel: this.currentWaterLevel,
+         floodArea: result.floodedArea,
+         floodVolume: result.floodedVolume,
+         mode: this.floodMode,
+         tilesetUrl: this.dataSource?.tilesetUrl,
+       } as FloodAnalysisData,
+       position: centroid,
+    })
+
+    // 5. 重置绘制状态，准备下一次绘制（或者保持结果显示）
+    // 如果不清除 polygonPositions，handleMouseMove 会再次检测到有顶点从而重启预览
+    this.polygonPositions = []
   }
 
   /**
@@ -426,9 +596,11 @@ export class FloodTool extends BaseTool {
         name: `淹没分析 #${gisStore.analysisResults.length + 1}`,
         data: {
           waterLevel: level,
-          floodedArea: 0, // TODO: 计算淹没面积
-          floodedVolume: 0, // TODO: 计算淹没体积
-        },
+          floodArea: result.floodedArea,
+          floodVolume: result.floodedVolume,
+          mode: this.floodMode,
+          tilesetUrl: this.dataSource?.tilesetUrl,
+        } as FloodAnalysisData,
         position: centroid,
       })
     }
@@ -559,6 +731,7 @@ export class FloodTool extends BaseTool {
   private cancel(): void {
     this.clearPreview()
     this.polygonPositions = []
+    this.cursorPosition = null
     this.onCancel?.()
   }
 
@@ -574,12 +747,18 @@ export class FloodTool extends BaseTool {
       this.waterEntity = null
     }
 
+    if (this.waterOutlineEntity) {
+      this.viewer.entities.remove(this.waterOutlineEntity)
+      this.waterOutlineEntity = null
+    }
+
     if (this.waterTileset) {
       this.tilesetService.remove(this.waterTileset)
       this.waterTileset = null
     }
 
     this.polygonPositions = []
+    this.cursorPosition = null
     this.currentWaterLevel = 0
   }
 

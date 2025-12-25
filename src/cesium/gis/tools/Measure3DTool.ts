@@ -14,7 +14,12 @@ import * as Cesium from 'cesium'
 import { BaseTool, type BaseToolOptions, type ToolType } from '../core/BaseTool'
 import type { Coordinate } from '@/types/geometry'
 import { TOOL_COLORS, POINT_STYLES, createGlowLineMaterial } from '../utils/toolStyles'
+import {
+  formatDistance as geoFormatDistance,
+  generateId as geoGenerateId,
+} from '../utils/geo'
 import { useGISStore } from '@/stores/gis'
+import type { Measure3DAnalysisData } from '@/types/analysis'
 
 /**
  * 高度模式
@@ -36,27 +41,21 @@ export interface Measure3DPoint {
 }
 
 /**
- * 3D 测量结果
+ * 3D 测量结果 (增强型)
  */
-export interface Measure3DResult {
+export interface Measure3DResult extends Measure3DAnalysisData {
   /** 唯一ID */
   id: string
-  /** 起点 */
+  /** 起点 (详细数据) */
   startPoint: Measure3DPoint
-  /** 终点 */
+  /** 终点 (详细数据) */
   endPoint: Measure3DPoint
-  /** 空间直线距离（斜距） */
-  slopeDistance: number
-  /** 水平距离 */
-  horizontalDistance: number
-  /** 垂直距离 */
-  verticalDistance: number
-  /** 高程差（终点 - 起点） */
-  elevationDifference: number
-  /** 坡度（角度） */
+  /** 坡度角度 */
   slopeAngle: number
-  /** 坡度（百分比） */
+  /** 坡度百分比 */
   slopePercent: number
+  /** 落差 */
+  elevationDifference: number
   /** 测量时间 */
   createdAt: Date
 }
@@ -291,6 +290,8 @@ export class Measure3DTool extends BaseTool {
    */
   protected onActivate(): void {
     this.setCursor('crosshair')
+    // 禁用双击缩放
+    ;(this.viewer.scene.screenSpaceCameraController as any).zoomOnDoubleClick = false
   }
 
   /**
@@ -302,6 +303,8 @@ export class Measure3DTool extends BaseTool {
     this.shiftPressed = false
     this.ctrlPressed = false
     this.altPressed = false
+    // 恢复双击缩放
+    ;(this.viewer.scene.screenSpaceCameraController as any).zoomOnDoubleClick = true
   }
 
   /**
@@ -379,7 +382,7 @@ export class Measure3DTool extends BaseTool {
    * 更新预览
    */
   private updatePreview(): void {
-    if (!this.cursorPosition || this.points.length === 0) return
+    if (!this.cursorPosition || this.points.length === 0 || this.points.length >= 2) return
 
     this.clearPreviewEntities()
 
@@ -484,7 +487,7 @@ export class Measure3DTool extends BaseTool {
   private completeMeasurement(): void {
     if (this.points.length !== 2) return
 
-    this.clearPreviewEntities()
+    this.clearPreview()
 
     const startPoint = this.points[0]
     const endPoint = this.points[1]
@@ -514,12 +517,18 @@ export class Measure3DTool extends BaseTool {
       id: this.generateId(),
       startPoint,
       endPoint,
-      slopeDistance,
+      spaceDistance: slopeDistance, // 统一使用 spaceDistance
       horizontalDistance,
       verticalDistance,
       elevationDifference,
       slopeAngle,
       slopePercent: isFinite(slopePercent) ? slopePercent : 0,
+      startLon: startPoint.coordinate.longitude,
+      startLat: startPoint.coordinate.latitude,
+      startHeight: startPoint.elevation,
+      endLon: endPoint.coordinate.longitude,
+      endLat: endPoint.coordinate.latitude,
+      endHeight: endPoint.elevation,
       createdAt: new Date(),
     }
 
@@ -625,20 +634,17 @@ export class Measure3DTool extends BaseTool {
   }
 
   /**
-   * 格式化距离
+   * 格式化距离 - 使用共享工具函数
    */
   private formatDistance(meters: number): string {
-    if (meters < 1000) {
-      return `${meters.toFixed(2)} m`
-    }
-    return `${(meters / 1000).toFixed(3)} km`
+    return geoFormatDistance(meters)
   }
 
   /**
-   * 生成唯一ID
+   * 生成唯一ID - 使用共享工具函数
    */
   private generateId(): string {
-    return `measure3d_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+    return geoGenerateId('measure3d')
   }
 
   /**
@@ -678,14 +684,12 @@ export class Measure3DTool extends BaseTool {
   }
 
   /**
-   * 重置
+   * 重置（仅重置数据，不清除实体）
    */
   private reset(): void {
     this.points = []
     this.referenceHeight = null
     this.cursorPosition = null
-    this.markerEntities.forEach((e) => this.viewer.entities.remove(e))
-    this.markerEntities = []
   }
 
   /**

@@ -1,5 +1,5 @@
 <template>
-  <!-- This is a logical component with no template -->
+	<!-- This is a logical component with no template -->
 </template>
 
 <script setup lang="ts">
@@ -27,7 +27,7 @@ const gisStore = useGISStore()
 
 // Current active tool instance
 const currentTool = shallowRef<
-  DrawTool | VolumeTool | FloodTool | ProfileTool | Measure3DTool | null
+	DrawTool | VolumeTool | FloodTool | ProfileTool | Measure3DTool | null
 >(null)
 
 // Volume analysis tool instance (persistent for result display)
@@ -70,564 +70,579 @@ let snapIndicator: any = null // Cesium.Entity
 let _currentSnapTarget: SnapTarget | null = null // For future DrawTool integration
 
 onMounted(() => {
-  // Set viewer in GIS store
-  if (cesiumStore.viewer) {
-    gisStore.setViewer(cesiumStore.viewer)
-    setupSelectionHandler()
-    initSnapService()
-  }
+	// Set viewer in GIS store
+	if (cesiumStore.viewer) {
+		gisStore.setViewer(cesiumStore.viewer)
+		setupSelectionHandler()
+		initSnapService()
+	}
 })
 
 onUnmounted(() => {
-  cleanup()
+	cleanup()
 })
 
 /**
  * Setup map click handler for feature selection and drag
  */
 function setupSelectionHandler() {
-  const viewer = cesiumStore.viewer
-  if (!viewer) return
+	const viewer = cesiumStore.viewer
+	if (!viewer) return
 
-  // Track Ctrl/Meta/Shift key state via DOM events
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Control' || e.key === 'Meta') {
-      isCtrlPressed = true
-    }
-    if (e.key === 'Shift') {
-      isShiftPressed = true
-    }
-    // ESC to exit edit mode
-    if (e.key === 'Escape') {
-      exitEditMode()
-    }
+	// Track Ctrl/Meta/Shift key state via DOM events
+	const handleKeyDown = (e: KeyboardEvent) => {
+		if (e.key === 'Control' || e.key === 'Meta') {
+			isCtrlPressed = true
+		}
+		if (e.key === 'Shift') {
+			isShiftPressed = true
+		}
+		// ESC to exit edit mode
+		if (e.key === 'Escape') {
+			exitEditMode()
+		}
 
-    // Ctrl+Z for undo
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-      e.preventDefault()
-      if (gisStore.canUndo) {
-        gisStore.undo()
-        // Refresh graphics after undo (feature may have been restored/removed)
-        refreshGraphicsFromFeatures()
-      }
-    }
+		// Ctrl+Z for undo
+		if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+			e.preventDefault()
+			if (gisStore.canUndo) {
+				gisStore.undo()
+				// Refresh graphics after undo (feature may have been restored/removed)
+				refreshGraphicsFromFeatures()
+			}
+		}
 
-    // Ctrl+Y or Ctrl+Shift+Z for redo
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-      e.preventDefault()
-      if (gisStore.canRedo) {
-        gisStore.redo()
-        // Refresh graphics after redo (feature may have been restored/removed)
-        refreshGraphicsFromFeatures()
-      }
-    }
+		// Ctrl+Y or Ctrl+Shift+Z for redo
+		if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+			e.preventDefault()
+			if (gisStore.canRedo) {
+				gisStore.redo()
+				// Refresh graphics after redo (feature may have been restored/removed)
+				refreshGraphicsFromFeatures()
+			}
+		}
 
-    // Delete or Backspace to remove selected features
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      // Don't delete if in edit mode (vertex editing) or if user is in an input field
-      if (editingFeatureId || isInputFocused()) return
+		// Delete or Backspace to remove selected features
+		if (e.key === 'Delete' || e.key === 'Backspace') {
+			// Don't delete if in edit mode (vertex editing) or if user is in an input field
+			if (editingFeatureId || isInputFocused()) return
 
-      e.preventDefault()
-      deleteSelectedFeatures()
-    }
+			e.preventDefault()
+			deleteSelectedFeatures()
+		}
 
-    // Ctrl+A to select all features
-    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-      // Don't select all if user is in an input field
-      if (isInputFocused()) return
+		// Ctrl+A to select all features
+		if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+			// Don't select all if user is in an input field
+			if (isInputFocused()) return
 
-      e.preventDefault()
-      selectAllFeatures()
-    }
-  }
-  const handleKeyUp = (e: KeyboardEvent) => {
-    if (e.key === 'Control' || e.key === 'Meta') {
-      isCtrlPressed = false
-    }
-    if (e.key === 'Shift') {
-      isShiftPressed = false
-    }
-  }
-  document.addEventListener('keydown', handleKeyDown)
-  document.addEventListener('keyup', handleKeyUp)
+			e.preventDefault()
+			selectAllFeatures()
+		}
+	}
+	const handleKeyUp = (e: KeyboardEvent) => {
+		if (e.key === 'Control' || e.key === 'Meta') {
+			isCtrlPressed = false
+		}
+		if (e.key === 'Shift') {
+			isShiftPressed = false
+		}
+	}
+	document.addEventListener('keydown', handleKeyDown)
+	document.addEventListener('keyup', handleKeyUp)
 
-  selectionHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas)
+	selectionHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas)
 
-  // Store cleanup functions
-  ;(selectionHandler as any)._keyboardCleanup = () => {
-    document.removeEventListener('keydown', handleKeyDown)
-    document.removeEventListener('keyup', handleKeyUp)
-  }
+		// Store cleanup functions
+		; (selectionHandler as any)._keyboardCleanup = () => {
+			document.removeEventListener('keydown', handleKeyDown)
+			document.removeEventListener('keyup', handleKeyUp)
+		}
 
-  // LEFT_DOWN for drag start (feature drag or vertex drag)
-  selectionHandler.setInputAction((event: any) => {
-    // Skip when drawing tool is active
-    if (gisStore.isDrawing || gisStore.toolType) return
+	// LEFT_DOWN for drag start (feature drag or vertex drag)
+	selectionHandler.setInputAction((event: any) => {
+		// Skip when drawing tool is active
+		if (gisStore.isDrawing || gisStore.toolType) return
 
-    const pickedObject = viewer.scene.pick(event.position)
+		const pickedObject = viewer.scene.pick(event.position)
 
-    if (Cesium.defined(pickedObject) && pickedObject.id) {
-      const entity = pickedObject.id
+		if (Cesium.defined(pickedObject) && pickedObject.id) {
+			const entity = pickedObject.id
 
-      // Check if this is a vertex marker (has vertexIndex property)
-      const vertexIndex = getVertexIndexFromEntity(entity)
-      if (vertexIndex !== null && editingFeatureId) {
-        // Start vertex dragging
-        isDraggingVertex = true
-        dragVertexIndex = vertexIndex
-        dragVertexFeatureId = editingFeatureId
-        dragStartPosition = viewer.scene.pickPosition(event.position)
+			// Check if this is a vertex marker (has vertexIndex property)
+			const vertexIndex = getVertexIndexFromEntity(entity)
+			if (vertexIndex !== null && editingFeatureId) {
+				// Start vertex dragging
+				isDraggingVertex = true
+				dragVertexIndex = vertexIndex
+				dragVertexFeatureId = editingFeatureId
+				dragStartPosition = viewer.scene.pickPosition(event.position)
 
-        // Disable camera controls during drag
-        disableCameraControls(viewer)
-        return
-      }
+				// Disable camera controls during drag
+				disableCameraControls(viewer)
+				return
+			}
 
-      const featureId = getFeatureIdFromEntity(entity)
+			const featureId = getFeatureIdFromEntity(entity)
 
-      // Only start drag if clicking on a selected feature (not in edit mode)
-      if (featureId && gisStore.selectedFeatureIds.has(featureId) && !editingFeatureId) {
-        isDragging = true
-        dragFeatureId = featureId
-        dragStartPosition = viewer.scene.pickPosition(event.position)
+			// Only start drag if clicking on a selected feature (not in edit mode)
+			if (featureId && gisStore.selectedFeatureIds.has(featureId) && !editingFeatureId) {
+				isDragging = true
+				dragFeatureId = featureId
+				dragStartPosition = viewer.scene.pickPosition(event.position)
 
-        // Disable camera controls during drag
-        disableCameraControls(viewer)
-      }
-    }
-  }, Cesium.ScreenSpaceEventType.LEFT_DOWN)
+				// Disable camera controls during drag
+				disableCameraControls(viewer)
+			}
+		}
+	}, Cesium.ScreenSpaceEventType.LEFT_DOWN)
 
-  // LEFT_DOUBLE_CLICK for entering edit mode
-  selectionHandler.setInputAction((event: any) => {
-    // Skip when drawing tool is active
-    if (gisStore.isDrawing || gisStore.toolType) return
+	// LEFT_DOUBLE_CLICK for entering edit mode
+	selectionHandler.setInputAction((event: any) => {
+		// Skip when drawing tool is active
+		if (gisStore.isDrawing || gisStore.toolType) return
 
-    const pickedObject = viewer.scene.pick(event.position)
+		const pickedObject = viewer.scene.pick(event.position)
 
-    if (Cesium.defined(pickedObject) && pickedObject.id) {
-      const featureId = getFeatureIdFromEntity(pickedObject.id)
+		if (Cesium.defined(pickedObject) && pickedObject.id) {
+			const featureId = getFeatureIdFromEntity(pickedObject.id)
 
-      if (featureId && gisStore.features.has(featureId)) {
-        const feature = gisStore.features.get(featureId)
-        // Only polygon and line support vertex editing
-        if (feature && (feature.type === 'polygon' || feature.type === 'line')) {
-          enterEditMode(featureId)
-        }
-      }
-    }
-  }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK)
+			if (featureId && gisStore.features.has(featureId)) {
+				const feature = gisStore.features.get(featureId)
+				// Only polygon and line support vertex editing
+				if (feature && (feature.type === 'polygon' || feature.type === 'line')) {
+					enterEditMode(featureId)
+				}
+			}
+		}
+	}, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK)
 
-  // MOUSE_MOVE for drag (feature drag or vertex drag)
-  selectionHandler.setInputAction((event: any) => {
-    const currentPosition = viewer.scene.pickPosition(event.endPosition)
-    if (!Cesium.defined(currentPosition)) return
+	// MOUSE_MOVE for drag (feature drag or vertex drag)
+	selectionHandler.setInputAction((event: any) => {
+		const currentPosition = viewer.scene.pickPosition(event.endPosition)
+		if (!Cesium.defined(currentPosition)) return
 
-    // Handle vertex dragging
-    if (isDraggingVertex && dragVertexFeatureId !== null && dragVertexIndex >= 0) {
-      const graphic = gisStore.graphics.get(dragVertexFeatureId) as any
-      if (graphic) {
-        // Update vertex position based on graphic type
-        if (graphic instanceof PolygonGraphic) {
-          graphic.updateVertex(dragVertexIndex, currentPosition)
-        } else if (graphic instanceof LineGraphic) {
-          const positions = graphic.getPositions()
-          if (positions && dragVertexIndex < positions.length) {
-            positions[dragVertexIndex] = currentPosition
-            graphic.updatePositions(positions)
-          }
-        }
-      }
-      return
-    }
+		// Handle vertex dragging
+		if (isDraggingVertex && dragVertexFeatureId !== null && dragVertexIndex >= 0) {
+			const graphic = gisStore.graphics.get(dragVertexFeatureId) as any
+			if (graphic) {
+				// Update vertex position based on graphic type
+				if (graphic instanceof PolygonGraphic) {
+					graphic.updateVertex(dragVertexIndex, currentPosition)
+				} else if (graphic instanceof LineGraphic) {
+					const positions = graphic.getPositions()
+					if (positions && dragVertexIndex < positions.length) {
+						positions[dragVertexIndex] = currentPosition
+						graphic.updatePositions(positions)
+					}
+				}
+			}
+			return
+		}
 
-    // Handle feature dragging
-    if (!isDragging || !dragFeatureId || !dragStartPosition) return
+		// Handle feature dragging
+		if (!isDragging || !dragFeatureId || !dragStartPosition) return
 
-    // Calculate offset
-    const offset = Cesium.Cartesian3.subtract(
-      currentPosition,
-      dragStartPosition,
-      new Cesium.Cartesian3()
-    )
+		// Calculate offset
+		const offset = Cesium.Cartesian3.subtract(
+			currentPosition,
+			dragStartPosition,
+			new Cesium.Cartesian3()
+		)
 
-    // Move all selected features
-    gisStore.selectedFeatureIds.forEach((featureId) => {
-      const graphic = gisStore.graphics.get(featureId)
-      if (graphic && graphic.move) {
-        graphic.move(offset)
-      }
-    })
+		// Move all selected features
+		gisStore.selectedFeatureIds.forEach((featureId) => {
+			const graphic = gisStore.graphics.get(featureId)
+			if (graphic && graphic.move) {
+				graphic.move(offset)
+			}
+		})
 
-    // Update drag start position for next move
-    dragStartPosition = currentPosition
-  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE)
+		// Update drag start position for next move
+		dragStartPosition = currentPosition
+	}, Cesium.ScreenSpaceEventType.MOUSE_MOVE)
 
-  // LEFT_UP for drag end and selection
-  selectionHandler.setInputAction((event: any) => {
-    const wasDragging = isDragging
-    const wasDraggingVertex = isDraggingVertex
+	// LEFT_UP for drag end and selection
+	selectionHandler.setInputAction((event: any) => {
+		const wasDragging = isDragging
+		const wasDraggingVertex = isDraggingVertex
 
-    // Re-enable camera controls
-    enableCameraControls(viewer)
+		// Re-enable camera controls
+		enableCameraControls(viewer)
 
-    // Handle vertex drag completion
-    if (wasDraggingVertex && dragVertexFeatureId) {
-      // Update feature geometry after vertex drag
-      const graphic = gisStore.graphics.get(dragVertexFeatureId)
-      if (graphic) {
-        updateFeatureGeometry(dragVertexFeatureId, graphic)
-      }
+		// Handle vertex drag completion
+		if (wasDraggingVertex && dragVertexFeatureId) {
+			// Update feature geometry after vertex drag
+			const graphic = gisStore.graphics.get(dragVertexFeatureId)
+			if (graphic) {
+				updateFeatureGeometry(dragVertexFeatureId, graphic)
+			}
 
-      // Reset vertex drag state
-      isDraggingVertex = false
-      dragVertexIndex = -1
-      dragVertexFeatureId = null
-      dragStartPosition = null
-      return
-    }
+			// Reset vertex drag state
+			isDraggingVertex = false
+			dragVertexIndex = -1
+			dragVertexFeatureId = null
+			dragStartPosition = null
+			return
+		}
 
-    if (wasDragging) {
-      // Update feature geometry in store after drag
-      gisStore.selectedFeatureIds.forEach((featureId) => {
-        const graphic = gisStore.graphics.get(featureId)
-        const feature = gisStore.features.get(featureId)
-        if (graphic && feature) {
-          // Update feature geometry from graphic positions
-          updateFeatureGeometry(featureId, graphic)
-        }
-      })
+		if (wasDragging) {
+			// Update feature geometry in store after drag
+			gisStore.selectedFeatureIds.forEach((featureId) => {
+				const graphic = gisStore.graphics.get(featureId)
+				const feature = gisStore.features.get(featureId)
+				if (graphic && feature) {
+					// Update feature geometry from graphic positions
+					updateFeatureGeometry(featureId, graphic)
+				}
+			})
 
-      // Reset drag state
-      isDragging = false
-      dragFeatureId = null
-      dragStartPosition = null
-      return
-    }
+			// Reset drag state
+			isDragging = false
+			dragFeatureId = null
+			dragStartPosition = null
+			return
+		}
 
-    // If not dragging, handle as selection click or vertex operations
-    // Skip selection when drawing tool is active
-    if (gisStore.isDrawing || gisStore.toolType) return
+		// If not dragging, handle as selection click or vertex operations
+		// Skip selection when drawing tool is active
+		if (gisStore.isDrawing || gisStore.toolType) return
 
-    const pickedObject = viewer.scene.pick(event.position)
+		const pickedObject = viewer.scene.pick(event.position)
 
-    if (Cesium.defined(pickedObject) && pickedObject.id) {
-      const entity = pickedObject.id
+		if (Cesium.defined(pickedObject) && pickedObject.id) {
+			const entity = pickedObject.id
 
-      // Check if clicking on a vertex marker
-      const vertexIndex = getVertexIndexFromEntity(entity)
-      if (vertexIndex !== null && editingFeatureId) {
-        // Shift+Click: Delete vertex
-        if (isShiftPressed) {
-          deleteVertex(editingFeatureId, vertexIndex)
-        }
-        return
-      }
+			// Check if clicking on a vertex marker
+			const vertexIndex = getVertexIndexFromEntity(entity)
+			if (vertexIndex !== null && editingFeatureId) {
+				// Shift+Click: Delete vertex
+				if (isShiftPressed) {
+					deleteVertex(editingFeatureId, vertexIndex)
+				}
+				return
+			}
 
-      const featureId = getFeatureIdFromEntity(entity)
+			const featureId = getFeatureIdFromEntity(entity)
 
-      if (featureId && gisStore.features.has(featureId)) {
-        // If in edit mode and clicking on different feature, exit edit mode first
-        if (editingFeatureId && editingFeatureId !== featureId) {
-          exitEditMode()
-        }
+			if (featureId && gisStore.features.has(featureId)) {
+				// If in edit mode and clicking on different feature, exit edit mode first
+				if (editingFeatureId && editingFeatureId !== featureId) {
+					exitEditMode()
+				}
 
-        if (isCtrlPressed) {
-          // Ctrl+Click: Toggle selection
-          gisStore.toggleSelection(featureId)
-        } else {
-          // Normal click: Single selection
-          gisStore.selectFeature(featureId, false)
-        }
+				if (isCtrlPressed) {
+					// Ctrl+Click: Toggle selection
+					gisStore.toggleSelection(featureId)
+				} else {
+					// Normal click: Single selection
+					gisStore.selectFeature(featureId, false)
+				}
 
-        // Apply highlight to selected features
-        applySelectionHighlights()
-      }
-    } else {
-      // Click on empty space
-      if (editingFeatureId) {
-        // Exit edit mode when clicking empty space
-        exitEditMode()
-      } else if (!isCtrlPressed) {
-        // Deselect all (unless Ctrl is held)
-        gisStore.deselectFeature()
-        applySelectionHighlights()
-      }
-    }
+				// Apply highlight to selected features
+				applySelectionHighlights()
+			}
+		} else {
+			// Click on empty space
+			if (editingFeatureId) {
+				// Exit edit mode when clicking empty space
+				exitEditMode()
+			} else if (!isCtrlPressed) {
+				// Deselect all (unless Ctrl is held)
+				gisStore.deselectFeature()
+				applySelectionHighlights()
+			}
+		}
 
-    // Reset drag state
-    isDragging = false
-    dragFeatureId = null
-    dragStartPosition = null
-  }, Cesium.ScreenSpaceEventType.LEFT_UP)
+		// Reset drag state
+		isDragging = false
+		dragFeatureId = null
+		dragStartPosition = null
+	}, Cesium.ScreenSpaceEventType.LEFT_UP)
 }
 
 /**
  * Extract featureId from entity
  */
 function getFeatureIdFromEntity(entity: any): string | null {
-  let featureId: string | null = null
+	let featureId: string | null = null
 
-  if (entity.properties && entity.properties.featureId) {
-    const prop = entity.properties.featureId
-    featureId = prop.getValue ? prop.getValue(Cesium.JulianDate.now()) : prop
-  }
+	if (entity.properties && entity.properties.featureId) {
+		const prop = entity.properties.featureId
+		featureId = prop.getValue ? prop.getValue(Cesium.JulianDate.now()) : prop
+	}
 
-  // Fallback: try entity.id
-  if (!featureId && typeof entity.id === 'string') {
-    featureId = entity.id
-  }
+	// Fallback: try entity.id
+	if (!featureId && typeof entity.id === 'string') {
+		featureId = entity.id
+	}
 
-  return featureId
+	return featureId
 }
 
 /**
  * Extract vertexIndex from entity (for vertex markers)
  */
 function getVertexIndexFromEntity(entity: any): number | null {
-  if (entity.properties && entity.properties.vertexIndex !== undefined) {
-    const prop = entity.properties.vertexIndex
-    const value = prop.getValue ? prop.getValue(Cesium.JulianDate.now()) : prop
-    return typeof value === 'number' ? value : null
-  }
-  return null
+	if (entity.properties && entity.properties.vertexIndex !== undefined) {
+		const prop = entity.properties.vertexIndex
+		const value = prop.getValue ? prop.getValue(Cesium.JulianDate.now()) : prop
+		return typeof value === 'number' ? value : null
+	}
+	return null
 }
 
 /**
  * Disable camera controls (during drag)
  */
 function disableCameraControls(viewer: any): void {
-  viewer.scene.screenSpaceCameraController.enableRotate = false
-  viewer.scene.screenSpaceCameraController.enableTranslate = false
-  viewer.scene.screenSpaceCameraController.enableZoom = false
-  viewer.scene.screenSpaceCameraController.enableTilt = false
-  viewer.scene.screenSpaceCameraController.enableLook = false
+	viewer.scene.screenSpaceCameraController.enableRotate = false
+	viewer.scene.screenSpaceCameraController.enableTranslate = false
+	viewer.scene.screenSpaceCameraController.enableZoom = false
+	viewer.scene.screenSpaceCameraController.enableTilt = false
+	viewer.scene.screenSpaceCameraController.enableLook = false
 }
 
 /**
  * Enable camera controls (after drag)
  */
 function enableCameraControls(viewer: any): void {
-  viewer.scene.screenSpaceCameraController.enableRotate = true
-  viewer.scene.screenSpaceCameraController.enableTranslate = true
-  viewer.scene.screenSpaceCameraController.enableZoom = true
-  viewer.scene.screenSpaceCameraController.enableTilt = true
-  viewer.scene.screenSpaceCameraController.enableLook = true
+	viewer.scene.screenSpaceCameraController.enableRotate = true
+	viewer.scene.screenSpaceCameraController.enableTranslate = true
+	viewer.scene.screenSpaceCameraController.enableZoom = true
+	viewer.scene.screenSpaceCameraController.enableTilt = true
+	viewer.scene.screenSpaceCameraController.enableLook = true
 }
 
 /**
  * Enter edit mode for a feature
  */
 function enterEditMode(featureId: string): void {
-  // Exit existing edit mode if any
-  if (editingFeatureId && editingFeatureId !== featureId) {
-    exitEditMode()
-  }
+	// Exit existing edit mode if any
+	if (editingFeatureId && editingFeatureId !== featureId) {
+		exitEditMode()
+	}
 
-  const graphic = gisStore.graphics.get(featureId)
-  if (!graphic) return
+	const graphic = gisStore.graphics.get(featureId)
+	if (!graphic) return
 
-  editingFeatureId = featureId
-  gisStore.enterEditMode(featureId)
+	editingFeatureId = featureId
+	gisStore.enterEditMode(featureId)
 
-  // Start edit on graphic (shows vertex markers)
-  graphic.startEdit()
+	// Start edit on graphic (shows vertex markers)
+	graphic.startEdit()
 
-  console.log('Entered edit mode for feature:', featureId)
+	console.log('Entered edit mode for feature:', featureId)
 }
 
 /**
  * Exit edit mode
  */
 function exitEditMode(): void {
-  if (!editingFeatureId) return
+	if (!editingFeatureId) return
 
-  const graphic = gisStore.graphics.get(editingFeatureId)
-  if (graphic) {
-    // Stop edit on graphic (hides vertex markers)
-    graphic.stopEdit()
+	const graphic = gisStore.graphics.get(editingFeatureId)
+	if (graphic) {
+		// Stop edit on graphic (hides vertex markers)
+		graphic.stopEdit()
 
-    // Sync geometry to store
-    updateFeatureGeometry(editingFeatureId, graphic)
-  }
+		// Sync geometry to store
+		updateFeatureGeometry(editingFeatureId, graphic)
+	}
 
-  gisStore.exitEditMode()
-  editingFeatureId = null
+	gisStore.exitEditMode()
+	editingFeatureId = null
 
-  // Reset vertex drag state
-  isDraggingVertex = false
-  dragVertexIndex = -1
-  dragVertexFeatureId = null
+	// Reset vertex drag state
+	isDraggingVertex = false
+	dragVertexIndex = -1
+	dragVertexFeatureId = null
 
-  console.log('Exited edit mode')
+	console.log('Exited edit mode')
 }
 
 /**
  * Delete a vertex from the editing feature
  */
 function deleteVertex(featureId: string, vertexIndex: number): void {
-  const graphic = gisStore.graphics.get(featureId) as any
-  const feature = gisStore.features.get(featureId)
-  if (!graphic || !feature) return
+	const graphic = gisStore.graphics.get(featureId) as any
+	const feature = gisStore.features.get(featureId)
+	if (!graphic || !feature) return
 
-  try {
-    if (graphic instanceof PolygonGraphic) {
-      // Polygon needs at least 3 vertices
-      const positions = graphic.getPositions()
-      if (positions && positions.length <= 3) {
-        console.warn('Cannot delete vertex: polygon must have at least 3 vertices')
-        return
-      }
-      graphic.removeVertex(vertexIndex)
-    } else if (graphic instanceof LineGraphic) {
-      // Line needs at least 2 vertices
-      const positions = graphic.getPositions()
-      if (!positions || positions.length <= 2) {
-        console.warn('Cannot delete vertex: line must have at least 2 vertices')
-        return
-      }
-      // Remove vertex by updating positions
-      const newPositions = positions.filter((_: any, i: number) => i !== vertexIndex)
-      graphic.stopEdit() // Stop edit to hide old markers
-      graphic.updatePositions(newPositions)
-      graphic.startEdit() // Re-enter edit to show updated markers
-    }
+	try {
+		if (graphic instanceof PolygonGraphic) {
+			// Polygon needs at least 3 vertices
+			const positions = graphic.getPositions()
+			if (positions && positions.length <= 3) {
+				console.warn('Cannot delete vertex: polygon must have at least 3 vertices')
+				return
+			}
+			graphic.removeVertex(vertexIndex)
+		} else if (graphic instanceof LineGraphic) {
+			// Line needs at least 2 vertices
+			const positions = graphic.getPositions()
+			if (!positions || positions.length <= 2) {
+				console.warn('Cannot delete vertex: line must have at least 2 vertices')
+				return
+			}
+			// Remove vertex by updating positions
+			const newPositions = positions.filter((_: any, i: number) => i !== vertexIndex)
+			graphic.stopEdit() // Stop edit to hide old markers
+			graphic.updatePositions(newPositions)
+			graphic.startEdit() // Re-enter edit to show updated markers
+		}
 
-    // Update feature geometry
-    updateFeatureGeometry(featureId, graphic)
+		// Update feature geometry
+		updateFeatureGeometry(featureId, graphic)
 
-    // Re-enter edit mode to refresh vertex markers
-    if (graphic instanceof PolygonGraphic) {
-      graphic.stopEdit()
-      graphic.startEdit()
-    }
+		// Re-enter edit mode to refresh vertex markers
+		if (graphic instanceof PolygonGraphic) {
+			graphic.stopEdit()
+			graphic.startEdit()
+		}
 
-    console.log('Deleted vertex', vertexIndex, 'from feature', featureId)
-  } catch (error) {
-    console.error('Failed to delete vertex:', error)
-  }
+		console.log('Deleted vertex', vertexIndex, 'from feature', featureId)
+	} catch (error) {
+		console.error('Failed to delete vertex:', error)
+	}
 }
 
 /**
  * Update feature geometry from graphic positions after move
  */
 function updateFeatureGeometry(featureId: string, graphic: any) {
-  const feature = gisStore.features.get(featureId)
-  if (!feature) return
+	const feature = gisStore.features.get(featureId)
+	if (!feature) return
 
-  const positions = graphic.getPositions()
-  if (!positions || positions.length === 0) return
+	const positions = graphic.getPositions()
+	if (!positions || positions.length === 0) return
 
-  // Convert positions to GeoJSON coordinates
-  const coordinates = positions.map((pos: any) => {
-    const cartographic = Cesium.Cartographic.fromCartesian(pos)
-    return [
-      Cesium.Math.toDegrees(cartographic.longitude),
-      Cesium.Math.toDegrees(cartographic.latitude),
-      cartographic.height,
-    ]
-  })
+	// Convert positions to Coordinates
+	const coordinates = positions.map((pos: any) => {
+		const cartographic = Cesium.Cartographic.fromCartesian(pos)
+		return {
+			longitude: Cesium.Math.toDegrees(cartographic.longitude),
+			latitude: Cesium.Math.toDegrees(cartographic.latitude),
+			height: cartographic.height,
+		}
+	})
 
-  // Update geometry based on feature type
-  switch (feature.type) {
-    case 'point':
-      feature.geometry.coordinates = coordinates[0]
-      break
-    case 'line':
-      feature.geometry.coordinates = coordinates
-      break
-    case 'polygon':
-      // Close polygon ring
-      feature.geometry.coordinates = [[...coordinates, coordinates[0]]]
-      break
-    case 'circle':
-      // Circle: store center and recalculate radius
-      feature.geometry.coordinates = coordinates[0]
-      if (graphic.getRadius) {
-        feature.properties = feature.properties || {}
-        feature.properties.radius = graphic.getRadius()
-      }
-      break
-    case 'rectangle':
-      // Rectangle: store as polygon
-      const sw = coordinates[0]
-      const ne = coordinates[1]
-      feature.geometry.coordinates = [
-        [
-          [sw[0], ne[1]], // NW
-          [ne[0], ne[1]], // NE
-          [ne[0], sw[1]], // SE
-          [sw[0], sw[1]], // SW
-          [sw[0], ne[1]], // Close
-        ],
-      ]
-      break
-  }
+	// Update geometry based on feature type
+	switch (feature.type) {
+		case 'point':
+			feature.position = coordinates[0]
+			break
+		case 'line':
+			feature.vertices = coordinates
+			if (graphic.getLength) {
+				feature.length = graphic.getLength()
+			}
+			break
+		case 'polygon':
+			feature.vertices = coordinates
+			if (graphic.getArea) {
+				feature.area = graphic.getArea()
+			}
+			break
+		case 'circle':
+			// Circle: store center and recalculate radius
+			feature.center = coordinates[0]
+			if (graphic.getRadius) {
+				feature.radius = graphic.getRadius()
+				feature.area = Math.PI * feature.radius * feature.radius
+			}
+			break
+		case 'rectangle':
+			// For rectangle, we need to re-calculate bounds from all interaction points
+			// But for now, we just rely on existing structure if possible
+			// Simplification: Assume coordinates allow us to derive SW/NE
+			{
+				let minLon = Number.MAX_VALUE, maxLon = -Number.MAX_VALUE
+				let minLat = Number.MAX_VALUE, maxLat = -Number.MAX_VALUE
+				coordinates.forEach((c: any) => {
+					minLon = Math.min(minLon, c.longitude)
+					maxLon = Math.max(maxLon, c.longitude)
+					minLat = Math.min(minLat, c.latitude)
+					maxLat = Math.max(maxLat, c.latitude)
+				})
+				feature.southwest = { longitude: minLon, latitude: minLat, height: coordinates[0].height }
+				feature.northeast = { longitude: maxLon, latitude: maxLat, height: coordinates[0].height }
+				feature.width = Cesium.Cartesian3.distance(
+					Cesium.Cartesian3.fromDegrees(minLon, minLat), Cesium.Cartesian3.fromDegrees(maxLon, minLat)
+				)
+				feature.height = Cesium.Cartesian3.distance(
+					Cesium.Cartesian3.fromDegrees(minLon, minLat), Cesium.Cartesian3.fromDegrees(minLon, maxLat)
+				)
+				feature.area = feature.width * feature.height
+			}
+			break
+	}
 
-  // Update timestamp
-  gisStore.updateFeature(featureId, { updatedAt: new Date() })
+	// Update timestamp
+	gisStore.updateFeature(featureId, { updatedAt: new Date() })
 }
 
 /**
  * Check if user is focused on an input field
  */
 function isInputFocused(): boolean {
-  const activeElement = document.activeElement
-  if (!activeElement) return false
-  const tagName = activeElement.tagName.toLowerCase()
-  return (
-    tagName === 'input' ||
-    tagName === 'textarea' ||
-    activeElement.getAttribute('contenteditable') === 'true'
-  )
+	const activeElement = document.activeElement
+	if (!activeElement) return false
+	const tagName = activeElement.tagName.toLowerCase()
+	return (
+		tagName === 'input' ||
+		tagName === 'textarea' ||
+		activeElement.getAttribute('contenteditable') === 'true'
+	)
 }
 
 /**
  * Delete all selected features
  */
 function deleteSelectedFeatures(): void {
-  const selectedIds = Array.from(gisStore.selectedFeatureIds)
-  if (selectedIds.length === 0) return
+	const selectedIds = Array.from(gisStore.selectedFeatureIds)
+	if (selectedIds.length === 0) return
 
-  console.log('Deleting selected features:', selectedIds)
+	console.log('Deleting selected features:', selectedIds)
 
-  // Remove each selected feature
-  selectedIds.forEach((featureId) => {
-    gisStore.removeFeature(featureId)
-  })
+	// Remove each selected feature
+	selectedIds.forEach((featureId) => {
+		gisStore.removeFeature(featureId)
+	})
 
-  // Clear selection
-  gisStore.deselectFeature()
+	// Clear selection
+	gisStore.deselectFeature()
 }
 
 /**
  * Select all features
  */
 function selectAllFeatures(): void {
-  const allFeatureIds = Array.from(gisStore.features.keys())
-  if (allFeatureIds.length === 0) return
+	const allFeatureIds = Array.from(gisStore.features.keys())
+	if (allFeatureIds.length === 0) return
 
-  console.log('Selecting all features:', allFeatureIds.length)
+	console.log('Selecting all features:', allFeatureIds.length)
 
-  // Select all features
-  gisStore.selectFeature(allFeatureIds, true)
+	// Select all features
+	gisStore.selectFeature(allFeatureIds, true)
 
-  // Apply highlights
-  applySelectionHighlights()
+	// Apply highlights
+	applySelectionHighlights()
 }
 
 /**
  * Apply highlight effect to all selected features
  */
 function applySelectionHighlights() {
-  const selectedIds = gisStore.selectedFeatureIds
+	const selectedIds = gisStore.selectedFeatureIds
 
-  // Iterate through all graphics and update highlight state
-  gisStore.graphics.forEach((graphic, featureId) => {
-    const shouldHighlight = selectedIds.has(featureId)
-    if (graphic.setHighlight) {
-      graphic.setHighlight(shouldHighlight)
-    }
-  })
+	// Iterate through all graphics and update highlight state
+	gisStore.graphics.forEach((graphic, featureId) => {
+		const shouldHighlight = selectedIds.has(featureId)
+		if (graphic.setHighlight) {
+			graphic.setHighlight(shouldHighlight)
+		}
+	})
 }
 
 /**
@@ -635,519 +650,475 @@ function applySelectionHighlights() {
  * This ensures the visual representation matches the feature state
  */
 function refreshGraphicsFromFeatures() {
-  const viewer = cesiumStore.viewer
-  if (!viewer) return
+	const viewer = cesiumStore.viewer
+	if (!viewer) return
 
-  // Find features that need graphics created (restored by undo)
-  gisStore.features.forEach((feature, featureId) => {
-    if (!gisStore.graphics.has(featureId)) {
-      // Feature exists but no graphic - create one
-      const graphic = createGraphicFromFeature(feature, viewer)
-      if (graphic) {
-        gisStore.graphics.set(featureId, graphic)
-        console.log('Recreated graphic for restored feature:', featureId)
-      }
-    }
-  })
+	// Find features that need graphics created (restored by undo)
+	gisStore.features.forEach((feature, featureId) => {
+		if (!gisStore.graphics.has(featureId)) {
+			// Feature exists but no graphic - create one
+			const graphic = createGraphicFromFeature(feature, viewer)
+			if (graphic) {
+				gisStore.graphics.set(featureId, graphic)
+				console.log('Recreated graphic for restored feature:', featureId)
+			}
+		}
+	})
 
-  // Find graphics that need to be removed (feature removed by undo)
-  const graphicsToRemove: string[] = []
-  gisStore.graphics.forEach((_, featureId) => {
-    if (!gisStore.features.has(featureId)) {
-      graphicsToRemove.push(featureId)
-    }
-  })
-  graphicsToRemove.forEach((featureId) => {
-    const graphic = gisStore.graphics.get(featureId)
-    if (graphic) {
-      graphic.destroy()
-      gisStore.graphics.delete(featureId)
-      console.log('Removed graphic for deleted feature:', featureId)
-    }
-  })
+	// Find graphics that need to be removed (feature removed by undo)
+	const graphicsToRemove: string[] = []
+	gisStore.graphics.forEach((_, featureId) => {
+		if (!gisStore.features.has(featureId)) {
+			graphicsToRemove.push(featureId)
+		}
+	})
+	graphicsToRemove.forEach((featureId) => {
+		const graphic = gisStore.graphics.get(featureId)
+		if (graphic) {
+			graphic.destroy()
+			gisStore.graphics.delete(featureId)
+			console.log('Removed graphic for deleted feature:', featureId)
+		}
+	})
 
-  // Update highlights
-  applySelectionHighlights()
+	// Update highlights
+	applySelectionHighlights()
 }
 
 // Watch for selection changes (from list or other sources)
 watch(
-  () => [...gisStore.selectedFeatureIds],
-  () => {
-    applySelectionHighlights()
-  },
-  { deep: true }
+	() => [...gisStore.selectedFeatureIds],
+	() => {
+		applySelectionHighlights()
+	},
+	{ deep: true }
 )
 
 // Watch for tool type changes
 watch(
-  () => gisStore.toolType,
-  (newToolType, oldToolType) => {
-    if (oldToolType) {
-      deactivateTool()
-    }
+	() => gisStore.toolType,
+	(newToolType, oldToolType) => {
+		if (oldToolType) {
+			deactivateTool()
+		}
 
-    if (newToolType && isDrawTool(newToolType)) {
-      activateTool(newToolType as DrawToolType)
-    } else if (newToolType && isAnalysisTool(newToolType)) {
-      activateAnalysisTool(newToolType)
-    }
-  }
+		if (newToolType && isDrawTool(newToolType)) {
+			activateTool(newToolType as DrawToolType)
+		} else if (newToolType && isAnalysisTool(newToolType)) {
+			activateAnalysisTool(newToolType)
+		}
+	}
 )
 
 /**
  * Check if tool type is a drawing tool
  */
 function isDrawTool(toolType: string | null): boolean {
-  if (!toolType) return false
-  return ['point', 'line', 'circle', 'rectangle', 'polygon'].includes(toolType)
+	if (!toolType) return false
+	return ['draw-point', 'draw-line', 'draw-circle', 'draw-rectangle', 'draw-polygon'].includes(
+		toolType
+	)
 }
 
 /**
  * Check if tool type is an analysis tool
  */
 function isAnalysisTool(toolType: string | null): boolean {
-  if (!toolType) return false
-  return ['volume', 'flood', 'profile', 'measure3d'].includes(toolType)
+	if (!toolType) return false
+	return ['volume', 'flood', 'profile', 'measure3d'].includes(toolType)
 }
 
 /**
  * Activate drawing tool
  */
 function activateTool(toolType: DrawToolType) {
-  const viewer = cesiumStore.viewer
-  if (!viewer) {
-    console.warn('Cesium viewer not ready')
-    return
-  }
+	const viewer = cesiumStore.viewer
+	if (!viewer) {
+		console.warn('Cesium viewer not ready')
+		return
+	}
 
-  try {
-    // Get tool-specific style from store (with localStorage persistence)
-    const toolStyle = gisStore.getToolStyle(toolType as any)
+	try {
+		// Get tool-specific style from store (with localStorage persistence)
+		const toolStyle = gisStore.getToolStyle(toolType as any)
 
-    // Merge with defaults (fallback to drawStyle for any missing properties)
-    const style = {
-      strokeColor: toolStyle.strokeColor || gisStore.drawStyle.strokeColor,
-      strokeWidth: toolStyle.strokeWidth ?? gisStore.drawStyle.strokeWidth,
-      fillColor: toolStyle.fillColor || gisStore.drawStyle.fillColor,
-      fillOpacity: toolStyle.fillOpacity ?? gisStore.drawStyle.fillOpacity,
-      lineType: toolStyle.lineType || gisStore.drawStyle.lineType,
-      pointColor: toolStyle.pointColor || gisStore.drawStyle.pointColor,
-      pointSize: toolStyle.pointSize ?? gisStore.drawStyle.pointSize,
-      iconType: toolStyle.iconType || gisStore.drawStyle.iconType,
-    }
+		// Merge with defaults (fallback to drawStyle for any missing properties)
+		const style = {
+			strokeColor: toolStyle.strokeColor || gisStore.drawStyle.strokeColor,
+			strokeWidth: toolStyle.strokeWidth ?? gisStore.drawStyle.strokeWidth,
+			fillColor: toolStyle.fillColor || gisStore.drawStyle.fillColor,
+			fillOpacity: toolStyle.fillOpacity ?? gisStore.drawStyle.fillOpacity,
+			lineType: toolStyle.lineType || gisStore.drawStyle.lineType,
+			pointColor: toolStyle.pointColor || gisStore.drawStyle.pointColor,
+			pointSize: toolStyle.pointSize ?? gisStore.drawStyle.pointSize,
+			iconType: toolStyle.iconType || gisStore.drawStyle.iconType,
+		}
 
-    const tool = new DrawTool(viewer, {
-      geometryType: toolType as any, // toolType is 'point' | 'line' | 'circle' | 'rectangle' | 'polygon'
-      style: style,
-      onComplete: (feature: Feature) => {
-        // Convert Feature to Graphic
-        const graphic = createGraphicFromFeature(feature, viewer)
-        if (!graphic) {
-          console.error('Failed to create graphic from feature:', feature)
-          return
-        }
+		const tool = new DrawTool(viewer, {
+			geometryType: toolType.replace('draw-', '') as any, // toolType is 'draw-point' etc., remove prefix
+			style: style,
+			onComplete: (feature: Feature) => {
+				// Convert Feature to Graphic
+				const graphic = createGraphicFromFeature(feature, viewer)
+				if (!graphic) {
+					console.error('Failed to create graphic from feature:', feature)
+					return
+				}
 
-        // Register feature and graphic to GISStore
-        gisStore.addFeature(feature, graphic)
+				// Register feature and graphic to GISStore
+				gisStore.addFeature(feature, graphic)
 
-        // For MVP: Keep tool active for easier use (user can click away to deactivate)
-        // Future: Add toggle for continuous mode in UI
-        // if (!gisStore.continuousMode) {
-        //   gisStore.deactivateTool()
-        // }
-      },
-      onCancel: () => {
-        // User cancelled drawing
-        console.log('Drawing cancelled')
-      },
-    })
+				// For MVP: Keep tool active for easier use (user can click away to deactivate)
+				// Future: Add toggle for continuous mode in UI
+				// if (!gisStore.continuousMode) {
+				//   gisStore.deactivateTool()
+				// }
+			},
+			onCancel: () => {
+				// User cancelled drawing
+				console.log('Drawing cancelled')
+			},
+		})
 
-    // Activate the tool
-    tool.activate()
+		// Activate the tool
+		tool.activate()
 
-    // Store tool instance (both locally and in store for style updates)
-    currentTool.value = tool
-    gisStore.currentTool = tool
+		// Store tool instance (both locally and in store for style updates)
+		currentTool.value = tool
+		gisStore.currentTool = tool
 
-    // Update store state
-    gisStore.startDrawing()
-  } catch (error) {
-    console.error('Failed to activate drawing tool:', error)
-  }
+		// Update store state
+		gisStore.startDrawing()
+	} catch (error) {
+		console.error('Failed to activate drawing tool:', error)
+	}
 }
 
 /**
  * Deactivate current tool
  */
 function deactivateTool() {
-  if (currentTool.value) {
-    try {
-      currentTool.value.deactivate()
-      currentTool.value = null
-      gisStore.currentTool = null
-      gisStore.cancelDrawing()
-    } catch (error) {
-      console.error('Failed to deactivate tool:', error)
-    }
-  }
+	if (currentTool.value) {
+		try {
+			currentTool.value.deactivate()
+			currentTool.value = null
+			gisStore.currentTool = null
+			gisStore.cancelDrawing()
+		} catch (error) {
+			console.error('Failed to deactivate tool:', error)
+		}
+	}
 }
 
 /**
  * Activate analysis tool
  */
 function activateAnalysisTool(toolType: string) {
-  const viewer = cesiumStore.viewer
-  if (!viewer) {
-    console.warn('Cesium viewer not ready')
-    return
-  }
+	const viewer = cesiumStore.viewer
+	if (!viewer) {
+		console.warn('Cesium viewer not ready')
+		return
+	}
 
-  try {
-    switch (toolType) {
-      case 'volume':
-        activateVolumeTool(viewer)
-        break
-      case 'flood':
-        activateFloodTool(viewer)
-        break
-      case 'profile':
-        activateProfileTool(viewer)
-        break
-      case 'measure3d':
-        activateMeasure3DTool(viewer)
-        break
-      default:
-        console.warn('Unknown analysis tool type:', toolType)
-    }
-  } catch (error) {
-    console.error('Failed to activate analysis tool:', error)
-  }
+	try {
+		switch (toolType) {
+			case 'volume':
+				activateVolumeTool(viewer)
+				break
+			case 'flood':
+				activateFloodTool(viewer)
+				break
+			case 'profile':
+				activateProfileTool(viewer)
+				break
+			case 'measure3d':
+				activateMeasure3DTool(viewer)
+				break
+			default:
+				console.warn('Unknown analysis tool type:', toolType)
+		}
+	} catch (error) {
+		console.error('Failed to activate analysis tool:', error)
+	}
 }
 
 /**
  * Activate volume calculation tool
  */
 function activateVolumeTool(viewer: any) {
-  // Clear previous volume result if any
-  if (volumeTool.value) {
-    volumeTool.value.clearResult()
-  }
+	const tool = new VolumeTool(viewer, {
+		requiresTerrain: true, // 强制要求地形
+		baseHeight: 0,
+		onComplete: (result: VolumeAnalysisResult) => {
+			console.log('Volume analysis complete:', result)
+			// Emit event or update store with result
+			// For now, the result visualization is handled by VolumeTool itself
+		},
+		onCancel: () => {
+			console.log('Volume analysis cancelled')
+		},
+	})
 
-  const tool = new VolumeTool(viewer, {
-    baseHeight: 0,
-    onComplete: (result: VolumeAnalysisResult) => {
-      console.log('Volume analysis complete:', result)
-      // Emit event or update store with result
-      // For now, the result visualization is handled by VolumeTool itself
-    },
-    onCancel: () => {
-      console.log('Volume analysis cancelled')
-    },
-  })
-
-  tool.activate()
-  currentTool.value = tool
-  volumeTool.value = tool
-  gisStore.startDrawing()
+	if (tool.activate()) {
+		currentTool.value = tool
+		volumeTool.value = tool
+		gisStore.startDrawing()
+	} else {
+		// Activation failed (e.g. no terrain), reset tool type selection
+		gisStore.setTool(null)
+	}
 }
 
 /**
  * Activate flood simulation tool
  */
 function activateFloodTool(viewer: any) {
-  // Clear previous flood result if any
-  if (floodTool.value) {
-    floodTool.value.clear()
-  }
+	// Clear previous flood result if any
+	if (floodTool.value) {
+		floodTool.value.clear()
+	}
 
-  const tool = new FloodTool(viewer, {
-    mode: 'polygon', // 默认使用多边形绘制模式
-    initialWaterLevel: 5,
-    waterLevelStep: 1,
-    waterColor: '#1E90FF',
-    waterOpacity: 0.6,
-    dataSource: {
-      type: 'polygon',
-      minWaterLevel: 0,
-      maxWaterLevel: 50,
-    },
-    onWaterLevelChange: (level: number, result: FloodAnalysisResult) => {
-      console.log(`Water level: ${level}m, Area: ${result.floodedArea.toFixed(0)}m²`)
-    },
-    onComplete: (result: FloodAnalysisResult) => {
-      console.log('Flood analysis complete:', result)
-    },
-    onCancel: () => {
-      console.log('Flood analysis cancelled')
-    },
-  })
+	const tool = new FloodTool(viewer, {
+		mode: 'polygon', // 默认使用多边形绘制模式
+		requiresTerrain: true, // 强制要求地形
+		initialWaterLevel: 5,
+		waterLevelStep: 1,
+		waterColor: '#1E90FF',
+		waterOpacity: 0.6,
+		dataSource: {
+			type: 'polygon',
+			minWaterLevel: 0,
+			maxWaterLevel: 50,
+		},
+		onWaterLevelChange: (level: number, result: FloodAnalysisResult) => {
+			console.log(`Water level: ${level}m, Area: ${result.floodedArea.toFixed(0)}m²`)
+		},
+		onComplete: (result: FloodAnalysisResult) => {
+			console.log('Flood analysis complete:', result)
+		},
+		onCancel: () => {
+			console.log('Flood analysis cancelled')
+		},
+	})
 
-  tool.activate()
-  currentTool.value = tool
-  floodTool.value = tool
-  gisStore.startDrawing()
+	if (tool.activate()) {
+		currentTool.value = tool
+		floodTool.value = tool
+		gisStore.startDrawing()
+	} else {
+		gisStore.setTool(null)
+	}
 }
 
 /**
  * Activate profile analysis tool
  */
 function activateProfileTool(viewer: any) {
-  // Clear previous profile result
-  if (profileTool.value) {
-    profileTool.value.clearResult()
-  }
-  profileResult.value = null
+	profileResult.value = null
 
-  const tool = new ProfileTool(viewer, {
-    sampleInterval: 20,
-    maxSamples: 500,
-    onComplete: (result: ProfileAnalysisResult) => {
-      console.log('Profile analysis complete:', result)
-      profileResult.value = result
-      // Result can be visualized via ProfileChart.vue component
-    },
-    onProgress: (progress: number) => {
-      console.log(`Profile sampling progress: ${progress}%`)
-    },
-    onCancel: () => {
-      console.log('Profile analysis cancelled')
-    },
-  })
+	const tool = new ProfileTool(viewer, {
+		sampleInterval: 20,
+		maxSamples: 500,
+		onComplete: (result: ProfileAnalysisResult) => {
+			console.log('Profile analysis complete:', result)
+			profileResult.value = result
+			// Result can be visualized via ProfileChart.vue component
+		},
+		onProgress: () => {
+			// Optional: update UI loading state
+		},
+		onCancel: () => {
+			console.log('Profile analysis cancelled')
+		},
+	})
 
-  tool.activate()
-  currentTool.value = tool
-  profileTool.value = tool
-  gisStore.startDrawing()
+	if (tool.activate()) {
+		currentTool.value = tool
+		profileTool.value = tool
+		gisStore.startDrawing()
+	} else {
+		gisStore.setTool(null)
+	}
 }
 
 /**
  * Activate 3D measure tool
  */
 function activateMeasure3DTool(viewer: any) {
-  // Clear previous result
-  if (measure3dTool.value) {
-    measure3dTool.value.clearResult()
-  }
+	const tool = new Measure3DTool(viewer, {
+		requiresTerrain: true, // 强制要求地形
+		heightMode: 'terrain',
+		customHeight: 0,
+		onComplete: (result: Measure3DResult) => {
+			console.log('Measure 3D complete:', result)
+			console.log(
+				`Slope: ${result.spaceDistance.toFixed(2)}m, Horizontal: ${result.horizontalDistance.toFixed(2)}m`
+			)
+		},
+		onHeightModeChange: (mode) => {
+			console.log(`Height mode changed to: ${mode}`)
+		},
+		onCancel: () => {
+			console.log('3D Measure cancelled')
+		},
+	})
 
-  const tool = new Measure3DTool(viewer, {
-    heightMode: 'terrain',
-    customHeight: 0,
-    onComplete: (result: Measure3DResult) => {
-      console.log('3D Measure complete:', result)
-      console.log(
-        `Slope: ${result.slopeDistance.toFixed(2)}m, Horizontal: ${result.horizontalDistance.toFixed(2)}m`
-      )
-    },
-    onHeightModeChange: (mode) => {
-      console.log(`Height mode changed to: ${mode}`)
-    },
-    onCancel: () => {
-      console.log('3D Measure cancelled')
-    },
-  })
-
-  tool.activate()
-  currentTool.value = tool
-  measure3dTool.value = tool
-  gisStore.startDrawing()
+	if (tool.activate()) {
+		currentTool.value = tool
+		measure3dTool.value = tool
+		gisStore.startDrawing()
+	} else {
+		gisStore.setTool(null)
+	}
 }
 
 /**
  * Create Graphic instance from Feature
  */
 function createGraphicFromFeature(feature: Feature, viewer: any) {
-  const { geometry, style, name, properties } = feature
+	const { style, name } = feature
+	const properties = feature.properties || {}
 
-  // Convert coordinates to Cartesian3
-  const positions = convertCoordinatesToCartesian3(geometry)
-  if (!positions || positions.length === 0) {
-    console.error('Failed to convert geometry coordinates:', geometry)
-    return null
-  }
+	let positions: any[] = []
 
-  // Create appropriate Graphic based on type
-  let graphic
-  try {
-    switch (feature.type) {
-      case 'point':
-        graphic = new PointGraphic(viewer, {
-          name,
-          style,
-          label: name,
-        })
-        break
-      case 'line':
-        graphic = new LineGraphic(viewer, {
-          name,
-          style,
-          lineStyle: (style as any).lineType || 'solid', // Preserve lineType from feature
-        })
-        break
-      case 'circle': {
-        // Circle needs center and radius
-        if (!properties?.radius) {
-          console.error('Circle missing radius property:', feature)
-          return null
-        }
-        // CircleGraphic.create() expects [center, edgePoint]
-        // Calculate edge point from center + radius
-        const centerPos = positions[0]
-        const centerCarto = Cesium.Cartographic.fromCartesian(centerPos)
-        const edgePos = Cesium.Cartesian3.fromRadians(
-          centerCarto.longitude + properties.radius / 6378137, // approximate
-          centerCarto.latitude,
-          centerCarto.height
-        )
-        const circlePositions = [centerPos, edgePos]
+	try {
+		// Extract positions based on feature type
+		if (feature.type === 'point') {
+			const p = feature.position
+			positions = [Cesium.Cartesian3.fromDegrees(p.longitude, p.latitude, (p as any).height || 0)]
+		} else if (feature.type === 'line') {
+			positions = feature.vertices.map(v => Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, (v as any).height || 0))
+		} else if (feature.type === 'polygon') {
+			positions = feature.vertices.map(v => Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, (v as any).height || 0))
+		} else if (feature.type === 'circle') {
+			const c = feature.center
+			positions = [Cesium.Cartesian3.fromDegrees(c.longitude, c.latitude, (c as any).height || 0)]
+		} else if (feature.type === 'rectangle') {
+			const sw = feature.southwest
+			const ne = feature.northeast
+			// Construct approximate corners for RectangleGraphic creation (opposite corners)
+			const p1 = Cesium.Cartesian3.fromDegrees(sw.longitude, sw.latitude, (sw as any).height || 0)
+			const p2 = Cesium.Cartesian3.fromDegrees(ne.longitude, ne.latitude, (ne as any).height || 0)
+			positions = [p1, p2]
+		}
 
-        graphic = new CircleGraphic(viewer, {
-          name,
-          style,
-        })
-        graphic.create(circlePositions)
-        graphic.bindFeatureId(feature.id)
-        console.log(`Created circle graphic:`, feature.id, circlePositions.length, 'positions')
-        return graphic
-      }
-      case 'rectangle': {
-        // Rectangle is stored as Polygon with 5 positions (4 corners + closing point)
-        // RectangleGraphic.create() expects [corner1, corner2] (opposite corners)
-        if (positions.length < 4) {
-          console.error('Rectangle needs at least 4 corner positions:', positions.length)
-          return null
-        }
-        // Use corner 0 (SW) and corner 2 (NE) as opposite corners
-        const rectanglePositions = [positions[0], positions[2]]
+		if (!positions || positions.length === 0) {
+			console.error('Failed to get positions from feature:', feature)
+			return null
+		}
 
-        graphic = new RectangleGraphic(viewer, {
-          name,
-          style,
-        })
-        graphic.create(rectanglePositions)
-        graphic.bindFeatureId(feature.id)
-        console.log(
-          `Created rectangle graphic:`,
-          feature.id,
-          rectanglePositions.length,
-          'positions'
-        )
-        return graphic
-      }
-      case 'polygon':
-        graphic = new PolygonGraphic(viewer, {
-          name,
-          style,
-        })
-        break
-      default:
-        console.error('Unknown feature type:', feature.type)
-        return null
-    }
+		// Create appropriate Graphic based on type
+		let graphic
+		switch (feature.type) {
+			case 'point':
+				graphic = new PointGraphic(viewer, {
+					name,
+					style,
+					label: name,
+				})
+				break
+			case 'line':
+				graphic = new LineGraphic(viewer, {
+					name,
+					style,
+					lineStyle: (style as any).lineType || 'solid', // Preserve lineType from feature
+				})
+				break
+			case 'circle': {
+				// Circle needs center and radius
+				if (!feature.radius) {
+					console.error('Circle missing radius property:', feature)
+					return null
+				}
+				// CircleGraphic.create() expects [center, edgePoint]
+				// Calculate edge point from center + radius
+				const centerPos = positions[0]
+				const centerCarto = Cesium.Cartographic.fromCartesian(centerPos)
+				const edgePos = Cesium.Cartesian3.fromRadians(
+					centerCarto.longitude + feature.radius / 6378137, // approximate
+					centerCarto.latitude,
+					centerCarto.height
+				)
+				const circlePositions = [centerPos, edgePos]
 
-    // Create the graphic with positions
-    graphic.create(positions)
+				graphic = new CircleGraphic(viewer, {
+					name,
+					style,
+				})
+				graphic.create(circlePositions)
+				graphic.bindFeatureId(feature.id)
+				console.log(`Created circle graphic:`, feature.id, circlePositions.length, 'positions')
+				return graphic
+			}
+			case 'rectangle': {
+				// Rectangle is stored as Polygon with 5 positions (4 corners + closing point)
+				// RectangleGraphic.create() expects [corner1, corner2] (opposite corners)
+				// Use positions[0] (SW) and positions[1] (NE) as opposite corners
+				const rectanglePositions = [positions[0], positions[1]]
 
-    // Bind featureId to graphic and its entities for selection
-    graphic.bindFeatureId(feature.id)
+				graphic = new RectangleGraphic(viewer, {
+					name,
+					style,
+				})
+				graphic.create(rectanglePositions)
+				graphic.bindFeatureId(feature.id)
+				console.log(
+					`Created rectangle graphic:`,
+					feature.id,
+					rectanglePositions.length,
+					'positions'
+				)
+				return graphic
+			}
+			case 'polygon':
+				graphic = new PolygonGraphic(viewer, {
+					name,
+					style,
+				})
+				break
+			default:
+				console.error('Unknown feature type:', (feature as any).type)
+				return null
+		}
 
-    console.log(`Created ${feature.type} graphic:`, feature.id, positions.length, 'positions')
-    return graphic
-  } catch (error) {
-    console.error(`Error creating ${feature.type} graphic:`, error, feature)
-    return null
-  }
+		// Create the graphic with positions
+		// Note: Circle and Rectangle handled above
+		if (graphic) {
+			graphic.create(positions)
+			graphic.bindFeatureId(feature.id)
+			console.log(`Created ${feature.type} graphic:`, feature.id, positions.length, 'positions')
+		}
+
+		return graphic
+	} catch (error) {
+		console.error(`Error creating ${(feature as any).type} graphic:`, error, feature)
+		return null
+	}
 }
 
-/**
- * Convert Feature geometry coordinates to Cesium.Cartesian3 array
- */
-function convertCoordinatesToCartesian3(geometry: any): any[] {
-  if (!geometry || !geometry.coordinates) {
-    console.error('Invalid geometry:', geometry)
-    return []
-  }
 
-  const coords = geometry.coordinates
-
-  try {
-    switch (geometry.type) {
-      case 'Point':
-        // Single coordinate [lon, lat, height?]
-        if (!Array.isArray(coords) || coords.length < 2) {
-          console.error('Invalid Point coordinates:', coords)
-          return []
-        }
-        return [Cesium.Cartesian3.fromDegrees(coords[0], coords[1], coords[2] || 0)]
-
-      case 'LineString':
-        // Array of coordinates [[lon, lat, height?], ...]
-        if (!Array.isArray(coords)) {
-          console.error('Invalid LineString coordinates:', coords)
-          return []
-        }
-        return coords
-          .map((c: number[]) => {
-            if (!Array.isArray(c) || c.length < 2) {
-              console.warn('Invalid coordinate in LineString:', c)
-              return null
-            }
-            return Cesium.Cartesian3.fromDegrees(c[0], c[1], c[2] || 0)
-          })
-          .filter((p: any) => p !== null)
-
-      case 'Polygon':
-        // Array of rings, use first ring (exterior)
-        if (!Array.isArray(coords) || coords.length === 0) {
-          console.error('Invalid Polygon coordinates:', coords)
-          return []
-        }
-        const ring = coords[0]
-        if (!Array.isArray(ring)) {
-          console.error('Invalid Polygon ring:', ring)
-          return []
-        }
-        return ring
-          .map((c: number[]) => {
-            if (!Array.isArray(c) || c.length < 2) {
-              console.warn('Invalid coordinate in Polygon:', c)
-              return null
-            }
-            return Cesium.Cartesian3.fromDegrees(c[0], c[1], c[2] || 0)
-          })
-          .filter((p: any) => p !== null)
-
-      default:
-        console.warn('Unsupported geometry type:', geometry.type)
-        return []
-    }
-  } catch (error) {
-    console.error('Error converting coordinates:', error, geometry)
-    return []
-  }
-}
 
 /**
  * Cleanup on unmount
  */
 function cleanup() {
-  deactivateTool()
+	deactivateTool()
 
-  // Destroy selection handler and keyboard listeners
-  if (selectionHandler) {
-    if ((selectionHandler as any)._keyboardCleanup) {
-      ;(selectionHandler as any)._keyboardCleanup()
-    }
-    selectionHandler.destroy()
-    selectionHandler = null
-  }
+	// Destroy selection handler and keyboard listeners
+	if (selectionHandler) {
+		if ((selectionHandler as any)._keyboardCleanup) {
+			; (selectionHandler as any)._keyboardCleanup()
+		}
+		selectionHandler.destroy()
+		selectionHandler = null
+	}
 
-  // Cleanup snap service
-  if (snapService) {
-    snapService.destroy()
-    snapService = null
-  }
-  removeSnapIndicator()
+	// Cleanup snap service
+	if (snapService) {
+		snapService.destroy()
+		snapService = null
+	}
+	removeSnapIndicator()
 }
 
 // ========== Snap Functions ==========
@@ -1156,78 +1127,78 @@ function cleanup() {
  * Initialize snap service
  */
 function initSnapService(): void {
-  const viewer = cesiumStore.viewer
-  if (!viewer) return
+	const viewer = cesiumStore.viewer
+	if (!viewer) return
 
-  snapService = new SnapService(viewer, {
-    enabled: gisStore.snapEnabled,
-    tolerance: gisStore.snapTolerance,
-    snapToVertex: true,
-    snapToEdge: true,
-  })
+	snapService = new SnapService(viewer, {
+		enabled: gisStore.snapEnabled,
+		tolerance: gisStore.snapTolerance,
+		snapToVertex: true,
+		snapToEdge: true,
+	})
 
-  // Sync existing features
-  snapService.syncFromStore(gisStore.graphics)
+	// Sync existing features
+	snapService.syncFromStore(gisStore.graphics)
 
-  // Create snap indicator entity
-  createSnapIndicator()
+	// Create snap indicator entity
+	createSnapIndicator()
 }
 
 /**
  * Create snap indicator entity
  */
 function createSnapIndicator(): void {
-  const viewer = cesiumStore.viewer
-  if (!viewer || snapIndicator) return
+	const viewer = cesiumStore.viewer
+	if (!viewer || snapIndicator) return
 
-  snapIndicator = viewer.entities.add({
-    id: '_snap_indicator',
-    position: Cesium.Cartesian3.ZERO,
-    show: false,
-    point: {
-      pixelSize: 12,
-      color: Cesium.Color.ORANGE,
-      outlineColor: Cesium.Color.WHITE,
-      outlineWidth: 2,
-      disableDepthTestDistance: Number.POSITIVE_INFINITY,
-    },
-  })
+	snapIndicator = viewer.entities.add({
+		id: '_snap_indicator',
+		position: Cesium.Cartesian3.ZERO,
+		show: false,
+		point: {
+			pixelSize: 12,
+			color: Cesium.Color.ORANGE,
+			outlineColor: Cesium.Color.WHITE,
+			outlineWidth: 2,
+			disableDepthTestDistance: Number.POSITIVE_INFINITY,
+		},
+	})
 }
 
 /**
  * Remove snap indicator entity
  */
 function removeSnapIndicator(): void {
-  const viewer = cesiumStore.viewer
-  if (viewer && snapIndicator) {
-    viewer.entities.remove(snapIndicator)
-    snapIndicator = null
-  }
+	const viewer = cesiumStore.viewer
+	if (viewer && snapIndicator) {
+		viewer.entities.remove(snapIndicator)
+		snapIndicator = null
+	}
 }
 
 /**
  * Update snap indicator position and visibility
  */
 function updateSnapIndicator(target: SnapTarget | null): void {
-  if (!snapIndicator) return
+	if (!snapIndicator) return
 
-  _currentSnapTarget = target
+	_currentSnapTarget = target
 
-  if (target) {
-    snapIndicator.position = target.position
-    snapIndicator.show = true
+	if (target) {
+		snapIndicator.position = target.position
+		snapIndicator.show = true
 
-    // Change color based on snap type
-    if (target.type === 'vertex') {
-      snapIndicator.point.color = Cesium.Color.ORANGE
-      snapIndicator.point.pixelSize = 14
-    } else {
-      snapIndicator.point.color = Cesium.Color.YELLOW
-      snapIndicator.point.pixelSize = 10
-    }
-  } else {
-    snapIndicator.show = false
-  }
+		// Change color based on snap type
+		if (target.type === 'vertex') {
+			snapIndicator.point.color = Cesium.Color.ORANGE
+			snapIndicator.point.pixelSize = 14
+		} else {
+			snapIndicator.point.color = Cesium.Color.YELLOW
+			snapIndicator.point.pixelSize = 10
+		}
+	} else {
+		snapIndicator.show = false
+	}
 }
 
 /**
@@ -1235,50 +1206,50 @@ function updateSnapIndicator(target: SnapTarget | null): void {
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function _findSnapTarget(screenPosition: { x: number; y: number }): SnapTarget | null {
-  if (!snapService || !gisStore.snapEnabled) return null
+	if (!snapService || !gisStore.snapEnabled) return null
 
-  // Update snap service options
-  snapService.setOptions({
-    enabled: gisStore.snapEnabled,
-    tolerance: gisStore.snapTolerance,
-  })
+	// Update snap service options
+	snapService.setOptions({
+		enabled: gisStore.snapEnabled,
+		tolerance: gisStore.snapTolerance,
+	})
 
-  return snapService.findSnapTarget(new Cesium.Cartesian2(screenPosition.x, screenPosition.y))
+	return snapService.findSnapTarget(new Cesium.Cartesian2(screenPosition.x, screenPosition.y))
 }
 
 /**
  * Sync features to snap service when graphics change
  */
 function syncSnapFeatures(): void {
-  if (snapService) {
-    snapService.syncFromStore(gisStore.graphics)
-  }
+	if (snapService) {
+		snapService.syncFromStore(gisStore.graphics)
+	}
 }
 
 // Watch for feature changes to sync snap targets
 watch(
-  () => gisStore.featureCount,
-  () => {
-    syncSnapFeatures()
-  }
+	() => gisStore.featureCount,
+	() => {
+		syncSnapFeatures()
+	}
 )
 
 // Watch for snap enabled changes
 watch(
-  () => gisStore.snapEnabled,
-  (enabled) => {
-    if (snapService) {
-      snapService.setOptions({ enabled })
-    }
-    if (!enabled) {
-      updateSnapIndicator(null)
-    }
-  }
+	() => gisStore.snapEnabled,
+	(enabled) => {
+		if (snapService) {
+			snapService.setOptions({ enabled })
+		}
+		if (!enabled) {
+			updateSnapIndicator(null)
+		}
+	}
 )
 
 // Export snap functions for future integration
 defineExpose({
-  findSnapTarget: _findSnapTarget,
-  getCurrentSnapTarget: () => _currentSnapTarget,
+	findSnapTarget: _findSnapTarget,
+	getCurrentSnapTarget: () => _currentSnapTarget,
 })
 </script>

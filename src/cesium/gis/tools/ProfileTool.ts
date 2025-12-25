@@ -21,6 +21,12 @@ import {
   createHintLabel,
   createPointMarker,
 } from '../utils/toolStyles'
+import type { ProfileAnalysisData } from '@/types/analysis'
+import {
+  calculatePathDistance as geoCalculatePathDistance,
+  formatDistance as geoFormatDistance,
+  generateId as geoGenerateId,
+} from '../utils/geo'
 import { useGISStore } from '@/stores/gis'
 
 /**
@@ -40,31 +46,18 @@ export interface ProfileSample {
 }
 
 /**
- * 剖面分析结果
+ * 剖面分析结果 (增强型)
  */
-export interface ProfileAnalysisResult {
+export interface ProfileAnalysisResult extends ProfileAnalysisData {
   /** 唯一ID */
   id: string
-  /** 采样点数组 */
+  /** 采样点数组 (详细数据) */
   samples: ProfileSample[]
-  /** 路径总长度（米） */
-  totalDistance: number
-  /** 最高点高程 */
-  maxElevation: number
-  /** 最低点高程 */
-  minElevation: number
-  /** 平均高程 */
-  avgElevation: number
-  /** 累计爬升 */
-  totalAscent: number
-  /** 累计下降 */
-  totalDescent: number
-  /** 起点坐标 */
-  startPoint: Coordinate
-  /** 终点坐标 */
-  endPoint: Coordinate
   /** 采样时间 */
   createdAt: Date
+  /** 额外坐标信息 (用于向后兼容或特殊显示) */
+  startPoint: Coordinate
+  endPoint: Coordinate
 }
 
 /**
@@ -166,7 +159,7 @@ export class ProfileTool extends BaseTool {
    * 构造函数
    */
   constructor(viewer: Cesium.Viewer, options: ProfileToolOptions = {}) {
-    super(viewer, { ...options, type: 'custom' as ToolType })
+    super(viewer, { ...options, type: 'profile' as ToolType, requiresTerrain: true })
     this.sampleInterval = options.sampleInterval ?? 20
     this.maxSamples = options.maxSamples ?? 500
     this.onComplete = options.onComplete
@@ -219,6 +212,8 @@ export class ProfileTool extends BaseTool {
    */
   protected onActivate(): void {
     this.setCursor('crosshair')
+    // 禁用双击缩放
+    ;(this.viewer.scene.screenSpaceCameraController as any).zoomOnDoubleClick = false
   }
 
   /**
@@ -227,6 +222,8 @@ export class ProfileTool extends BaseTool {
   protected onDeactivate(): void {
     this.resetCursor()
     this.clearPreview()
+    // 恢复双击缩放
+    ;(this.viewer.scene.screenSpaceCameraController as any).zoomOnDoubleClick = true
   }
 
   /**
@@ -276,11 +273,14 @@ export class ProfileTool extends BaseTool {
     this.updatePreview()
   }
 
-  /**
-   * 更新预览
-   */
   private updatePreview(): void {
-    if (!this.cursorPosition || this.positions.length === 0) return
+    if (
+      !this.cursorPosition ||
+      this.positions.length === 0 ||
+      this.positions.length >= 2 ||
+      this.isSampling
+    )
+      return
 
     const needsRecreate = this.positions.length !== this.lastPreviewCount
     if (needsRecreate) {
@@ -343,7 +343,7 @@ export class ProfileTool extends BaseTool {
     if (this.positions.length < 2 || this.isSampling) return
 
     this.isSampling = true
-    this.clearPreviewEntities()
+    this.clearPreview() // 清除所有路径线、标签和标记点
 
     try {
       // 采样地形
@@ -476,10 +476,17 @@ export class ProfileTool extends BaseTool {
 
     let totalAscent = 0
     let totalDescent = 0
+    let maxSlopeAngle = 0
     for (let i = 1; i < samples.length; i++) {
       const diff = samples[i].elevation - samples[i - 1].elevation
       if (diff > 0) totalAscent += diff
       else totalDescent += Math.abs(diff)
+
+      const dist = samples[i].distance - samples[i - 1].distance
+      if (dist > 0) {
+        const slope = (Math.abs(diff) / dist) * 100 // 坡度百分比
+        maxSlopeAngle = Math.max(maxSlopeAngle, slope)
+      }
     }
 
     const firstSample = samples[0]
@@ -488,12 +495,14 @@ export class ProfileTool extends BaseTool {
     return {
       id: this.generateId(),
       samples,
-      totalDistance: lastSample.distance,
+      totalLength: lastSample.distance,
       maxElevation,
       minElevation,
       avgElevation,
       totalAscent,
       totalDescent,
+      maxSlope: maxSlopeAngle,
+      sampleCount: samples.length,
       startPoint: {
         longitude: firstSample.longitude,
         latitude: firstSample.latitude,
@@ -579,31 +588,24 @@ export class ProfileTool extends BaseTool {
   }
 
   /**
-   * 计算路径总长度
+   * 计算路径总长度 - 使用共享工具函数
    */
   private calculatePathDistance(positions: Cesium.Cartesian3[]): number {
-    let distance = 0
-    for (let i = 1; i < positions.length; i++) {
-      distance += Cesium.Cartesian3.distance(positions[i - 1], positions[i])
-    }
-    return distance
+    return geoCalculatePathDistance(positions)
   }
 
   /**
-   * 格式化距离
+   * 格式化距离 - 使用共享工具函数
    */
   private formatDistance(meters: number): string {
-    if (meters < 1000) {
-      return `${meters.toFixed(1)} m`
-    }
-    return `${(meters / 1000).toFixed(2)} km`
+    return geoFormatDistance(meters)
   }
 
   /**
-   * 生成唯一ID
+   * 生成唯一ID - 使用共享工具函数
    */
   private generateId(): string {
-    return `profile_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+    return geoGenerateId('profile')
   }
 
   /**
@@ -624,14 +626,12 @@ export class ProfileTool extends BaseTool {
   }
 
   /**
-   * 重置状态
+   * 重置状态（仅重置数据，不清除实体）
    */
   private reset(): void {
     this.positions = []
     this.cursorPosition = null
     this.lastPreviewCount = 0
-    this.markerEntities.forEach((e) => this.viewer.entities.remove(e))
-    this.markerEntities = []
   }
 
   /**

@@ -110,6 +110,7 @@ export interface FeatureStyle {
   pointColor?: string // 点颜色（可选）
   fillOpacity?: number // 填充透明度（可选）
   iconType?: string // 图标类型（可选）
+  centerIcon?: string // 多边形中心图标（可选）
 }
 
 /**

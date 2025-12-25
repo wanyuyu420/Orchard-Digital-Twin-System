@@ -118,7 +118,8 @@ export const useGISStore = defineStore('gis', () => {
     lineType: 'solid' as 'solid' | 'dashed' | 'dotted',
     pointColor: '#22D3EE',
     pointSize: 10,
-    iconType: 'dot' as 'dot' | 'pin' | 'diamond' | 'star',
+    iconType: 'dot' as 'dot' | 'pin' | 'diamond' | 'star' | 'camera' | 'wifi',
+    centerIcon: undefined as string | undefined, // For polygon center icon
   })
 
   /** Per-tool style configuration (persisted to localStorage) */
@@ -130,56 +131,57 @@ export const useGISStore = defineStore('gis', () => {
     lineType?: 'solid' | 'dashed' | 'dotted'
     pointColor?: string
     pointSize?: number
-    iconType?: 'dot' | 'pin' | 'diamond' | 'star' // for point tools
+    iconType?: 'dot' | 'pin' | 'diamond' | 'star' | 'camera' | 'wifi' // for point tools
+    centerIcon?: string
   }
 
   interface ToolStyles {
-    point: ToolStyleConfig
-    line: ToolStyleConfig
-    polygon: ToolStyleConfig
-    circle: ToolStyleConfig
-    rectangle: ToolStyleConfig
-    distance: ToolStyleConfig // measurement tool
-    area: ToolStyleConfig // measurement tool
+    'draw-point': ToolStyleConfig
+    'draw-line': ToolStyleConfig
+    'draw-polygon': ToolStyleConfig
+    'draw-circle': ToolStyleConfig
+    'draw-rectangle': ToolStyleConfig
+    'measure-distance': ToolStyleConfig // measurement tool
+    'measure-area': ToolStyleConfig // measurement tool
   }
 
   /** Default tool styles */
   const DEFAULT_TOOL_STYLES: ToolStyles = {
-    point: {
+    'draw-point': {
       pointColor: '#22D3EE',
       pointSize: 12,
       strokeColor: '#FFFFFF',
       strokeWidth: 2,
       iconType: 'dot',
     },
-    line: {
+    'draw-line': {
       strokeColor: '#22D3EE',
       strokeWidth: 3,
       lineType: 'solid',
     },
-    polygon: {
+    'draw-polygon': {
       fillColor: '#3B82F6',
       fillOpacity: 0.3,
       strokeColor: '#22D3EE',
       strokeWidth: 3,
     },
-    circle: {
+    'draw-circle': {
       fillColor: '#10B981',
       fillOpacity: 0.3,
       strokeColor: '#059669',
       strokeWidth: 3,
     },
-    rectangle: {
+    'draw-rectangle': {
       fillColor: '#F59E0B',
       fillOpacity: 0.3,
       strokeColor: '#D97706',
       strokeWidth: 3,
     },
-    distance: {
+    'measure-distance': {
       strokeColor: '#EF4444',
       strokeWidth: 2,
     },
-    area: {
+    'measure-area': {
       fillColor: '#8B5CF6',
       fillOpacity: 0.3,
       strokeColor: '#7C3AED',

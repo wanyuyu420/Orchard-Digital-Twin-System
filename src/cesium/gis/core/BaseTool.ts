@@ -40,8 +40,8 @@ export interface BaseToolOptions {
   snapEnabled?: boolean
   /** 是否显示提示 */
   showTips?: boolean
-  /** 自定义样式 */
-  style?: Record<string, any>
+  /** 是否需要地形 */
+  requiresTerrain?: boolean
 }
 
 /**
@@ -100,6 +100,7 @@ export abstract class BaseTool {
     this.options = {
       snapEnabled: false,
       showTips: true,
+      requiresTerrain: false,
       ...options,
     }
     this.toolType = options.type || 'custom'
@@ -109,17 +110,36 @@ export abstract class BaseTool {
   /**
    * 激活工具
    * 开始监听用户交互事件
+   * @returns 是否成功激活
    */
-  public activate(): void {
+  public activate(): boolean {
     if (this.active) {
       console.warn(`Tool ${this.toolType} is already active`)
-      return
+      return true
+    }
+
+    // 检查地形要求
+    if (this.options.requiresTerrain) {
+      const isEllipsoid = this.viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider
+      if (isEllipsoid) {
+        // 使用原生 confirm 或 alert
+        // 这里只是简单的提醒，无法直接帮用户开启地形（因为BaseTool不持有Store或UI控制器）
+        window.alert('该工具需要开启地形才能使用，请先在图层控制中开启地形。')
+        // 也可以使用 confirm 让用户确认
+        // if (!window.confirm('该工具建议在地形开启状态下使用，是否继续？')) { return false }
+        
+        // 需求：提醒必须开启（取消选择）或推荐开启（不取消）
+        // 这里实现：强制要求开启 -> 取消工具选择
+        return false
+      }
     }
 
     this.active = true
     this.mode = 'active'
     this.setupEventHandlers()
     this.onActivate()
+    
+    return true
   }
 
   /**
@@ -225,7 +245,20 @@ export abstract class BaseTool {
    * @returns 世界坐标（Cartesian3），如果拾取失败返回 null
    */
   protected pickPosition(screenPosition: Cesium.Cartesian2): Cesium.Cartesian3 | null {
-    // 1. 尝试拾取地形
+    // 0. 优先尝试使用 scene.pickPosition (支持 3D Tiles 和地形)
+    // 注意：scene.pickPosition 需要深度缓冲区支持，且在某些视角下可能不稳定
+    if (this.viewer.scene.mode === Cesium.SceneMode.SCENE3D) {
+      try {
+        const cartesian = this.viewer.scene.pickPosition(screenPosition);
+        if (cartesian) {
+          return cartesian;
+        }
+      } catch (e) {
+        // 忽略 pickPosition 可能抛出的错误（如深度缓冲区未就绪）
+      }
+    }
+
+    // 1. 尝试拾取地形 (后备方案)
     const ray = this.viewer.camera.getPickRay(screenPosition)
     if (ray) {
       const cartesian = this.viewer.scene.globe.pick(ray, this.viewer.scene)
@@ -234,7 +267,7 @@ export abstract class BaseTool {
       }
     }
 
-    // 2. 拾取椭球面
+    // 2. 拾取椭球面 (最后兜底)
     const ellipsoid = this.viewer.scene.globe.ellipsoid
     return this.viewer.camera.pickEllipsoid(screenPosition, ellipsoid) || null
   }
