@@ -29,6 +29,33 @@ export interface LayerConfig {
     longitude: number
     latitude: number
     height: number
+    offsetEast?: number
+    offsetNorth?: number
+    offsetUp?: number
+    rotationX: number
+    rotationY: number
+    rotationZ: number
+    scale: number
+  }
+  alignmentEllipsoid?: {
+    longitude: number
+    latitude: number
+    height: number
+    offsetEast?: number
+    offsetNorth?: number
+    offsetUp?: number
+    rotationX: number
+    rotationY: number
+    rotationZ: number
+    scale: number
+  }
+  alignmentTerrain?: {
+    longitude: number
+    latitude: number
+    height: number
+    offsetEast?: number
+    offsetNorth?: number
+    offsetUp?: number
     rotationX: number
     rotationY: number
     rotationZ: number
@@ -37,6 +64,15 @@ export interface LayerConfig {
   ellipsoidOffset?: number
   terrainOffset?: number
   provider?: string
+  // Point cloud specific configuration
+  pointCloud?: {
+    pointSize?: number
+    maximumAttenuation?: number
+    eyeDomeLighting?: boolean
+    color?: string
+    attenuation?: boolean
+    maximumScreenSpaceError?: number
+  }
 }
 
 export interface GISLayer {

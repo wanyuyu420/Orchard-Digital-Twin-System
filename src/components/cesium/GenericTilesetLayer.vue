@@ -47,66 +47,140 @@ watch(
 	}
 )
 
-// Watch for terrain changes to re-ground OSGB
+// Watch for terrain changes to re-ground OSGB and point cloud
 watch(
 	() => cesiumStore.terrainEnabled,
-	async () => {
-		if (tileset.value && props.layer.config?.ellipsoidOffset !== undefined) {
+	async (terrainEnabled) => {
+		if (!tileset.value) return
+		const config = props.layer.config || {}
+
+		// Re-ground OSGB
+		if (config.ellipsoidOffset !== undefined) {
 			await applyOSGBGrounding()
+		}
+		// Re-align BIM based on terrain state
+		else if (config.alignment || config.alignmentEllipsoid || config.alignmentTerrain) {
+			applyBIMAlignment(terrainEnabled)
+		}
+		// Re-ground point cloud
+		else if (config.pointCloud) {
+			const viewer = cesiumStore.viewer
+			if (viewer) {
+				console.log(`[GenericTilesetLayer] Re-grounding point cloud after terrain change...`)
+				await BIMAlignment.autoGroundSmart(tileset.value, viewer, 10)
+			}
 		}
 	}
 )
 
+// Apply BIM alignment with terrain-aware height
+function applyBIMAlignment(terrainEnabled: boolean) {
+	const config = props.layer.config || {}
+	if (!tileset.value) return
+
+	// Prefer dual-params (recommended), fallback to legacy single alignment
+	const chosen =
+		(terrainEnabled ? config.alignmentTerrain : config.alignmentEllipsoid) ||
+		config.alignment
+
+	if (!chosen) return
+
+	// Copy params to avoid mutating config
+	const params = { ...chosen }
+
+	console.log(`[GenericTilesetLayer] BIM alignment (terrain: ${terrainEnabled}):`, params)
+	BIMAlignment.applyToTileset(tileset.value, params)
+}
+
 async function loadTileset() {
 	const viewer = cesiumStore.viewer
+	if (!viewer || !props.layer.url || tileset.value || isLoading.value) return
+
 	const config = props.layer.config || {}
-
-	// Must have either URL or Ion assetId
-	const hasUrl = !!props.layer.url
-	const hasIonAsset = config.provider === 'ion' && config.assetId
-
-	if (!viewer || (!hasUrl && !hasIonAsset) || tileset.value || isLoading.value) return
 
 	try {
 		isLoading.value = true
+		console.log(`[GenericTilesetLayer] Loading ${props.layer.code} from ${props.layer.url}`)
 
-		let loadedTileset: any
+		// Determine SSE based on config or defaults
+		const sse = config.pointCloud?.maximumScreenSpaceError ?? 16
+		// Point cloud needs more memory for dense display
+		const memoryUsage = config.pointCloud ? 2048 : 512
+		// Point cloud should NOT skip LOD for dense display (matches demo quality mode)
+		const skipLOD = config.pointCloud ? false : true
 
-		if (hasIonAsset) {
-			// Load from Cesium Ion asset
-			console.log(`[GenericTilesetLayer] Loading ${props.layer.code} from Ion asset ${config.assetId}`)
-			loadedTileset = await Cesium.Cesium3DTileset.fromIonAssetId(config.assetId, {
-				maximumScreenSpaceError: 16,
-			})
-		} else {
-			// Load from URL
-			console.log(`[GenericTilesetLayer] Loading ${props.layer.code} from ${props.layer.url}`)
-			loadedTileset = await Cesium.Cesium3DTileset.fromUrl(props.layer.url, {
-				maximumScreenSpaceError: 16,
-				maximumMemoryUsage: 512,
-				skipLevelOfDetail: true,
-				baseScreenSpaceError: 1024,
-				skipScreenSpaceErrorFactor: 16,
-				skipLevels: 1,
-			})
+		// Point cloud loading options (same as demo)
+		const tilesetOptions: Record<string, unknown> = {
+			maximumScreenSpaceError: sse,
+			maximumMemoryUsage: memoryUsage,
+			skipLevelOfDetail: skipLOD,
+			baseScreenSpaceError: 1024,
+			skipScreenSpaceErrorFactor: 16,
+			skipLevels: 1,
 		}
+
+		// Add demo-specific options for point cloud only
+		if (config.pointCloud) {
+			tilesetOptions.immediatelyLoadDesiredLevelOfDetail = false
+			tilesetOptions.loadSiblings = false
+			tilesetOptions.cullWithChildrenBounds = true
+		}
+
+		// Load the tileset
+		const loadedTileset = await Cesium.Cesium3DTileset.fromUrl(props.layer.url, tilesetOptions)
 
 		// Apply alignment if specified (for BIM models)
-		if (config.alignment) {
-			BIMAlignment.applyToTileset(loadedTileset, config.alignment)
+		if (config.alignment || config.alignmentEllipsoid || config.alignmentTerrain) {
+			// 先添加到 scene 并保存引用，再调用 applyBIMAlignment
+			viewer.scene.primitives.add(loadedTileset)
+			tileset.value = loadedTileset
+			applyBIMAlignment(cesiumStore.terrainEnabled)
+		} else {
+			console.log(`[GenericTilesetLayer] No alignment config for ${props.layer.code}`)
+			// Add to scene
+			viewer.scene.primitives.add(loadedTileset)
+			tileset.value = loadedTileset
 		}
 
-		// Add to scene
-		viewer.scene.primitives.add(loadedTileset)
-		tileset.value = loadedTileset
+		// ============ Point Cloud Styling ============
+		if (config.pointCloud) {
+			const pc = config.pointCloud
+			console.log(`[GenericTilesetLayer] Applying point cloud styling for ${props.layer.code}`)
+
+			// Apply style (point size and color)
+			const styleOptions: Record<string, unknown> = {}
+			if (pc.pointSize) {
+				styleOptions.pointSize = pc.pointSize
+			}
+			if (pc.color) {
+				// Support both CSS color names and hex
+				styleOptions.color = `color('${pc.color}')`
+			}
+			if (Object.keys(styleOptions).length > 0) {
+				loadedTileset.style = new Cesium.Cesium3DTileStyle(styleOptions)
+			}
+
+			// Apply point cloud shading options
+			if (pc.eyeDomeLighting !== undefined) {
+				loadedTileset.pointCloudShading.eyeDomeLighting = pc.eyeDomeLighting
+			}
+			if (pc.attenuation !== undefined) {
+				loadedTileset.pointCloudShading.attenuation = pc.attenuation
+			}
+			if (pc.maximumAttenuation !== undefined) {
+				loadedTileset.pointCloudShading.maximumAttenuation = pc.maximumAttenuation
+			}
+		}
 
 		// Apply grounding for OSGB (has ellipsoidOffset/terrainOffset)
 		if (config.ellipsoidOffset !== undefined || config.terrainOffset !== undefined) {
 			await applyOSGBGrounding()
 		}
-		// Apply conservative grounding for BIM
-		else if (config.alignment) {
-			await BIMAlignment.autoGroundConservative(loadedTileset, viewer)
+		// BIM 模型已通过 alignment 精确定位，不需要 autoGroundConservative（它会覆盖对齐）
+		// Apply auto-grounding for point cloud (自动贴地)
+		else if (config.pointCloud) {
+			console.log(`[GenericTilesetLayer] Auto-grounding point cloud ${props.layer.code}...`)
+			await BIMAlignment.autoGroundSmart(loadedTileset, viewer, 10)
 		}
 
 		// Fly to tileset

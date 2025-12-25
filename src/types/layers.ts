@@ -44,6 +44,27 @@ export interface PointLayerConfig extends BaseLayerConfig {
 
 // ============ 3D Tiles Layer (3dtiles) ============
 
+/** Point cloud specific rendering configuration */
+export interface PointCloudConfig {
+  /** Point size in pixels (default: 3) */
+  pointSize?: number
+  
+  /** Maximum attenuation distance */
+  maximumAttenuation?: number
+  
+  /** Enable Eye Dome Lighting for depth perception */
+  eyeDomeLighting?: boolean
+  
+  /** Override point color (CSS color name or hex) */
+  color?: string
+  
+  /** Enable distance-based attenuation */
+  attenuation?: boolean
+  
+  /** Maximum screen space error for LOD (higher = lower quality, better performance) */
+  maximumScreenSpaceError?: number
+}
+
 export interface TilesetLayerConfig extends BaseLayerConfig {
   /** Height offset when terrain is disabled (ellipsoid mode) */
   ellipsoidOffset?: number
@@ -53,12 +74,25 @@ export interface TilesetLayerConfig extends BaseLayerConfig {
   
   /** Full model transformation for positioned tilesets (BIM) */
   alignment?: ModelAlignment
+
+  /** BIM alignment when terrain is disabled (ellipsoid) */
+  alignmentEllipsoid?: ModelAlignment
+
+  /** BIM alignment when terrain is enabled */
+  alignmentTerrain?: ModelAlignment
+  
+  /** Point cloud specific rendering settings */
+  pointCloud?: PointCloudConfig
 }
 
 export interface ModelAlignment {
   longitude: number
   latitude: number
   height: number
+  /** Local ENU offsets (meters) for fine-tuning */
+  offsetEast?: number
+  offsetNorth?: number
+  offsetUp?: number
   rotationX: number // degrees
   rotationY: number // degrees
   rotationZ: number // degrees
