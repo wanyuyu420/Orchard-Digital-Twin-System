@@ -100,6 +100,7 @@ async function loadPoints() {
 					outlineColor: Cesium.Color.WHITE,
 					outlineWidth: 2,
 					heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+					disableDepthTestDistance: Number.POSITIVE_INFINITY,
 				},
 				label: {
 					text: labelText || '',
@@ -110,7 +111,8 @@ async function loadPoints() {
 					style: Cesium.LabelStyle.FILL_AND_OUTLINE,
 					pixelOffset: new Cesium.Cartesian2(0, -20),
 					heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-					distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 50000)
+					distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 50000),
+					disableDepthTestDistance: Number.POSITIVE_INFINITY,
 				},
 				properties: {
 					layerCode: props.layer.code,
@@ -123,7 +125,7 @@ async function loadPoints() {
 
 		// Fly to center if configured
 		if (config.autoFlyTo && count > 0) {
-			const center = Cesium.Cartesian3.fromDegrees(sumLng / count, sumLat / count, 2000)
+			const center = Cesium.Cartesian3.fromDegrees(sumLng / count, sumLat / count, 8000)
 			viewer.camera.flyTo({
 				destination: center,
 				duration: 1.5
