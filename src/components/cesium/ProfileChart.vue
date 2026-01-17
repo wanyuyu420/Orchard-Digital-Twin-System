@@ -18,7 +18,7 @@
     <div class="chart-stats">
       <div class="stat-item">
         <span class="stat-label">总长度</span>
-        <span class="stat-value">{{ formatDistance(result?.totalDistance || 0) }}</span>
+        <span class="stat-value">{{ formatDistance(result?.totalLength || 0) }}</span>
       </div>
       <div class="stat-item">
         <span class="stat-label">最高点</span>
@@ -41,7 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, shallowRef } from 'vue'
+import { ref, watch, onMounted, onUnmounted, shallowRef, nextTick } from 'vue'
 import * as echarts from 'echarts/core'
 import { LineChart } from 'echarts/charts'
 import {
@@ -83,14 +83,19 @@ const emit = defineEmits<{
   ): void
 }>()
 
-const chartRef = ref<HTMLElement>()
+const chartRef = ref<HTMLElement | null>(null)
 const chartInstance = shallowRef<echarts.ECharts | null>(null)
+let resizeObserver: ResizeObserver | null = null
 
 onMounted(() => {
   initChart()
 })
 
 onUnmounted(() => {
+  if (resizeObserver && chartRef.value) {
+    resizeObserver.unobserve(chartRef.value)
+    resizeObserver = null
+  }
   if (chartInstance.value) {
     chartInstance.value.dispose()
     chartInstance.value = null
@@ -110,25 +115,31 @@ watch(
 watch(
   () => props.visible,
   (visible) => {
-    if (visible && props.result) {
-      // Wait for DOM update then resize
-      setTimeout(() => {
-        chartInstance.value?.resize()
-        if (props.result) {
-          updateChart(props.result)
-        }
-      }, 100)
-    }
+    if (!visible) return
+
+    // When the component is mounted but DOM was gated by v-if, chartRef is not
+    // available during onMounted. Re-init on first show.
+    nextTick(() => {
+      if (!chartInstance.value) {
+        initChart()
+        return
+      }
+      chartInstance.value.resize()
+      if (props.result) updateChart(props.result)
+    })
   }
 )
 
 function initChart() {
   if (!chartRef.value) return
 
+  // Avoid double-init
+  if (chartInstance.value) return
+
   chartInstance.value = echarts.init(chartRef.value, 'dark')
 
   // Handle resize
-  const resizeObserver = new ResizeObserver(() => {
+  resizeObserver = new ResizeObserver(() => {
     chartInstance.value?.resize()
   })
   resizeObserver.observe(chartRef.value)
@@ -314,11 +325,13 @@ function handleClose() {
 <style scoped lang="scss">
 .profile-chart-container {
   position: absolute;
-  bottom: 80px;
+  /* Keep above BottomDock (bottom:24px + ~76px height + gap) */
+  bottom: 120px;
   left: 50%;
   transform: translateX(-50%);
   width: 600px;
   max-width: calc(100vw - 400px);
+  pointer-events: auto;
   background: rgba(10, 15, 30, 0.95);
   backdrop-filter: blur(16px);
   border: 1px solid var(--border-color, rgba(0, 255, 255, 0.2));

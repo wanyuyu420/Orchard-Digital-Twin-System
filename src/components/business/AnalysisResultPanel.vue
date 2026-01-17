@@ -83,7 +83,7 @@
         <div v-else-if="resultType === 'profile'" class="result-content">
           <div class="result-item highlight">
             <div class="item-label">路径长度</div>
-            <div class="item-value">{{ formatDistance(result.totalDistance) }}</div>
+            <div class="item-value">{{ formatDistance(result.totalLength) }}</div>
           </div>
           <div class="result-grid">
             <div class="grid-item">

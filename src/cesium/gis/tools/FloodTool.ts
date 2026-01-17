@@ -81,11 +81,20 @@ export interface FloodToolOptions extends BaseToolOptions {
   /** 水面透明度 */
   waterOpacity?: number
 
+  /** 是否显示边界水墙（增强可读性，仅视觉效果） */
+  showWaterWall?: boolean
+
+  /** 水墙透明度（默认与 waterOpacity 接近） */
+  waterWallOpacity?: number
+
   /** 是否启用动画 */
   enableAnimation?: boolean
 
-  /** 动画速度（毫秒/帧） */
+  /** 动画 tick 间隔（毫秒/帧），主要用于平滑度/性能，一般无需调整 */
   animationSpeed?: number
+
+  /** 涨/退水速度（米/秒） */
+  riseRateMps?: number
 
   /** 水位变化回调 */
   onWaterLevelChange?: (level: number, result: FloodAnalysisResult) => void
@@ -95,6 +104,12 @@ export interface FloodToolOptions extends BaseToolOptions {
 
   /** 取消回调 */
   onCancel?: () => void
+
+  /** 地形采样网格间距（米，局部平面近似）。越小越精细，但采样更慢。 */
+  gridSpacingMeters?: number
+
+  /** 网格采样点数量上限，超过则自动放大网格间距 */
+  maxGridPoints?: number
 }
 
 /**
@@ -137,14 +152,29 @@ export class FloodTool extends BaseTool {
   /** 水面透明度 */
   private waterOpacity: number
 
+  /** 是否显示边界水墙 */
+  private showWaterWall: boolean
+
+  /** 水墙透明度 */
+  private waterWallOpacity: number
+
   /** 是否启用动画 */
   private _enableAnimation: boolean
 
-  /** 动画速度 */
-  private animationSpeed: number
+  /** 动画 tick 间隔（毫秒） */
+  private animationTickMs: number
+
+  /** 涨/退水速度（米/秒） */
+  private riseRateMps: number
 
   /** 动画定时器 */
   private animationTimer: number | null = null
+
+  /** 动画上一次 tick 时间戳（ms） */
+  private lastAnimationTs: number = 0
+
+  /** 合并调度：拖动水位时避免每次都同步重算导致卡顿 */
+  private pendingRecomputeTimer: number | null = null
 
   /** 动画方向 (1: 上涨, -1: 下降) */
   private animationDirection: 1 | -1 = 1
@@ -158,8 +188,44 @@ export class FloodTool extends BaseTool {
   /** 简单水面实体（terrain 模式） */
   private waterEntity: Cesium.Entity | null = null
 
+  /** 边界水墙实体（可选） */
+  private waterWallEntity: Cesium.Entity | null = null
+
+  /** Transient UI entities (e.g. validation hints) */
+  private transientEntities: Cesium.Entity[] = []
+
   /** 多边形绘制顶点 */
   private polygonPositions: Cesium.Cartesian3[] = []
+
+  /** 已完成的多边形顶点（用于面积/体积计算） */
+  private completedPositions: Cesium.Cartesian3[] = []
+
+  /** 顶点高程范围（在网格采样完成前用于生成水位上下限） */
+  private vertexMinHeight: number | null = null
+  private vertexMaxHeight: number | null = null
+
+  /** 地形网格采样配置 */
+  private gridSpacingMeters: number
+  private maxGridPoints: number
+
+  /** 地形网格采样缓存（局部 ENU 平面近似） */
+  private gridCache:
+    | {
+        status: 'idle' | 'sampling' | 'ready' | 'failed'
+        requestedSpacing: number
+        effectiveSpacing: number
+        cellArea: number
+        terrainHeights: number[]
+        minTerrainHeight: number
+        maxTerrainHeight: number
+      }
+    | null = null
+
+  /** 用于取消/丢弃过期采样任务 */
+  private gridSamplingToken = 0
+
+  /** 对应的分析结果ID（用于水位变化时更新同一条结果，而不是新增） */
+  private analysisResultId: string | null = null
 
   /** 预览实体 */
   private previewEntities: Cesium.Entity[] = []
@@ -183,8 +249,13 @@ export class FloodTool extends BaseTool {
     waterLevelStep: 1,
     waterColor: TOOL_COLORS.flood.fill,
     waterOpacity: 0.6,
+    showWaterWall: true,
+    waterWallOpacity: 0.35,
     enableAnimation: false,
-    animationSpeed: 100,
+    animationSpeed: 50,
+    riseRateMps: 0.5,
+    gridSpacingMeters: 50,
+    maxGridPoints: 20000,
   }
 
   constructor(viewer: Cesium.Viewer, options: FloodToolOptions = {}) {
@@ -201,14 +272,262 @@ export class FloodTool extends BaseTool {
     this.waterLevelStep = options.waterLevelStep ?? FloodTool.DEFAULTS.waterLevelStep
     this.waterColor = options.waterColor ?? FloodTool.DEFAULTS.waterColor
     this.waterOpacity = options.waterOpacity ?? FloodTool.DEFAULTS.waterOpacity
+    this.showWaterWall = options.showWaterWall ?? FloodTool.DEFAULTS.showWaterWall
+    this.waterWallOpacity = options.waterWallOpacity ?? FloodTool.DEFAULTS.waterWallOpacity
     this._enableAnimation = options.enableAnimation ?? FloodTool.DEFAULTS.enableAnimation
-    this.animationSpeed = options.animationSpeed ?? FloodTool.DEFAULTS.animationSpeed
+    this.animationTickMs = options.animationSpeed ?? FloodTool.DEFAULTS.animationSpeed
+    this.riseRateMps = options.riseRateMps ?? FloodTool.DEFAULTS.riseRateMps
+
+    this.gridSpacingMeters = options.gridSpacingMeters ?? FloodTool.DEFAULTS.gridSpacingMeters
+    this.maxGridPoints = options.maxGridPoints ?? FloodTool.DEFAULTS.maxGridPoints
 
     this.onWaterLevelChange = options.onWaterLevelChange
     this.onComplete = options.onComplete
     this.onCancel = options.onCancel
 
     this.tilesetService = new TilesetService(viewer)
+  }
+
+  private getGridStatus(): FloodAnalysisData['calculationStatus'] {
+    return (this.gridCache?.status ?? 'idle') as FloodAnalysisData['calculationStatus']
+  }
+
+  private getWaterLevelLimits(): { min: number; max: number } {
+    // polygon/terrain 模式下：水位应该跟着地形高程范围走，而不是固定 0-50。
+    const baseMin = this.dataSource?.minWaterLevel ?? 0
+    const baseMax = this.dataSource?.maxWaterLevel ?? 100
+
+    let minH: number | null = null
+    let maxH: number | null = null
+
+    if (this.gridCache?.status === 'ready') {
+      minH = this.gridCache.minTerrainHeight
+      maxH = this.gridCache.maxTerrainHeight
+    } else if (this.vertexMinHeight !== null && this.vertexMaxHeight !== null) {
+      minH = this.vertexMinHeight
+      maxH = this.vertexMaxHeight
+    }
+
+    if (minH !== null && maxH !== null && Number.isFinite(minH) && Number.isFinite(maxH)) {
+      const min = Math.floor(minH) - 5
+      const max = Math.ceil(maxH) + 50
+      // 确保包含当前值
+      return {
+        min: Math.min(min, this.currentWaterLevel),
+        max: Math.max(max, this.currentWaterLevel),
+      }
+    }
+
+    // 回退：仍用 dataSource 的 min/max，但也要覆盖当前水位
+    return {
+      min: Math.min(baseMin, this.currentWaterLevel),
+      max: Math.max(baseMax, this.currentWaterLevel),
+    }
+  }
+
+  private async prepareTerrainGridAsync(positions: Cesium.Cartesian3[]): Promise<void> {
+    // 只在 polygon/terrain 模式下启用网格采样。tileset 模式目前没有可靠地形支撑。
+    if (positions.length < 3) return
+    if (this.floodMode !== 'polygon' && this.floodMode !== 'terrain') return
+
+    const token = ++this.gridSamplingToken
+    this.gridCache = {
+      status: 'sampling',
+      requestedSpacing: this.gridSpacingMeters,
+      effectiveSpacing: this.gridSpacingMeters,
+      cellArea: this.gridSpacingMeters * this.gridSpacingMeters,
+      terrainHeights: [],
+      minTerrainHeight: Number.POSITIVE_INFINITY,
+      maxTerrainHeight: Number.NEGATIVE_INFINITY,
+    }
+
+    // 先把“正在计算”的状态写进结果（如果存在）
+    if (this.analysisResultId) {
+      const gisStore = useGISStore()
+      gisStore.updateAnalysisResult(this.analysisResultId, {
+        data: {
+          calculationMethod: 'terrain_grid',
+          calculationStatus: 'sampling',
+          gridSpacingMeters: this.gridSpacingMeters,
+        } as FloodAnalysisData,
+      })
+    }
+
+    try {
+      const grid = await this.sampleTerrainGridHeights(positions, this.gridSpacingMeters, this.maxGridPoints)
+      if (token !== this.gridSamplingToken) return
+
+      this.gridCache = {
+        status: 'ready',
+        requestedSpacing: this.gridSpacingMeters,
+        effectiveSpacing: grid.effectiveSpacing,
+        cellArea: grid.cellArea,
+        terrainHeights: grid.terrainHeights,
+        minTerrainHeight: grid.minTerrainHeight,
+        maxTerrainHeight: grid.maxTerrainHeight,
+      }
+
+      const result = this.calculateFloodResult()
+      this.onWaterLevelChange?.(this.currentWaterLevel, result)
+
+      if (this.analysisResultId) {
+        const gisStore = useGISStore()
+        gisStore.updateAnalysisResult(this.analysisResultId, {
+          data: {
+            waterLevel: this.currentWaterLevel,
+            floodArea: result.floodedArea,
+            floodVolume: result.floodedVolume,
+            mode: this.floodMode,
+            tilesetUrl: this.dataSource?.tilesetUrl,
+            calculationMethod: 'terrain_grid',
+            calculationStatus: 'ready',
+            gridSpacingMeters: this.gridCache.requestedSpacing,
+            effectiveGridSpacingMeters: this.gridCache.effectiveSpacing,
+            sampleCount: this.gridCache.terrainHeights.length,
+            cellArea: this.gridCache.cellArea,
+            minTerrainHeight: this.gridCache.minTerrainHeight,
+            maxTerrainHeight: this.gridCache.maxTerrainHeight,
+          } as FloodAnalysisData,
+        })
+      }
+    } catch (e) {
+      if (token !== this.gridSamplingToken) return
+      console.error('[FloodTool] Terrain grid sampling failed:', e)
+      if (this.gridCache) this.gridCache.status = 'failed'
+      if (this.analysisResultId) {
+        const gisStore = useGISStore()
+        gisStore.updateAnalysisResult(this.analysisResultId, {
+          data: {
+            calculationMethod: 'terrain_grid',
+            calculationStatus: 'failed',
+            gridSpacingMeters: this.gridSpacingMeters,
+          } as FloodAnalysisData,
+        })
+      }
+    }
+  }
+
+  private async sampleTerrainGridHeights(
+    polygonPositions: Cesium.Cartesian3[],
+    spacingMeters: number,
+    maxPoints: number
+  ): Promise<{
+    effectiveSpacing: number
+    cellArea: number
+    terrainHeights: number[]
+    minTerrainHeight: number
+    maxTerrainHeight: number
+  }> {
+    const ellipsoid = Cesium.Ellipsoid.WGS84
+    const center = Cesium.BoundingSphere.fromPoints(polygonPositions).center
+    const originOnSurface = ellipsoid.scaleToGeodeticSurface(center, new Cesium.Cartesian3())
+    const enu = Cesium.Transforms.eastNorthUpToFixedFrame(originOnSurface)
+    const invEnu = Cesium.Matrix4.inverseTransformation(enu, new Cesium.Matrix4())
+
+    const polygon2D: Array<{ x: number; y: number }> = polygonPositions.map((p) => {
+      const local = Cesium.Matrix4.multiplyByPoint(invEnu, p, new Cesium.Cartesian3())
+      return { x: local.x, y: local.y }
+    })
+
+    let minX = Number.POSITIVE_INFINITY
+    let minY = Number.POSITIVE_INFINITY
+    let maxX = Number.NEGATIVE_INFINITY
+    let maxY = Number.NEGATIVE_INFINITY
+    for (const p of polygon2D) {
+      minX = Math.min(minX, p.x)
+      minY = Math.min(minY, p.y)
+      maxX = Math.max(maxX, p.x)
+      maxY = Math.max(maxY, p.y)
+    }
+
+    const width = Math.max(0, maxX - minX)
+    const height = Math.max(0, maxY - minY)
+    if (width === 0 || height === 0) {
+      return {
+        effectiveSpacing: spacingMeters,
+        cellArea: spacingMeters * spacingMeters,
+        terrainHeights: [],
+        minTerrainHeight: 0,
+        maxTerrainHeight: 0,
+      }
+    }
+
+    // 估算点数并在必要时自动放大网格间距，避免采样过慢
+    const approxCount = Math.ceil(width / spacingMeters) * Math.ceil(height / spacingMeters)
+    const effectiveSpacing =
+      approxCount > maxPoints
+        ? spacingMeters * Math.sqrt(approxCount / Math.max(1, maxPoints))
+        : spacingMeters
+    const cellArea = effectiveSpacing * effectiveSpacing
+
+    const cartographics: Cesium.Cartographic[] = []
+    for (let x = minX; x <= maxX; x += effectiveSpacing) {
+      for (let y = minY; y <= maxY; y += effectiveSpacing) {
+        // cell center
+        const px = x + effectiveSpacing / 2
+        const py = y + effectiveSpacing / 2
+        if (!this.isPointInPolygon(px, py, polygon2D)) continue
+
+        const world = Cesium.Matrix4.multiplyByPoint(
+          enu,
+          new Cesium.Cartesian3(px, py, 0),
+          new Cesium.Cartesian3()
+        )
+        cartographics.push(Cesium.Cartographic.fromCartesian(world))
+
+        if (cartographics.length >= maxPoints) {
+          // 再保险：如果仍然超上限，提前截断
+          break
+        }
+      }
+      if (cartographics.length >= maxPoints) break
+    }
+
+    if (cartographics.length === 0) {
+      return {
+        effectiveSpacing,
+        cellArea,
+        terrainHeights: [],
+        minTerrainHeight: 0,
+        maxTerrainHeight: 0,
+      }
+    }
+
+    // 采样地形高度（MostDetailed 在无地形或低级 terrainProvider 下也会退化，但仍可用）
+    const updated = await Cesium.sampleTerrainMostDetailed(this.viewer.terrainProvider, cartographics)
+
+    const heights: number[] = []
+    let minH = Number.POSITIVE_INFINITY
+    let maxH = Number.NEGATIVE_INFINITY
+    for (const c of updated) {
+      const h = c.height ?? 0
+      heights.push(h)
+      minH = Math.min(minH, h)
+      maxH = Math.max(maxH, h)
+    }
+
+    return {
+      effectiveSpacing,
+      cellArea,
+      terrainHeights: heights,
+      minTerrainHeight: Number.isFinite(minH) ? minH : 0,
+      maxTerrainHeight: Number.isFinite(maxH) ? maxH : 0,
+    }
+  }
+
+  private isPointInPolygon(x: number, y: number, polygon: Array<{ x: number; y: number }>): boolean {
+    // Ray casting algorithm
+    let inside = false
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].x
+      const yi = polygon[i].y
+      const xj = polygon[j].x
+      const yj = polygon[j].y
+
+      const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi + 0.0) + xi
+      if (intersect) inside = !inside
+    }
+    return inside
   }
 
   protected setupEventHandlers(): void {
@@ -331,6 +650,31 @@ export class FloodTool extends BaseTool {
     // Hack: Store it in `previewEntities`? No, `previewEntities` are cleared on completion.
     // Let's assign it to a new property `waterOutlineEntity`.
     this.waterOutlineEntity = outlineEntity
+
+    // 可选：边界水墙（从地形抬到水位高度，增强“盛水”效果；纯视觉，不参与计算）
+    if (this.showWaterWall) {
+      const ring = [...positions, positions[0]]
+      const minimumHeights = ring.map((p) => Cesium.Cartographic.fromCartesian(p).height ?? 0)
+      const maximumHeights = ring.map(() => this.currentWaterLevel)
+
+      if (!this.waterWallEntity) {
+        this.waterWallEntity = this.viewer.entities.add({
+          wall: {
+            positions: ring,
+            minimumHeights,
+            maximumHeights,
+            material: Cesium.Color.fromCssColorString(this.waterColor).withAlpha(
+              Math.min(0.95, Math.max(0.05, this.waterWallOpacity))
+            ),
+          },
+        })
+      } else {
+        // 更新既有墙体
+        ;(this.waterWallEntity.wall as any).positions = ring
+        ;(this.waterWallEntity.wall as any).minimumHeights = minimumHeights
+        ;(this.waterWallEntity.wall as any).maximumHeights = maximumHeights
+      }
+    }
   }
 
   private waterOutlineEntity: Cesium.Entity | null = null
@@ -480,6 +824,18 @@ export class FloodTool extends BaseTool {
     // 3. 创建结果 (使用位置副本)
     const positionsCopy = [...this.polygonPositions]
 
+    // 3.1 自相交检测：自相交会导致面积/体积/渲染不稳定
+    const intersection = this.findSelfIntersection(positionsCopy)
+    if (intersection) {
+      const centroid = this.calculateCentroid(positionsCopy)
+      this.showTransientLabel('多边形存在自相交（例如“8”字形）。请调整顶点或重新绘制。', centroid, 4500)
+      console.warn('[FloodTool] Polygon self-intersection detected:', intersection)
+      // Reset drawing state so user can redraw
+      this.polygonPositions = []
+      this.completedPositions = []
+      return
+    }
+
     // 自动计算初始水位：取所有顶点的最小高度
     // 这样能确保画在山上的水面不会跑到地下
     const heights = positionsCopy.map(pos => {
@@ -489,6 +845,9 @@ export class FloodTool extends BaseTool {
     
     if (heights.length > 0) {
       const minHeight = Math.min(...heights)
+      const maxHeight = Math.max(...heights)
+      this.vertexMinHeight = minHeight
+      this.vertexMaxHeight = maxHeight
       // 如果计算出的高度比默认的大（说明是山上），则使用该高度
       // 同时也保留一定的向下容差，防止完全贴地导致 Z-fighting
       if (minHeight > this.currentWaterLevel) {
@@ -497,6 +856,9 @@ export class FloodTool extends BaseTool {
         console.log(`Auto-adjusted water level to ${this.currentWaterLevel}m based on terrain`)
       }
     }
+
+    // 保存已完成的位置用于后续计算
+    this.completedPositions = positionsCopy
 
     this.createTerrainFlood(positionsCopy)
 
@@ -522,7 +884,7 @@ export class FloodTool extends BaseTool {
        totalZ / positionsCopy.length
     )
 
-    gisStore.addAnalysisResult({
+    this.analysisResultId = gisStore.addAnalysisResult({
        type: 'flood',
        name: `淹没分析 #${gisStore.analysisResults.length + 1}`,
        data: {
@@ -531,13 +893,141 @@ export class FloodTool extends BaseTool {
          floodVolume: result.floodedVolume,
          mode: this.floodMode,
          tilesetUrl: this.dataSource?.tilesetUrl,
+        calculationMethod: 'terrain_grid',
+        calculationStatus: this.getGridStatus(),
+        gridSpacingMeters: this.gridSpacingMeters,
+        // 在网格采样完成前，先用顶点高程范围给 UI 一个合理的水位范围
+        minTerrainHeight: this.vertexMinHeight ?? undefined,
+        maxTerrainHeight: this.vertexMaxHeight ?? undefined,
        } as FloodAnalysisData,
        position: centroid,
     })
 
+    // 异步准备地形网格采样缓存（不阻塞 UI）。完成后会自动更新该条结果。
+    void this.prepareTerrainGridAsync(positionsCopy)
+
     // 5. 重置绘制状态，准备下一次绘制（或者保持结果显示）
     // 如果不清除 polygonPositions，handleMouseMove 会再次检测到有顶点从而重启预览
     this.polygonPositions = []
+  }
+
+  private calculateCentroid(positions: Cesium.Cartesian3[]): Cesium.Cartesian3 {
+    let totalX = 0
+    let totalY = 0
+    let totalZ = 0
+    for (const pos of positions) {
+      totalX += pos.x
+      totalY += pos.y
+      totalZ += pos.z
+    }
+    return new Cesium.Cartesian3(totalX / positions.length, totalY / positions.length, totalZ / positions.length)
+  }
+
+  private showTransientLabel(message: string, position: Cesium.Cartesian3, ttlMs = 3500): void {
+    try {
+      const entity = this.viewer.entities.add({
+        position,
+        label: {
+          text: message,
+          font: '14px "Noto Sans SC", sans-serif',
+          fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK.withAlpha(0.6),
+          outlineWidth: 2,
+          showBackground: true,
+          backgroundColor: Cesium.Color.fromCssColorString('#ef4444').withAlpha(0.88),
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -14),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      })
+      this.transientEntities.push(entity)
+      window.setTimeout(() => {
+        this.viewer.entities.remove(entity)
+        this.transientEntities = this.transientEntities.filter((e) => e !== entity)
+      }, ttlMs)
+    } catch (err) {
+      console.warn('[FloodTool] Failed to show transient label:', err)
+    }
+  }
+
+  /**
+   * Check polygon self-intersection in local ENU plane.
+   * Returns first intersection pair, or null if ok.
+   */
+  private findSelfIntersection(
+    positions: Cesium.Cartesian3[]
+  ): { edgeA: [number, number]; edgeB: [number, number] } | null {
+    const n = positions.length
+    if (n < 4) return null
+
+    const centroid = this.calculateCentroid(positions)
+    const enu = Cesium.Transforms.eastNorthUpToFixedFrame(centroid)
+    const invEnu = Cesium.Matrix4.inverseTransformation(enu, new Cesium.Matrix4())
+
+    const pts = positions.map((p) => {
+      const local = Cesium.Matrix4.multiplyByPoint(invEnu, p, new Cesium.Cartesian3())
+      return { x: local.x, y: local.y }
+    })
+
+    const eps = 1e-9
+    const orient = (a: any, b: any, c: any) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+    const onSegment = (a: any, b: any, c: any) => {
+      return (
+        Math.min(a.x, b.x) - eps <= c.x &&
+        c.x <= Math.max(a.x, b.x) + eps &&
+        Math.min(a.y, b.y) - eps <= c.y &&
+        c.y <= Math.max(a.y, b.y) + eps
+      )
+    }
+    const segIntersect = (p1: any, p2: any, q1: any, q2: any) => {
+      const o1 = orient(p1, p2, q1)
+      const o2 = orient(p1, p2, q2)
+      const o3 = orient(q1, q2, p1)
+      const o4 = orient(q1, q2, p2)
+
+      const s1 = Math.sign(o1)
+      const s2 = Math.sign(o2)
+      const s3 = Math.sign(o3)
+      const s4 = Math.sign(o4)
+
+      if (s1 !== 0 && s2 !== 0 && s3 !== 0 && s4 !== 0) {
+        return s1 !== s2 && s3 !== s4
+      }
+
+      if (Math.abs(o1) <= eps && onSegment(p1, p2, q1)) return true
+      if (Math.abs(o2) <= eps && onSegment(p1, p2, q2)) return true
+      if (Math.abs(o3) <= eps && onSegment(q1, q2, p1)) return true
+      if (Math.abs(o4) <= eps && onSegment(q1, q2, p2)) return true
+      return false
+    }
+
+    const edge = (i: number) => [i, (i + 1) % n] as [number, number]
+
+    for (let i = 0; i < n; i++) {
+      const [a1, a2] = edge(i)
+      const A1 = pts[a1]
+      const A2 = pts[a2]
+
+      for (let j = i + 1; j < n; j++) {
+        const [b1, b2] = edge(j)
+
+        // Skip adjacent edges and shared endpoints
+        const sharesVertex = a1 === b1 || a1 === b2 || a2 === b1 || a2 === b2
+        if (sharesVertex) continue
+        // Also skip first/last edge adjacency in closed polygon
+        if ((a1 === 0 && a2 === 1 && b1 === n - 1 && b2 === 0) || (b1 === 0 && b2 === 1 && a1 === n - 1 && a2 === 0)) {
+          continue
+        }
+
+        const B1 = pts[b1]
+        const B2 = pts[b2]
+        if (segIntersect(A1, A2, B1, B2)) {
+          return { edgeA: [a1, a2], edgeB: [b1, b2] }
+        }
+      }
+    }
+
+    return null
   }
 
   /**
@@ -561,6 +1051,18 @@ export class FloodTool extends BaseTool {
       ;(this.waterEntity.polygon.height as any) = level
     }
 
+    // 更新水墙高度
+    if (this.waterWallEntity?.wall) {
+      const positions = (this.waterWallEntity.wall.positions as any)?.getValue?.(Cesium.JulianDate.now?.())
+      // 若取不到 positions（常量属性），回退读 wall.positions 本体
+      const ring = (Array.isArray(positions) ? positions : (this.waterWallEntity.wall.positions as any)) as
+        | Cesium.Cartesian3[]
+        | undefined
+      if (ring && Array.isArray(ring) && ring.length > 0) {
+        ;(this.waterWallEntity.wall.maximumHeights as any) = ring.map(() => level)
+      }
+    }
+
     // 更新 Tileset 样式（如果使用 tileset 模式）
     if (this.waterTileset) {
       this.tilesetService.applyStyle(this.waterTileset, {
@@ -569,41 +1071,54 @@ export class FloodTool extends BaseTool {
       })
     }
 
-    const result = this.calculateFloodResult()
-    this.onWaterLevelChange?.(level, result)
+    // 面板/进度条要跟手：先让 Cesium 画面更新，再合并计算与 store 更新
+    this.scheduleRecomputeAndStoreUpdate()
+  }
 
-    // 添加/更新分析结果到store
-    if (this.dataSource?.positions && this.dataSource.positions.length > 0) {
-      const gisStore = useGISStore()
-      // 计算中心点
-      const positions = this.dataSource.positions
-      let totalX = 0,
-        totalY = 0,
-        totalZ = 0
-      for (const pos of positions) {
-        totalX += pos.x
-        totalY += pos.y
-        totalZ += pos.z
-      }
-      const centroid = new Cesium.Cartesian3(
-        totalX / positions.length,
-        totalY / positions.length,
-        totalZ / positions.length
-      )
-
-      gisStore.addAnalysisResult({
-        type: 'flood',
-        name: `淹没分析 #${gisStore.analysisResults.length + 1}`,
-        data: {
-          waterLevel: level,
-          floodArea: result.floodedArea,
-          floodVolume: result.floodedVolume,
-          mode: this.floodMode,
-          tilesetUrl: this.dataSource?.tilesetUrl,
-        } as FloodAnalysisData,
-        position: centroid,
-      })
+  private scheduleRecomputeAndStoreUpdate(): void {
+    if (this.pendingRecomputeTimer) {
+      window.clearTimeout(this.pendingRecomputeTimer)
+      this.pendingRecomputeTimer = null
     }
+
+    this.pendingRecomputeTimer = window.setTimeout(() => {
+      this.pendingRecomputeTimer = null
+
+      const level = this.currentWaterLevel
+      const result = this.calculateFloodResult()
+      this.onWaterLevelChange?.(level, result)
+
+      // 更新同一条分析结果（避免水位拖动时不断新增）
+      if (this.analysisResultId) {
+        const gisStore = useGISStore()
+        gisStore.updateAnalysisResult(this.analysisResultId, {
+          data: {
+            waterLevel: level,
+            floodArea: result.floodedArea,
+            floodVolume: result.floodedVolume,
+            mode: this.floodMode,
+            tilesetUrl: this.dataSource?.tilesetUrl,
+            calculationMethod: this.gridCache ? 'terrain_grid' : 'simple',
+            calculationStatus: this.getGridStatus(),
+            gridSpacingMeters: this.gridSpacingMeters,
+            effectiveGridSpacingMeters: this.gridCache?.effectiveSpacing,
+            sampleCount: this.gridCache?.terrainHeights.length,
+            cellArea: this.gridCache?.cellArea,
+            minTerrainHeight: this.gridCache?.minTerrainHeight ?? this.vertexMinHeight ?? undefined,
+            maxTerrainHeight: this.gridCache?.maxTerrainHeight ?? this.vertexMaxHeight ?? undefined,
+          } as FloodAnalysisData,
+        })
+      }
+    }, 0)
+  }
+
+  public setRiseRateMps(rate: number): void {
+    const next = Math.max(0.01, Math.min(20, rate))
+    this.riseRateMps = next
+  }
+
+  public getRiseRateMps(): number {
+    return this.riseRateMps
   }
 
   /**
@@ -617,7 +1132,7 @@ export class FloodTool extends BaseTool {
    * 增加水位
    */
   public raiseWaterLevel(): void {
-    const maxLevel = this.dataSource?.maxWaterLevel ?? 100
+    const maxLevel = this.getWaterLevelLimits().max
     const newLevel = Math.min(this.currentWaterLevel + this.waterLevelStep, maxLevel)
     this.setWaterLevel(newLevel)
   }
@@ -626,7 +1141,7 @@ export class FloodTool extends BaseTool {
    * 降低水位
    */
   public lowerWaterLevel(): void {
-    const minLevel = this.dataSource?.minWaterLevel ?? 0
+    const minLevel = this.getWaterLevelLimits().min
     const newLevel = Math.max(this.currentWaterLevel - this.waterLevelStep, minLevel)
     this.setWaterLevel(newLevel)
   }
@@ -637,24 +1152,32 @@ export class FloodTool extends BaseTool {
   public startAnimation(): void {
     if (this.animationTimer) return
 
+    this.lastAnimationTs = performance.now()
+
     this.animationTimer = window.setInterval(() => {
-      const minLevel = this.dataSource?.minWaterLevel ?? 0
-      const maxLevel = this.dataSource?.maxWaterLevel ?? 100
+      const now = performance.now()
+      const dtSec = Math.max(0, (now - this.lastAnimationTs) / 1000)
+      this.lastAnimationTs = now
+
+      const { min: minLevel, max: maxLevel } = this.getWaterLevelLimits()
+
+      const delta = this.riseRateMps * dtSec
+      if (!Number.isFinite(delta) || delta <= 0) return
 
       if (this.animationDirection === 1) {
         if (this.currentWaterLevel >= maxLevel) {
           this.animationDirection = -1
         } else {
-          this.raiseWaterLevel()
+          this.setWaterLevel(Math.min(maxLevel, this.currentWaterLevel + delta))
         }
       } else {
         if (this.currentWaterLevel <= minLevel) {
           this.animationDirection = 1
         } else {
-          this.lowerWaterLevel()
+          this.setWaterLevel(Math.max(minLevel, this.currentWaterLevel - delta))
         }
       }
-    }, this.animationSpeed)
+    }, this.animationTickMs)
   }
 
   /**
@@ -682,14 +1205,39 @@ export class FloodTool extends BaseTool {
    * 计算淹没分析结果
    */
   private calculateFloodResult(): FloodAnalysisResult {
-    // 简化计算 - 实际项目中应使用精确的 GIS 计算
     let floodedArea = 0
     let floodedVolume = 0
 
-    if (this.polygonPositions.length >= 3) {
-      // 使用多边形面积近似计算
-      floodedArea = this.calculatePolygonArea(this.polygonPositions)
-      floodedVolume = floodedArea * this.currentWaterLevel
+    // 优先使用已完成的多边形位置，其次使用绘制中的位置
+    const positions = this.completedPositions.length >= 3 
+      ? this.completedPositions 
+      : this.polygonPositions
+
+    if (positions.length >= 3) {
+      if (this.gridCache?.status === 'ready' && this.gridCache.terrainHeights.length > 0) {
+        const H = this.currentWaterLevel
+        const cellArea = this.gridCache.cellArea
+        let area = 0
+        let volume = 0
+        for (const h of this.gridCache.terrainHeights) {
+          const depth = Math.max(0, H - h)
+          if (depth > 0) {
+            area += cellArea
+            volume += depth * cellArea
+          }
+        }
+        floodedArea = area
+        floodedVolume = volume
+      } else {
+        // 回退：无网格缓存时用多边形面积近似（占位）
+        floodedArea = this.calculatePolygonArea(positions)
+        floodedVolume = floodedArea * this.currentWaterLevel
+      }
+    } else {
+      console.warn('[FloodTool] calculateFloodResult: Not enough positions', {
+        completedPositionsCount: this.completedPositions.length,
+        polygonPositionsCount: this.polygonPositions.length,
+      })
     }
 
     return {
@@ -701,28 +1249,29 @@ export class FloodTool extends BaseTool {
   }
 
   /**
-   * 计算多边形面积（简化版）
+   * 计算多边形面积（三角剖分法）
    */
   private calculatePolygonArea(positions: Cesium.Cartesian3[]): number {
     if (positions.length < 3) return 0
 
-    // 使用球面多边形面积公式
-    const coordinates = positions.map((pos) => {
-      const carto = Cesium.Cartographic.fromCartesian(pos)
-      return { lon: carto.longitude, lat: carto.latitude }
-    })
+    // 使用三角剖分法：以第一个点为原点，计算所有三角形面积之和
+    let totalArea = 0
+    const origin = positions[0]
 
-    const earthRadius = 6371000
-    let area = 0
+    for (let i = 1; i < positions.length - 1; i++) {
+      const p1 = positions[i]
+      const p2 = positions[i + 1]
 
-    for (let i = 0; i < coordinates.length; i++) {
-      const j = (i + 1) % coordinates.length
-      area +=
-        (coordinates[j].lon - coordinates[i].lon) *
-        (2 + Math.sin(coordinates[i].lat) + Math.sin(coordinates[j].lat))
+      // 计算三角形面积：使用向量叉积
+      const v1 = Cesium.Cartesian3.subtract(p1, origin, new Cesium.Cartesian3())
+      const v2 = Cesium.Cartesian3.subtract(p2, origin, new Cesium.Cartesian3())
+      const cross = Cesium.Cartesian3.cross(v1, v2, new Cesium.Cartesian3())
+      const triangleArea = Cesium.Cartesian3.magnitude(cross) / 2
+
+      totalArea += triangleArea
     }
 
-    return Math.abs((area * earthRadius * earthRadius) / 2)
+    return totalArea
   }
 
   /**
@@ -742,6 +1291,11 @@ export class FloodTool extends BaseTool {
     this.stopAnimation()
     this.clearPreview()
 
+    if (this.pendingRecomputeTimer) {
+      window.clearTimeout(this.pendingRecomputeTimer)
+      this.pendingRecomputeTimer = null
+    }
+
     if (this.waterEntity) {
       this.viewer.entities.remove(this.waterEntity)
       this.waterEntity = null
@@ -752,14 +1306,32 @@ export class FloodTool extends BaseTool {
       this.waterOutlineEntity = null
     }
 
+    if (this.waterWallEntity) {
+      this.viewer.entities.remove(this.waterWallEntity)
+      this.waterWallEntity = null
+    }
+
     if (this.waterTileset) {
       this.tilesetService.remove(this.waterTileset)
       this.waterTileset = null
     }
 
+    if (this.transientEntities.length > 0) {
+      for (const e of this.transientEntities) {
+        this.viewer.entities.remove(e)
+      }
+      this.transientEntities = []
+    }
+
     this.polygonPositions = []
+    this.completedPositions = []
+    this.analysisResultId = null
     this.cursorPosition = null
     this.currentWaterLevel = 0
+    this.gridCache = null
+    this.gridSamplingToken++
+    this.vertexMinHeight = null
+    this.vertexMaxHeight = null
   }
 
   /**

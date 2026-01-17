@@ -227,6 +227,22 @@ export const useGISStore = defineStore('gis', () => {
   const analysisResults = ref<AnalysisResult[]>([])
   const selectedResultId = ref<string | null>(null)
 
+  // ========== Flood Control (wired by GISLayer) ==========
+  type FloodController = {
+    setWaterLevel: (level: number) => void
+    raise: () => void
+    lower: () => void
+    toggleAnimation: () => void
+    setRiseRateMps: (mps: number) => void
+    getRiseRateMps: () => number
+  }
+
+  const floodController = shallowRef<FloodController | null>(null)
+
+  function setFloodController(controller: FloodController | null) {
+    floodController.value = controller
+  }
+
   // ========== Analysis Results (for UI Panel) ==========
 
   /** Current analysis result type */
@@ -1256,6 +1272,41 @@ export const useGISStore = defineStore('gis', () => {
   }
 
   /**
+   * Update an existing analysis result in-place.
+   * Useful for tools with live parameters (e.g., flood water level slider).
+   */
+  function updateAnalysisResult(
+    id: string,
+    patch: Partial<Omit<AnalysisResult, 'id' | 'timestamp'>>
+  ): void {
+    const target = analysisResults.value.find((r) => r.id === id)
+    if (!target) return
+
+    if (patch.name !== undefined) target.name = patch.name
+    if (patch.position !== undefined) target.position = patch.position
+    if (patch.customName !== undefined) target.customName = patch.customName
+    if (patch.notes !== undefined) target.notes = patch.notes
+    if (patch.tags !== undefined) target.tags = patch.tags
+    if (patch.type !== undefined) target.type = patch.type
+
+    if (patch.data !== undefined) {
+      // Prefer in-place merge to keep existing object references reactive.
+      if (
+        target.data &&
+        typeof target.data === 'object' &&
+        !Array.isArray(target.data) &&
+        patch.data &&
+        typeof patch.data === 'object' &&
+        !Array.isArray(patch.data)
+      ) {
+        Object.assign(target.data as any, patch.data as any)
+      } else {
+        ;(target as any).data = patch.data as any
+      }
+    }
+  }
+
+  /**
    * 移除分析结果
    */
   function removeAnalysisResult(id: string): void {
@@ -1363,10 +1414,19 @@ export const useGISStore = defineStore('gis', () => {
     // ========== Analysis Results ==========
     analysisResults,
     selectedResultId,
+    analysisResultType,
+    analysisResultData,
+    setAnalysisResult,
+    clearAnalysisResult,
     addAnalysisResult,
+    updateAnalysisResult,
     removeAnalysisResult,
     selectAnalysisResult,
     clearAllAnalysisResults,
+
+    // ========== Flood Control ==========
+    floodController,
+    setFloodController,
 
     // ========== Import/Export ==========
     exportGeoJSON,

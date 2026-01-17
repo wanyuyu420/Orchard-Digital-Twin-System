@@ -170,7 +170,8 @@ const filterState = reactive({
 })
 
 // Map type
-const mapType = ref('amap')
+// Default basemap: Tianditu imagery
+const mapType = ref('tdt_img')
 
 // Preset colors
 const presetColors = [
@@ -356,6 +357,8 @@ onMounted(() => {
 	// Wait for Cesium viewer to be ready
 	const initTimer = setInterval(() => {
 		if (initGlobeFilter()) {
+			// Apply default basemap once viewer & base layers are ready
+			selectBasemap(mapType.value)
 			clearInterval(initTimer)
 		}
 	}, 300)

@@ -904,6 +904,14 @@ function activateFloodTool(viewer: any) {
 	if (tool.activate()) {
 		currentTool.value = tool
 		floodTool.value = tool
+		gisStore.setFloodController({
+			setWaterLevel: (level: number) => tool.setWaterLevel(level),
+			raise: () => tool.raiseWaterLevel(),
+			lower: () => tool.lowerWaterLevel(),
+			toggleAnimation: () => tool.toggleAnimation(),
+			setRiseRateMps: (mps: number) => tool.setRiseRateMps(mps),
+			getRiseRateMps: () => tool.getRiseRateMps(),
+		})
 		gisStore.startDrawing()
 	} else {
 		gisStore.setTool(null)
@@ -922,7 +930,8 @@ function activateProfileTool(viewer: any) {
 		onComplete: (result: ProfileAnalysisResult) => {
 			console.log('Profile analysis complete:', result)
 			profileResult.value = result
-			// Result can be visualized via ProfileChart.vue component
+			// Note: ProfileTool itself already appends the result into gisStore.analysisResults.
+			// Chart should be opened on demand from the results list ("查看剖面图表").
 		},
 		onProgress: () => {
 			// Optional: update UI loading state

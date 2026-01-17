@@ -5,7 +5,7 @@
         <i class="fa-solid fa-route"></i>
         路径长度
       </span>
-      <span class="data-value">{{ formatDistance(data.totalDistance) }}</span>
+      <span class="data-value">{{ formatDistance(data.totalLength) }}</span>
     </div>
 
     <div class="data-grid">
