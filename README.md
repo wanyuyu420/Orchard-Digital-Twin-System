@@ -94,7 +94,10 @@ uvicorn app.main:app --reload --port 8000
 
 ```env
 VITE_TIANDITU_KEY=YOUR_TIANDITU_KEY
+VITE_CESIUM_ION_TOKEN=YOUR_CESIUM_ION_TOKEN
 ```
+
+> **注意**: Cesium Ion Token 用于加载全球地形等资源，请在 https://cesium.com/ion/tokens 免费申请。
 
 ### 后端 (.env)
 ```env

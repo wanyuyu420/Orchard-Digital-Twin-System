@@ -13,9 +13,8 @@ declare const Cesium: any
 
 // Cesium Ion Access Token (for World Terrain and other Ion assets)
 // Register at: https://cesium.com/ion/tokens
-const CESIUM_ION_TOKEN =
-  import.meta.env.VITE_CESIUM_ION_TOKEN ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI1MzU2ZjNiOS0yZjdhLTRhNjItOTA0Yi1kZjJkZWQ1M2M1MDgiLCJpZCI6MzcxMzczLCJpYXQiOjE3NjYyMTg0OTV9.Z4phXbo_PCMshtIfmyQj1kgXT5yDDFRZiylIFJxFMCQ'
+// Set VITE_CESIUM_ION_TOKEN in your .env.local file
+const CESIUM_ION_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN || ''
 
 // Set Ion default access token
 Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN

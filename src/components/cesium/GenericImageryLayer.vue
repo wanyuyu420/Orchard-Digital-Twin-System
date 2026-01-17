@@ -47,17 +47,41 @@ watch(
 
 function loadImagery() {
 	const viewer = cesiumStore.viewer
-	if (!viewer || !props.layer.url || imageryLayer.value) return
-
 	const config = props.layer.config || {}
 
-	try {
-		console.log(`[GenericImageryLayer] Loading ${props.layer.code} from ${props.layer.url}`)
+	// Must have either URL or built-in provider
+	const hasUrl = !!props.layer.url
+	const hasBuiltinProvider = ['bing_aerial', 'openstreetmap', 'arcgis'].includes(config.provider)
 
+	if (!viewer || (!hasUrl && !hasBuiltinProvider) || imageryLayer.value) return
+
+	try {
 		let provider: any
 
+		// Built-in providers (no URL required)
+		if (config.provider === 'bing_aerial') {
+			console.log(`[GenericImageryLayer] Loading ${props.layer.code} using Bing Maps Aerial`)
+			provider = new Cesium.BingMapsImageryProvider({
+				url: 'https://dev.virtualearth.net',
+				key: Cesium.BingMapsApi.defaultKey,
+				mapStyle: Cesium.BingMapsStyle.AERIAL,
+			})
+		}
+		else if (config.provider === 'openstreetmap') {
+			console.log(`[GenericImageryLayer] Loading ${props.layer.code} using OpenStreetMap`)
+			provider = new Cesium.OpenStreetMapImageryProvider({
+				url: 'https://tile.openstreetmap.org/',
+			})
+		}
+		else if (config.provider === 'arcgis') {
+			console.log(`[GenericImageryLayer] Loading ${props.layer.code} using ArcGIS World Imagery`)
+			provider = new Cesium.ArcGisMapServerImageryProvider({
+				url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer',
+			})
+		}
 		// TMS (DOM) style
-		if (config.provider === 'tms' || config.urlTemplate) {
+		else if (config.provider === 'tms' || config.urlTemplate) {
+			console.log(`[GenericImageryLayer] Loading ${props.layer.code} from ${props.layer.url}`)
 			const bounds = config.bounds || {}
 			provider = new Cesium.UrlTemplateImageryProvider({
 				url: config.urlTemplate || props.layer.url,
@@ -71,6 +95,7 @@ function loadImagery() {
 		}
 		// WMS style
 		else if (config.provider === 'wms') {
+			console.log(`[GenericImageryLayer] Loading ${props.layer.code} from ${props.layer.url}`)
 			provider = new Cesium.WebMapServiceImageryProvider({
 				url: props.layer.url,
 				layers: config.layers || '',
@@ -78,11 +103,16 @@ function loadImagery() {
 			})
 		}
 		// Default: URL template
-		else {
+		else if (props.layer.url) {
+			console.log(`[GenericImageryLayer] Loading ${props.layer.code} from ${props.layer.url}`)
 			provider = new Cesium.UrlTemplateImageryProvider({
 				url: props.layer.url,
 				maximumLevel: config.maximumLevel || 18,
 			})
+		}
+		else {
+			console.warn(`[GenericImageryLayer] No valid provider for ${props.layer.code}`)
+			return
 		}
 
 		// Add to viewer

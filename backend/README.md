@@ -84,11 +84,57 @@ dom/tiles/      # DOM 正射影像
 | 类别 | 端点 |
 |------|------|
 | 健康检查 | `GET /api/health` |
-| 水位 | `GET /api/water_levels` |
-| 雨量 | `GET /api/rainfall_data` |
-| 渗压 | `GET /api/pore_pressures` |
-| 应力 | `GET /api/stress_data` |
-| 设备 | `GET /api/iot_devices` |
-| 事件 | `GET /api/events` |
-| 统计 | `GET /api/stats` |
-| 告警 | `GET /api/warnings` |
+| 图层配置 | `GET /api/v1/layers` |
+| 水位 | `GET /api/v1/water_levels` |
+| 雨量 | `GET /api/v1/rainfall_data` |
+| 渗压 | `GET /api/v1/pore_pressures` |
+| 应力 | `GET /api/v1/stress_data` |
+| 设备 | `GET /api/v1/iot_devices` |
+| 事件 | `GET /api/v1/events` |
+| 统计 | `GET /api/v1/stats` |
+| 告警 | `GET /api/v1/warnings` |
+
+---
+
+## 图层管理
+
+图层配置存储在数据库 `gis_layers` 表中，首次启动时自动填充默认图层。
+
+### 默认图层
+
+| 图层代码 | 名称 | 类型 | 说明 |
+|---------|------|------|------|
+| `terrain_global` | 全球地形 | terrain | Cesium World Terrain |
+| `terrain_ellipsoid` | 无地形模式 | terrain | 椭球体（无地形） |
+
+### 添加自定义图层
+
+编辑 `scripts/seed_layers.py` 中的 `DEFAULT_LAYERS` 列表，然后删除 `demo.db` 重启服务。
+
+**支持的图层类型：**
+
+| layer_type | 说明 | 配置示例 |
+|------------|------|----------|
+| `terrain` | 地形数据 | `{"provider": "cesium_world_terrain"}` |
+| `imagery` | 正射影像 | `{"provider": "ion", "assetId": 12345}` |
+| `3dtiles` | 3D Tiles 模型 | `{"provider": "ion", "assetId": 12345}` 或 URL |
+| `api_point` | API 点位数据 | `{"mapping": {"lng": "lng", "lat": "lat"}}` |
+
+**示例 - 添加 Cesium Ion 3D Tiles：**
+
+```python
+{
+    "code": "my_model",
+    "name": "我的模型",
+    "group_name": "三维模型",
+    "layer_type": "3dtiles",
+    "url": None,
+    "is_visible": False,
+    "is_enabled": True,
+    "icon": "fa-solid fa-city",
+    "order": 10,
+    "config": {
+        "provider": "ion",
+        "assetId": 12345  # 替换为你的 Ion Asset ID
+    }
+}

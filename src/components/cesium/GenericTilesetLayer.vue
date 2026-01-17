@@ -59,23 +59,37 @@ watch(
 
 async function loadTileset() {
 	const viewer = cesiumStore.viewer
-	if (!viewer || !props.layer.url || tileset.value || isLoading.value) return
-
 	const config = props.layer.config || {}
+
+	// Must have either URL or Ion assetId
+	const hasUrl = !!props.layer.url
+	const hasIonAsset = config.provider === 'ion' && config.assetId
+
+	if (!viewer || (!hasUrl && !hasIonAsset) || tileset.value || isLoading.value) return
 
 	try {
 		isLoading.value = true
-		console.log(`[GenericTilesetLayer] Loading ${props.layer.code} from ${props.layer.url}`)
 
-		// Load the tileset
-		const loadedTileset = await Cesium.Cesium3DTileset.fromUrl(props.layer.url, {
-			maximumScreenSpaceError: 16,
-			maximumMemoryUsage: 512,
-			skipLevelOfDetail: true,
-			baseScreenSpaceError: 1024,
-			skipScreenSpaceErrorFactor: 16,
-			skipLevels: 1,
-		})
+		let loadedTileset: any
+
+		if (hasIonAsset) {
+			// Load from Cesium Ion asset
+			console.log(`[GenericTilesetLayer] Loading ${props.layer.code} from Ion asset ${config.assetId}`)
+			loadedTileset = await Cesium.Cesium3DTileset.fromIonAssetId(config.assetId, {
+				maximumScreenSpaceError: 16,
+			})
+		} else {
+			// Load from URL
+			console.log(`[GenericTilesetLayer] Loading ${props.layer.code} from ${props.layer.url}`)
+			loadedTileset = await Cesium.Cesium3DTileset.fromUrl(props.layer.url, {
+				maximumScreenSpaceError: 16,
+				maximumMemoryUsage: 512,
+				skipLevelOfDetail: true,
+				baseScreenSpaceError: 1024,
+				skipScreenSpaceErrorFactor: 16,
+				skipLevels: 1,
+			})
+		}
 
 		// Apply alignment if specified (for BIM models)
 		if (config.alignment) {
