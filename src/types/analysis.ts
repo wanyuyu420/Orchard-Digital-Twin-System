@@ -12,44 +12,6 @@ import type * as Cesium from 'cesium'
 export type AnalysisToolType = 'volume' | 'measure3d' | 'profile' | 'flood'
 
 /**
- * 方量两期差异：直方图 bin
- */
-export interface VolumeDiffHistogramBin {
-  start: number
-  end: number
-  center: number
-  count: number
-}
-
-/**
- * 方量两期差异：附加元信息
- */
-export interface VolumeTwoPhaseDiffMeta {
-  requestedSpacingMeters: number
-  effectiveSpacingMeters: number
-  cellArea: number
-  sampleCount: number
-  minDiff: number
-  maxDiff: number
-  meanDiff: number
-  histogram: VolumeDiffHistogramBin[]
-}
-
-/** 两期差异：单个基本单元（网格采样点）的变化信息（轻量版，便于展示/导出） */
-export interface VolumeTwoPhaseDiffSample {
-  /** 局部 ENU X（m），相对 AOI 中心 */
-  x: number
-  /** 局部 ENU Y（m），相对 AOI 中心 */
-  y: number
-  /** 二期 - 一期（m） */
-  diff: number
-  /** 一期高程（m） */
-  heightA: number
-  /** 二期高程（m） */
-  heightB: number
-}
-
-/**
  * 方量分析结果数据
  */
 export interface VolumeAnalysisData {
@@ -69,18 +31,6 @@ export interface VolumeAnalysisData {
   minHeight: number
   /** 基准高程 (米) */
   baseHeight: number
-
-  /** 计算模式（向后兼容：不填默认为 single） */
-  diffMode?: 'single' | 'two_phase'
-  /** 净方量（填-挖，立方米；two_phase 时更有意义） */
-  netVolume?: number
-  /** 绝对方量（填+挖，立方米；two_phase 时更有意义） */
-  absVolume?: number
-  /** 两期差异元数据（仅在 two_phase 模式下提供） */
-  diff?: VolumeTwoPhaseDiffMeta
-
-  /** 两期差异采样点（可选：用于投影图/导出；可能较大） */
-  diffSamples?: VolumeTwoPhaseDiffSample[]
 
   /** AOI 元信息（用于结果展示/导出，不参与计算） */
   aoi?: {

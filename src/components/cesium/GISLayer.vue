@@ -1040,12 +1040,29 @@ function createGraphicFromFeature(feature: Feature, viewer: any) {
 					return null
 				}
 				// CircleGraphic.create() expects [center, edgePoint]
-				// Calculate edge point from center + radius
+				// Calculate edge point from center + radius using geodesic
 				const centerPos = positions[0]
 				const centerCarto = Cesium.Cartographic.fromCartesian(centerPos)
+
+				// Use EllipsoidGeodesic to calculate accurate edge point
+				const destinationCarto = new Cesium.Cartographic(
+					centerCarto.longitude,
+					centerCarto.latitude
+				)
+				// Move east by radius meters using geodesic calculation
+				const geodesic = new Cesium.EllipsoidGeodesic(
+					centerCarto,
+					new Cesium.Cartographic(
+						centerCarto.longitude + 0.01, // small offset east
+						centerCarto.latitude
+					)
+				)
+				// Scale to get actual edge point at correct distance
+				const fraction = feature.radius / geodesic.surfaceDistance
+				const edgeCarto = geodesic.interpolateUsingSurfaceDistance(feature.radius)
 				const edgePos = Cesium.Cartesian3.fromRadians(
-					centerCarto.longitude + feature.radius / 6378137, // approximate
-					centerCarto.latitude,
+					edgeCarto.longitude,
+					edgeCarto.latitude,
 					centerCarto.height
 				)
 				const circlePositions = [centerPos, edgePos]

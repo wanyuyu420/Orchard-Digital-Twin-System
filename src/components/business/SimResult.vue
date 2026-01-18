@@ -6,27 +6,6 @@
 			<span>加载数据中...</span>
 		</div>
 
-		<!-- HEC-RAS Results -->
-		<div v-else-if="state.engine === 'hec-ras'">
-			<!-- KB Scenario: Water Level vs Flow Chart -->
-			<div class="chart-section">
-				<HecRasStatsChart :data="store.hecRasStats" :currentFrame="currentFrame"
-					:title="store.selectedHecRasScenario?.code === 'kb' ? '水位 (m) vs 出库流量 (m³/s)' : '河道体积 (万m³)'"
-					height="180px" />
-			</div>
-
-			<!-- KB Scenario: Cumulative Outflow Chart -->
-			<div v-if="store.selectedHecRasScenario?.code === 'kb' && store.hecRasOutflow?.length > 0"
-				class="chart-section mt-3">
-				<HecRasStatsChart :data="outflowMetricData" :currentFrame="currentFrame" title="累计出库量 (万m³)" height="150px" />
-			</div>
-
-			<div class="mt-4">
-				<HecRasMetricCard :data="store.hecRasStats" :currentFrame="currentFrame"
-					:scenarioType="store.selectedHecRasScenario?.code as 'kb' | 'flow' || 'kb'" />
-			</div>
-		</div>
-
 		<!-- Flood/Hydro Results -->
 		<div v-else-if="state.engine === 'flood' || state.engine === 'hydro'">
 			<div class="result-metric text-alert-red font-mono">
@@ -101,32 +80,9 @@ import { storeToRefs } from 'pinia'
 import { useSimulationStore } from '@/stores/simulation'
 import GlassPanel from '@/components/common/GlassPanel.vue'
 import { FloodProgressChart, DisplacementTrendChart } from '@/components/charts'
-import HecRasStatsChart from '@/components/charts/HecRasStatsChart.vue'
-import HecRasMetricCard from '@/components/business/HecRasMetricCard.vue'
 
 const store = useSimulationStore()
 const { state } = storeToRefs(store)
-
-// Calculate current frame index from progress for HEC-RAS
-const currentFrame = computed(() => {
-	const totalFrames = store.hecRasStats?.length || 1
-	const progress = state.value.progress
-	return Math.floor((progress / 100) * Math.max(0, totalFrames - 1))
-})
-
-// Outflow data with unit conversion (Acre-Feet to 万m³)
-const ACRE_FEET_TO_10K_M3 = 0.123348
-const outflowMetricData = computed(() => {
-	return store.hecRasOutflow.map((item: any) => {
-		const newItem = { ...item }
-		const keys = Object.keys(item).filter(k => k !== 'time' && k !== 'id')
-		const volumeKey = keys[0]
-		if (volumeKey) {
-			newItem[volumeKey] = (item[volumeKey] || 0) * ACRE_FEET_TO_10K_M3
-		}
-		return newItem
-	})
-})
 
 function formatProgress(progress: number): string {
 	const hours = Math.floor((progress / 100) * 24)

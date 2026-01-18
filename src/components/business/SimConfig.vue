@@ -4,26 +4,10 @@
 		<div class="form-group">
 			<label class="form-label">模型引擎</label>
 			<select class="form-select" :value="state.engine" @change="onEngineChange">
-				<option value="flood">HEC-RAS (洪水演进)</option>
+				<option value="flood">洪水演进</option>
 				<option value="hydro">MIKE Hydro (流域水动力)</option>
 				<option value="dam">HST-Stat (大坝位移回归)</option>
-				<option value="hec-ras">HEC-RAS (时序帧动画)</option>
 			</select>
-		</div>
-
-		<!-- HEC-RAS Scenario Select -->
-		<div v-if="state.engine === 'hec-ras'" class="form-group">
-			<label class="form-label">仿真场景</label>
-			<select class="form-select" :value="store.selectedHecRasId" @change="onHecRasScenarioChange">
-				<option v-for="scenario in store.hecRasScenarios" :key="scenario.id" :value="scenario.id">
-					{{ scenario.name }} ({{ scenario.totalFrames }}帧)
-				</option>
-			</select>
-			<div v-if="store.selectedHecRasScenario" class="event-info">
-				<span class="event-tag level-blue">HEC-RAS</span>
-				<span class="event-region">{{ store.selectedHecRasScenario.description || store.selectedHecRasScenario.code
-				}}</span>
-			</div>
 		</div>
 
 		<!-- Flood Event Select (for flood/hydro engines) -->
@@ -67,9 +51,7 @@
 			<input type="number" class="form-input" v-model.number="state.agingFactor" step="0.001" />
 		</div>
 
-		<!-- HEC-RAS has no additional input forms - just playback control -->
-
-		<button class="btn-primary mt-4" :disabled="store.isLoading" v-if="state.engine !== 'hec-ras'">
+		<button class="btn-primary mt-4" :disabled="store.isLoading">
 			<i class="fa-solid" :class="store.isLoading ? 'fa-spinner fa-spin' : 'fa-play'"></i>
 			{{ store.isLoading ? '加载中...' : '开始计算' }}
 		</button>
@@ -77,7 +59,6 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useSimulationStore } from '@/stores/simulation'
 import GlassPanel from '@/components/common/GlassPanel.vue'
@@ -91,23 +72,11 @@ function onEngineChange(e: Event) {
 	const engine = target.value as SimEngine
 	store.setEngine(engine)
 
-	// Fetch HEC-RAS scenarios when switching to hec-ras engine
-	if (engine === 'hec-ras') {
-		store.fetchHecRasScenarios()
-	}
 }
 
 function onEventChange(e: Event) {
 	const target = e.target as HTMLSelectElement
 	store.selectEvent(target.value)
-}
-
-function onHecRasScenarioChange(e: Event) {
-	const target = e.target as HTMLSelectElement
-	const id = parseInt(target.value, 10)
-	if (!isNaN(id)) {
-		store.selectHecRasScenario(id)
-	}
 }
 
 function severityLabel(severity: string): string {
@@ -118,13 +87,6 @@ function severityLabel(severity: string): string {
 	}
 	return labels[severity] || severity
 }
-
-// Fetch HEC-RAS scenarios on mount if engine is already hec-ras
-onMounted(() => {
-	if (state.value.engine === 'hec-ras') {
-		store.fetchHecRasScenarios()
-	}
-})
 </script>
 
 <style scoped lang="scss">

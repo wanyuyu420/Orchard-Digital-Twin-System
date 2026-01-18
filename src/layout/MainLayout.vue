@@ -16,10 +16,6 @@
 			:model-value="(gisStore.analysisResultData as any)?.waterLevel ?? 0" :data="gisStore.analysisResultData"
 			@close="gisStore.clearAnalysisResult()" />
 
-		<!-- Volume diff chart (two-phase development fixture) -->
-		<VolumeDiffChart v-if="gisStore.analysisResultType === 'volume' && !!gisStore.analysisResultData"
-			:data="gisStore.analysisResultData" @close="gisStore.clearAnalysisResult()" />
-
 		<!-- Dynamic Layers (data-driven: 3D Tiles, Point Data, etc.) -->
 		<DynamicLayerRenderer />
 
@@ -44,7 +40,6 @@ import DynamicLayerRenderer from '@/components/cesium/DynamicLayerRenderer.vue'
 import BottomDock from '@/layout/BottomDock.vue'
 import ProfileChart from '@/components/cesium/ProfileChart.vue'
 import FloodControlPanel from '@/components/cesium/FloodControlPanel.vue'
-import VolumeDiffChart from '@/components/cesium/VolumeDiffChart.vue'
 import { useGISStore } from '@/stores/gis'
 import type { ProfileAnalysisResult } from '@/cesium/gis/tools/ProfileTool'
 

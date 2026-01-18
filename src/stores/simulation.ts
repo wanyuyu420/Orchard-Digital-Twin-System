@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { SimulationState, SimEngine, HecRasScenarioListItem, HecRasScenarioConfig } from '@/types/simulation'
+import type { SimulationState, SimEngine } from '@/types/simulation'
 import {
   getFloodEvents,
   getModelProducts,
@@ -208,84 +208,6 @@ export const useSimulationStore = defineStore('simulation', () => {
     currentFloodArea.value = area
   }
 
-  // ============ HEC-RAS State ============
-
-  const hecRasScenarios = ref<HecRasScenarioListItem[]>([])
-  const selectedHecRasId = ref<number | null>(null)
-  const hecRasStats = ref<any[]>([])
-  const selectedHecRasScenario = ref<HecRasScenarioConfig | null>(null)
-
-  // Fetch HEC-RAS scenarios from API
-  async function fetchHecRasScenarios() {
-    try {
-      const response = await fetch('/api/v1/hec-ras/scenarios')
-      if (!response.ok) throw new Error('Failed to fetch HEC-RAS scenarios')
-      hecRasScenarios.value = await response.json()
-      
-      // Auto-select first scenario if none selected, and load its stats
-      if (hecRasScenarios.value.length > 0 && !selectedHecRasId.value) {
-        const firstId = hecRasScenarios.value[0].id
-        selectedHecRasId.value = firstId
-        await loadHecRasStats(firstId)
-      }
-    } catch (err) {
-      console.error('Failed to fetch HEC-RAS scenarios:', err)
-    }
-  }
-
-  // Load HEC-RAS stats for a scenario
-  const hecRasOutflow = ref<any[]>([])
-  
-  async function loadHecRasStats(scenarioId: number) {
-    // Clear previous data immediately to prevent stale data display
-    hecRasStats.value = []
-    hecRasOutflow.value = []
-    
-    try {
-      // First get scenario details
-      const response = await fetch(`/api/v1/hec-ras/scenarios/${scenarioId}`)
-      if (!response.ok) throw new Error('Failed to fetch scenario details')
-      
-      const scenario = await response.json()
-      selectedHecRasScenario.value = scenario
-      
-      // Then load stats JSON
-      if (scenario.stats_path) {
-        const statsResponse = await fetch(scenario.stats_path)
-        if (statsResponse.ok) {
-          const statsData = await statsResponse.json()
-          hecRasStats.value = statsData.data || statsData || []
-        }
-      }
-      
-      // Load outflow.json for KB scenario (cumulative outflow)
-      if (scenario.code === 'kb') {
-        const outflowPath = scenario.stats_path.replace('stats.json', 'outflow.json')
-        try {
-          const outflowResponse = await fetch(outflowPath)
-          if (outflowResponse.ok) {
-            const outflowData = await outflowResponse.json()
-            hecRasOutflow.value = outflowData.data || outflowData || []
-          }
-        } catch (e) {
-          console.warn('Outflow data not available')
-        }
-      } else {
-        hecRasOutflow.value = []
-      }
-    } catch (err) {
-      console.error('Failed to load HEC-RAS stats:', err)
-    }
-  }
-
-  // Select HEC-RAS scenario
-  function selectHecRasScenario(id: number) {
-    selectedHecRasId.value = id
-    loadHecRasStats(id)
-    // Reset progress when switching scenarios
-    state.value.progress = 0
-  }
-
   return {
     state,
     floodEvents,
@@ -302,15 +224,6 @@ export const useSimulationStore = defineStore('simulation', () => {
     togglePlay,
     setProgress,
     setFloodArea,
-    // HEC-RAS
-    hecRasScenarios,
-    selectedHecRasId,
-    hecRasStats,
-    hecRasOutflow,
-    selectedHecRasScenario,
-    fetchHecRasScenarios,
-    loadHecRasStats,
-    selectHecRasScenario,
   }
 })
 

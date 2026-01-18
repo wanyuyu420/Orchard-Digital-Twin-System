@@ -3,13 +3,6 @@
 		<!-- Flood Visualization Layer (rendered when engine is flood/hydro) -->
 		<FloodLayer v-if="isFloodEngine" />
 
-		<!-- HEC-RAS Visualization Layer -->
-		<HecRasLayer v-if="isHecRasEngine" />
-		<MapLegend v-if="isHecRasEngine && simulationStore.selectedHecRasScenario"
-			:title="simulationStore.selectedHecRasScenario.legend?.title || '水深范围 (m)'"
-			:minDepth="simulationStore.selectedHecRasScenario.legend?.min || 0"
-			:maxDepth="simulationStore.selectedHecRasScenario.legend?.max || 5" position="bottom-left" />
-
 		<!-- Left Sidebar: Config -->
 		<transition name="sidebar-left">
 			<aside v-show="!isUiHidden" class="sidebar left">
@@ -63,8 +56,6 @@ import VolumeResultContent from '@/components/cesium/results/VolumeResultContent
 import Measure3DResultContent from '@/components/cesium/results/Measure3DResultContent.vue'
 import ProfileResultContent from '@/components/cesium/results/ProfileResultContent.vue'
 import FloodResultContent from '@/components/cesium/results/FloodResultContent.vue'
-import HecRasLayer from '@/components/cesium/HecRasLayer.vue'
-import MapLegend from '@/components/common/MapLegend.vue'
 
 const appStore = useAppStore()
 const simulationStore = useSimulationStore()
@@ -75,11 +66,6 @@ const isUiHidden = computed(() => appStore.isUiHidden)
 const isFloodEngine = computed(() => {
 	const engine = simulationStore.state.engine
 	return engine === 'flood' || engine === 'hydro'
-})
-
-// Show HEC-RAS layer when engine is hec-ras
-const isHecRasEngine = computed(() => {
-	return simulationStore.state.engine === 'hec-ras'
 })
 
 onMounted(() => {

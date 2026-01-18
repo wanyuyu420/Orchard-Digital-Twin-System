@@ -15,6 +15,9 @@
  * - Frame changes update state variables, Cesium reads on each render cycle
  *
  * This approach eliminates flickering caused by entity recreation.
+ *
+ * Demo Mode: When no backend data available, displays a dynamic test polygon
+ * that grows/shrinks based on timeline progress.
  */
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
@@ -45,6 +48,9 @@ const error = ref<string | null>(null)
 const scenario = ref<FloodScenarioDetail | null>(null)
 const currentFrame = ref<FloodFrame | null>(null)
 
+// Demo mode flag
+const isDemoMode = ref(false)
+
 // Module-level state for CallbackProperty (not Vue reactive - used by Cesium callbacks)
 // These are updated by Vue watchers and read by Cesium on each frame
 let currentHierarchy: any = null // Cesium.PolygonHierarchy
@@ -55,6 +61,73 @@ let currentBoundaryPositions: any = null // Cesium.Cartesian3[]
 let floodEntity: any = null
 let boundaryEntity: any = null
 let entitiesInitialized = false
+
+// ============ Demo Mode Configuration ============
+// Test location: 乌鲁木齐水库区域 (Urumqi Reservoir Area)
+const DEMO_CENTER = { lng: 87.35, lat: 43.75 }
+const DEMO_FLY_HEIGHT = 15000 // 15km
+
+/**
+ * Generate dynamic polygon vertices based on progress (0-100)
+ * Creates a polygon that expands from center as progress increases
+ */
+const generateDemoPolygon = (progress: number): number[] => {
+  const centerLng = DEMO_CENTER.lng
+  const centerLat = DEMO_CENTER.lat
+
+  // Base radius increases with progress (0.01 to 0.08 degrees, roughly 1-8km)
+  const baseRadius = 0.01 + (progress / 100) * 0.07
+
+  // Generate irregular polygon with 8 vertices
+  const vertices: number[] = []
+  const numPoints = 8
+
+  for (let i = 0; i < numPoints; i++) {
+    const angle = (i / numPoints) * 2 * Math.PI
+    // Add some variation to make it look natural
+    const variation = 0.7 + Math.sin(angle * 3 + progress * 0.1) * 0.3
+    const radius = baseRadius * variation
+
+    const lng = centerLng + radius * Math.cos(angle) * 1.5 // Stretch horizontally
+    const lat = centerLat + radius * Math.sin(angle)
+
+    vertices.push(lng, lat)
+  }
+
+  return vertices
+}
+
+/**
+ * Update demo polygon based on progress
+ */
+const updateDemoPolygon = (progress: number) => {
+  const positions = generateDemoPolygon(progress)
+  const cartesianPositions = Cesium.Cartesian3.fromDegreesArray(positions)
+
+  // Update polygon hierarchy
+  currentHierarchy = new Cesium.PolygonHierarchy(cartesianPositions)
+
+  // Update color - deeper blue as progress increases
+  const intensity = progress / 100
+  const alpha = 0.4 + intensity * 0.3 // 0.4 to 0.7
+  currentColor = Cesium.Color.fromBytes(
+    30,  // R
+    100 + Math.floor(intensity * 55), // G: 100-155
+    255, // B
+    Math.floor(alpha * 255)
+  )
+
+  // Update boundary positions (closed ring)
+  const closed = [...cartesianPositions]
+  if (cartesianPositions.length > 0) {
+    closed.push(cartesianPositions[0].clone())
+  }
+  currentBoundaryPositions = closed
+
+  // Update simulated flood area (km²)
+  const areaKm2 = 0.5 + (progress / 100) * 25 // 0.5 to 25.5 km²
+  simulationStore.setFloodArea(areaKm2)
+}
 
 /**
  * Compute water color based on water level
@@ -274,18 +347,42 @@ const loadScenario = async (id: number) => {
 }
 
 /**
- * Load default scenario (first available)
+ * Load default scenario (first available) or enter demo mode
  */
 const loadDefaultScenario = async () => {
   try {
     const scenarios = await getFloodScenarios()
     if (scenarios.length > 0) {
       await loadScenario(scenarios[0].id)
+    } else {
+      // No scenarios available - enter demo mode
+      console.log('[FloodLayer] No scenarios available, entering demo mode')
+      await enterDemoMode()
     }
   } catch (e) {
-    console.error('[FloodLayer] Failed to load scenarios:', e)
-    error.value = '加载洪水场景列表失败'
+    console.error('[FloodLayer] Failed to load scenarios, entering demo mode:', e)
+    // API failed - enter demo mode
+    await enterDemoMode()
   }
+}
+
+/**
+ * Enter demo mode with test dynamic polygon
+ */
+const enterDemoMode = async () => {
+  isDemoMode.value = true
+  error.value = null
+
+  // Initialize entities for demo mode
+  await initializeEntities()
+
+  // Set initial demo polygon
+  updateDemoPolygon(simState.value.progress)
+
+  // Fly to demo location
+  cesiumStore.flyTo(DEMO_CENTER.lng, DEMO_CENTER.lat, DEMO_FLY_HEIGHT, 2)
+
+  console.log('[FloodLayer] Demo mode activated - dynamic polygon ready')
 }
 
 /**
@@ -333,6 +430,12 @@ const fetchInterpolatedFrame = async (progress: number) => {
 watch(
   () => simState.value.progress,
   (progress) => {
+    // Demo mode: update polygon directly without API call
+    if (isDemoMode.value) {
+      updateDemoPolygon(progress)
+      return
+    }
+
     if (!scenario.value) return
 
     const now = Date.now()

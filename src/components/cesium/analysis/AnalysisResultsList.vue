@@ -30,10 +30,6 @@
 
 				<!-- 操作按钮 -->
 				<div class="result-actions">
-					<button v-if="result.type === 'volume'" @click.stop="handleViewVolumeDiffChart(result)" title="查看差异图表"
-						class="chart-btn">
-						<i class="fa-solid fa-chart-column"></i>
-					</button>
 					<button v-if="result.type === 'flood'" @click.stop="handleViewFloodPanel(result)" title="调节水位"
 						class="chart-btn flood-btn">
 						<i class="fa-solid fa-sliders"></i>
@@ -135,12 +131,6 @@ function handleSelect(id: string): void {
 function handleViewFloodPanel(result: AnalysisResult): void {
 	if (result.type !== 'flood') return
 	gisStore.setAnalysisResult('flood', result.data)
-}
-
-function handleViewVolumeDiffChart(result: AnalysisResult): void {
-	if (result.type !== 'volume') return
-	// 通过 store 的 overlay 状态驱动 VolumeDiffChart 显示
-	gisStore.setAnalysisResult('volume', result.data)
 }
 
 // 定位到结果

@@ -663,18 +663,18 @@ export class DrawTool extends BaseTool {
       this.getHeight(center)
     )
 
-    // 使用 CallbackProperty 动态计算半径
+    // 使用 CallbackProperty 动态计算半径 (大地测量距离)
     const previewCircle = this.viewer.entities.add({
       position: centerCartesian,
       ellipse: {
         semiMajorAxis: new Cesium.CallbackProperty(() => {
           return this.drawCursorPosition
-            ? Cesium.Cartesian3.distance(centerCartesian, this.drawCursorPosition)
+            ? this.calculateGeodesicDistance(centerCartesian, this.drawCursorPosition)
             : 0
         }, false),
         semiMinorAxis: new Cesium.CallbackProperty(() => {
           return this.drawCursorPosition
-            ? Cesium.Cartesian3.distance(centerCartesian, this.drawCursorPosition)
+            ? this.calculateGeodesicDistance(centerCartesian, this.drawCursorPosition)
             : 0
         }, false),
         material: Cesium.Color.fromCssColorString(this.style.fillColor).withAlpha(
@@ -697,7 +697,7 @@ export class DrawTool extends BaseTool {
       label: {
         text: new Cesium.CallbackProperty(() => {
           if (!this.drawCursorPosition) return ''
-          const radius = Cesium.Cartesian3.distance(centerCartesian, this.drawCursorPosition)
+          const radius = this.calculateGeodesicDistance(centerCartesian, this.drawCursorPosition)
           const area = Math.PI * radius * radius
           return `半径: ${this.formatLength(radius)}\n面积: ${this.formatArea(area)}`
         }, false),
@@ -713,6 +713,17 @@ export class DrawTool extends BaseTool {
       },
     })
     this.previewEntities.push(radiusLabel)
+  }
+
+  /**
+   * 计算大地测量距离 (与 CircleGraphic 一致)
+   */
+  private calculateGeodesicDistance(p1: Cesium.Cartesian3, p2: Cesium.Cartesian3): number {
+    const ellipsoid = this.viewer.scene.globe.ellipsoid
+    const carto1 = ellipsoid.cartesianToCartographic(p1)
+    const carto2 = ellipsoid.cartesianToCartographic(p2)
+    const geodesic = new Cesium.EllipsoidGeodesic(carto1, carto2)
+    return geodesic.surfaceDistance
   }
 
   /**
@@ -889,13 +900,13 @@ export class DrawTool extends BaseTool {
     const center = this.vertices[0]
     // const cursorCoord = this.cartesianToCoordinate(this.drawCursorPosition) // Unused
 
-    // Calculate radius using geodesic distance
+    // Calculate radius using geodesic distance (与预览一致)
     const centerCartesian = Cesium.Cartesian3.fromDegrees(
       center.longitude,
       center.latitude,
       this.getHeight(center)
     )
-    const radius = Cesium.Cartesian3.distance(centerCartesian, this.drawCursorPosition)
+    const radius = this.calculateGeodesicDistance(centerCartesian, this.drawCursorPosition)
 
     const feature: Feature = {
       id: this.generateId(),

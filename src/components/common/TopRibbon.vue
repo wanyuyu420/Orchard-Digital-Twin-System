@@ -170,8 +170,8 @@ const filterState = reactive({
 })
 
 // Map type
-// Default basemap: Tianditu imagery
-const mapType = ref('tdt_img')
+// Default basemap: AutoNavi (Gaode)
+const mapType = ref('amap')
 
 // Preset colors
 const presetColors = [

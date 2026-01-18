@@ -28,14 +28,9 @@ function togglePlay() {
 	store.togglePlay()
 }
 
-// Calculate total hours based on frame count (assume 10min per frame for HEC-RAS)
+// Calculate total hours (default 24 for all engines)
 const totalHours = computed(() => {
-	if (state.value.engine === 'hec-ras') {
-		const frameCount = store.hecRasStats?.length || 1
-		// Approximate: each frame represents ~10 minutes
-		return Math.max(1, Math.ceil((frameCount * 10) / 60))
-	}
-	return 24 // Default for other engines
+	return 24
 })
 
 function formatTime(progress: number) {

@@ -383,7 +383,9 @@
 
 			<!-- Tab 4: Analysis Results -->
 			<div v-show="activeTab === 'analysis'" class="analysis-panel">
-				<AnalysisResultsList />
+				<div class="analysis-scroll-content">
+					<AnalysisResultsList />
+				</div>
 			</div>
 		</div>
 	</GlassPanel>
@@ -1361,6 +1363,23 @@ function clearAllFeatures() {
 onMounted(async () => {
 	// Fetch layer configuration from backend
 	await layerStore.fetchLayers()
+
+	// Apply terrain for any initially visible terrain layers
+	const visibleTerrainLayers = layerStore.layers.filter(
+		l => l.layer_type === 'terrain' && layerStore.isLayerActive(l.id)
+	)
+	if (visibleTerrainLayers.length > 0) {
+		// Wait for Cesium viewer to be ready
+		const waitForViewer = setInterval(async () => {
+			if (cesiumStore.viewer) {
+				clearInterval(waitForViewer)
+				// Apply the first visible terrain layer
+				await applyTerrain(visibleTerrainLayers[0], true)
+			}
+		}, 100)
+		// Timeout after 5 seconds
+		setTimeout(() => clearInterval(waitForViewer), 5000)
+	}
 })
 </script>
 
@@ -1526,6 +1545,21 @@ onMounted(async () => {
 	overflow-y: auto;
 	@include custom-scrollbar;
 	padding-bottom: 10px;
+}
+
+// Analysis Panel
+.analysis-panel {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	overflow: hidden;
+}
+
+.analysis-scroll-content {
+	flex: 1;
+	overflow-y: auto;
+	@include custom-scrollbar;
+	padding: 10px;
 }
 
 // Tool Buttons
