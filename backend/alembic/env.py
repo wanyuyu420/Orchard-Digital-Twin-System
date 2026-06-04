@@ -1,5 +1,10 @@
 import asyncio
+import os
+import sys
 from logging.config import fileConfig
+
+# 确保 backend 目录在 sys.path 中，使 alembic 能找到 app 模块
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool

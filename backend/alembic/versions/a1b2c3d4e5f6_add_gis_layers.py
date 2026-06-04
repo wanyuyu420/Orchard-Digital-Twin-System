@@ -17,7 +17,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    if 'gis_layers' not in inspector.get_table_names():
+        op.create_table(
         'gis_layers',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('code', sa.String(64), nullable=False),

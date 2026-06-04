@@ -10,7 +10,7 @@ settings = get_settings()
 
 if settings.is_sqlite:
     # SQLite: Use TEXT to store WKT strings
-    def Geometry(geometry_type: str, srid: int = 4326):
+    def Geometry(geometry_type: str, srid: int = 4326, **kwargs):
         """Fallback Geometry type for SQLite - stores as WKT text."""
         return Text
 else:
