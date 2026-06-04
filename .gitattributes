@@ -1,0 +1,57 @@
+# 自动处理行尾
+* text=auto
+
+# 文档
+*.md text eol=lf
+*.txt text eol=lf
+README.md text eol=lf
+CHANGELOG.md text eol=lf
+LICENSE text eol=lf
+
+# 源代码
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.vue text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.py text eol=lf
+
+# 二进制文件
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mov binary
+*.mp4 binary
+*.mp3 binary
+*.gz binary
+*.zip binary
+*.7z binary
+*.ttf binary
+*.otf binary
+*.fnt binary
+
+# Cesium 库文件 - 标记为第三方代码
+public/Cesium-1.136-epawse/** linguist-vendored
+public/Cesium-1.82-epawse/** linguist-vendored
+
+# 编译输出 - 标记为生成的代码
+dist/** linguist-generated
+build/** linguist-generated
+node_modules/** linguist-vendored
+backend/.venv/** linguist-vendored
+backend/__pycache__/** linguist-generated
+**/venv/** linguist-vendored
+
+# 测试相关
+**/*.test.ts linguist-detectable=false
+**/*.spec.ts linguist-detectable=false
+**/test/** linguist-detectable=false
+
+# 数据库迁移文件 - 标记为生成的代码
+alembic/versions/** linguist-generated

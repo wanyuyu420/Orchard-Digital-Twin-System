@@ -1,0 +1,33 @@
+{
+  "type": "FeatureCollection",
+  "name": "flood_extreme_inundation",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "flood_zone_3",
+        "name": "特大洪水淹没区",
+        "waterLevel": 25,
+        "maxDepth": 15,
+        "area_sqm": 2560000,
+        "severity": "severe"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [81.00, 43.60],
+          [81.40, 43.60],
+          [81.40, 44.00],
+          [81.00, 44.00],
+          [81.00, 43.60]
+        ]]
+      }
+    }
+  ]
+}
