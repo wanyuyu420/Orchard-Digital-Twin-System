@@ -1,0 +1,132 @@
+@use './variables' as *;
+@use './mixins' as *;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  outline: none;
+  user-select: none;
+}
+
+body {
+  background-color: $bg-deep;
+  color: $text-main;
+  font-family: $font-ui;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+}
+
+// Global Scrollbar
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 2px;
+}
+
+// Transitions
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.2s $ease-out;
+}
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.sidebar-left-enter-active,
+.sidebar-left-leave-active,
+.sidebar-right-enter-active,
+.sidebar-right-leave-active {
+  transition: all 0.3s $ease-out;
+}
+.sidebar-left-enter-from,
+.sidebar-left-leave-to {
+  transform: translateX(-40px);
+  opacity: 0;
+}
+.sidebar-right-enter-from,
+.sidebar-right-leave-to {
+  transform: translateX(40px);
+  opacity: 0;
+}
+
+// Cesium Blur Transition
+.cesium-container {
+  transition:
+    filter 0.5s ease,
+    transform 0.5s ease;
+  &.is-blurred {
+    filter: blur(12px) brightness(0.4);
+    transform: scale(1.02);
+  }
+}
+
+// Glass Panel 通用样式
+.glass-panel {
+  background: $glass-base;
+  backdrop-filter: blur(16px);
+  border: 1px solid $border-subtle;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid $border-subtle;
+    font-size: 14px;
+    font-weight: 600;
+    color: $text-main;
+  }
+
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px;
+  }
+
+  .panel-footer {
+    padding: 14px 18px;
+    border-top: 1px solid $border-subtle;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: $text-main;
+    margin-bottom: 14px;
+  }
+}
+
+// 全局隐藏 Cesium 导航控件
+.cesium-viewer-navigationContainer,
+.compass,
+.navigation-controls,
+.cesium-navigation-help,
+.distance-legend {
+  display: none !important;
+}

@@ -1,0 +1,87 @@
+# 依赖目录
+node_modules/
+dist/
+
+# 日志文件
+*.log
+npm-debug.log*
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 敏感信息
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.so
+.venv/
+venv/
+ENV/
+
+# 缓存
+.cache/
+.eslintcache
+*.tsbuildinfo
+
+# 临时文件
+*.tmp
+*.temp
+
+# 测试覆盖率
+coverage/
+.nyc_output/
+
+# 个人文档和笔记
+上一次.txt
+上次记录.txt
+AGENTS.md
+*.local.md
+chat-*.txt
+GIS_CODE.md
+
+# Cesium 库
+public/Cesium-1.82-epawse/
+
+# 数据文件
+backend/data/
+data/
+*.sqlite
+*.db
+*.xlsx
+*.xls
+
+# 本地数据处理工具（不提交到仓库）
+local/
+backend/scripts/import_excel.py
+backend/scripts/ingest_hydrological.py
+
+# AI 助手配置
+.claude/
+.gemini/
+.agent/
+_context/
+
+# 第三方库
+public/cesium-draw/
+
+# OpenSpec 和开发文档
+openspec/
+devlogs/
+docs/
+skills/
+
+# AI Agent 配置文件
+CLAUDE.md
+new.md
+last-chat.txt
+dev.sh
+.trae/
+temp/

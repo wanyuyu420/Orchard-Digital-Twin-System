@@ -1,0 +1,17 @@
+{
+  "asset": {
+    "version": "1.0",
+    "generator": "CityEngine 2025.1"
+  },
+  "geometricError": 500,
+  "root": {
+    "geometricError": 0,
+    "refine": "ADD",
+    "boundingVolume": {
+      "box": [0, 0, 0, 200, 0, 0, 0, 200, 0, 0, 0, 100]
+    },
+    "content": {
+      "uri": "tree3D_0_centered.glb"
+    }
+  }
+}
