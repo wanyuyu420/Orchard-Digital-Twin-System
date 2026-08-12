@@ -1,14 +1,9 @@
 /**
  * Basemap configuration data
- * Default: Original color basemap (no filter)
- * Filter toggle enables water-ink/tech style
+ * 天地图底图
  */
 
 import type { MapImageryConfig, BaseMapConfig } from '@/utils/ctrlCesium/Controller'
-
-// 天地图 API Key - 请替换为你自己的 Key
-// 申请地址: https://console.tianditu.gov.cn/
-const TIANDITU_KEY = import.meta.env.VITE_TIANDITU_KEY || 'YOUR_TIANDITU_KEY'
 
 // Viewer configuration
 export const MockMapConfig: { data: { name: string; value: string }[] } = {
@@ -26,12 +21,12 @@ export const MockMapConfig: { data: { name: string; value: string }[] } = {
   ],
 }
 
-// Initial view settings (Xinjiang - Urumqi area)
+// Initial view settings (赣州 - 脐橙果园)
 export const MockMapView = {
   data: [
-    { name: 'lat', value: '43.82' },
-    { name: 'lng', value: '87.57' },
-    { name: 'height', value: '50000' },
+    { name: 'lat', value: '27.13' },
+    { name: 'lng', value: '116.5' },
+    { name: 'height', value: '2000' },
     { name: 'direction_x', value: '0' },
     { name: 'direction_y', value: '-0.9' },
     { name: 'direction_z', value: '-0.1' },
@@ -44,72 +39,12 @@ export const MockMapView = {
   ],
 }
 
-// Default AutoNavi basemap - NO filter applied initially (original color)
+// Empty — 无地球影像底图，GLB 模型作为主要内容
 export const MockMapImageryList: { data: MapImageryConfig[] } = {
-  data: [
-    {
-      type: 'UrlTemplateImageryProvider',
-      classConfig: {
-        url: 'https://webst0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&style=7',
-        subdomains: ['1', '2', '3', '4'],
-        maximumLevel: 18,
-      },
-      // Default: original color style (no filter)
-      interfaceConfig: {
-        saturation: 1.0, // Full color
-        brightness: 1.0, // Normal brightness
-        contrast: 1.0, // Normal contrast
-        hue: 0.0, // No hue shift
-        gamma: 1.0, // Normal gamma
-      },
-      offset: '0,0',
-      invertswitch: false, // No color inversion
-      filterRGB: '#ffffff', // No filter tint
-    },
-  ],
+  data: [],
 }
 
-// Tianditu configuration (for basemap switching)
-export const TiandituConfig = {
-  vec: {
-    type: 'UrlTemplateImageryProvider',
-    classConfig: {
-      url: `https://t{s}.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=${TIANDITU_KEY}`,
-      subdomains: ['0', '1', '2', '3', '4', '5', '6', '7'],
-      maximumLevel: 18,
-    },
-    interfaceConfig: {},
-    offset: '0,0',
-    invertswitch: false,
-    filterRGB: '#ffffff',
-  },
-  cva: {
-    type: 'UrlTemplateImageryProvider',
-    classConfig: {
-      url: `https://t{s}.tianditu.gov.cn/DataServer?T=cva_w&x={x}&y={y}&l={z}&tk=${TIANDITU_KEY}`,
-      subdomains: ['0', '1', '2', '3', '4', '5', '6', '7'],
-      maximumLevel: 18,
-    },
-    interfaceConfig: {},
-    offset: '0,0',
-    invertswitch: false,
-    filterRGB: '#ffffff',
-  },
-  img: {
-    type: 'UrlTemplateImageryProvider',
-    classConfig: {
-      url: `https://t{s}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=${TIANDITU_KEY}`,
-      subdomains: ['0', '1', '2', '3', '4', '5', '6', '7'],
-      maximumLevel: 18,
-    },
-    interfaceConfig: {},
-    offset: '0,0',
-    invertswitch: false,
-    filterRGB: '#ffffff',
-  },
-}
-
-// Layer style presets
+// 底图样式预设
 export const baseInkStyle = {
   saturation: 0.0,
   brightness: 0.55,

@@ -11,6 +11,22 @@ export interface LayerConfig {
 }
 
 export const projectConfig = {
+  // Orchard 3D Base Model — CityEngine GLB with terrain + instanced trees
+  // Replaces online map tiles as the primary basemap
+  orchardModel: {
+    url: '/models/orchard/tree3D_0.glb',
+    visible: true,
+    alignment: {
+      longitude: 115.03,   // Ganzhou, Jiangxi (initial guess — calibrate after first load)
+      latitude: 25.45,
+      height: 0,
+      rotationX: 0,        // CityEngine exports Z-up, no rotation needed
+      rotationY: 0,
+      rotationZ: 0,
+      scale: 1,
+    }
+  } as LayerConfig,
+
   // OSGB 3D Tiles (Oblique Photography)
   osgb: {
     url: 'http://localhost:8000/tiles/osgb/tileset.json',

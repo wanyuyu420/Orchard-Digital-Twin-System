@@ -1,17 +1,24 @@
-/* 2.1 Color Palette & Tokens */
+/* Color Palette & Tokens - 黑色主题版本 */
 
 // Backgrounds
-$bg-deep: #020617;
-$glass-base: rgba(15, 23, 42, 0.85);
-$glass-hover: rgba(34, 211, 238, 0.1);
+$bg-deep: #1a1a1a;
+$glass-base: rgba(30, 30, 30, 0.85);
+$glass-hover: rgba(0, 0, 0, 0.1);
+$sidebar-bg: rgba(20, 20, 20, 0.92);
+$panel-bg: rgba(25, 25, 25, 0.88);
 
 // Borders
-$border-glass: rgba(56, 189, 248, 0.3);
+$border-glass: rgba(0, 0, 0, 0.3);
 $border-subtle: rgba(255, 255, 255, 0.1);
+$border-active: rgba(0, 0, 0, 0.5);
 
-// Theme Colors
+// Theme Colors - 暗色主题
 $neon-cyan: #22d3ee;
 $neon-blue: #3b82f6;
+$orchard-orange: #fb923c;
+$orchard-green: #4ade80;
+$leaf-green: #22c55e;
+$soil-brown: #a08a6c;
 
 // Status Colors
 $alert-red: #ef4444;
@@ -19,8 +26,9 @@ $warn-yellow: #eab308;
 $success-green: #22c55e;
 
 // Text Colors
-$text-main: #f8fafc;
-$text-sub: #94a3b8;
+$text-main: #ffffff;
+$text-sub: #b0b0b0;
+$text-dim: #808080;
 
 // Typography
 $font-ui: 'Noto Sans SC', sans-serif;
@@ -35,6 +43,7 @@ $z-layer-0: 0; // CesiumViewer
 $z-layer-1: 1; // MeteoSplitLayer
 $z-layer-2: 10; // RouterView (UI Layer)
 $z-layer-3: 40; // SplitSlider
-$z-layer-4: 50; // TopRibbon
-$z-layer-5: 60; // FloodPanel
-$z-layer-6: 100; // BottomDock
+$z-layer-4: 50; // TopMenuBar
+$z-layer-5: 60; // Sidebar / Panels
+$z-layer-6: 80; // Query Panels
+$z-layer-7: 100; // Modal Windows

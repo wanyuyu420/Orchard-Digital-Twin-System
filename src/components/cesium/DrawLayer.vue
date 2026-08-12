@@ -10,6 +10,7 @@ import { useFeatureStore } from '@/stores/feature'
 import type { Coordinate } from '@/types/measure'
 import type { PointFeature, LineFeature, CircleFeature } from '@/types/feature'
 import { DEFAULT_STYLE } from '@/types/draw'
+import { sampleSurfacePositions } from '@/utils/surfaceSampler'
 
 declare const Cesium: any
 
@@ -417,7 +418,7 @@ function updateLinePreview() {
       positions: new Cesium.CallbackProperty(() => {
         if (!currentCursorPosition.value) return []
         return [
-          ...lineVertices.value.map((v) => Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude)),
+          ...lineVertices.value.map((v) => Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, v.height || 0)),
           currentCursorPosition.value,
         ]
       }, false),
@@ -427,7 +428,6 @@ function updateLinePreview() {
         glowPower: 0.15,
         color: Cesium.Color.CYAN.withAlpha(0.85),
       }),
-      clampToGround: true,
     },
   })
 
@@ -450,10 +450,13 @@ function completeLineDrawing() {
     totalLength += dist
   }
 
-  // Add final line
-  const positions = lineVertices.value.map((v) =>
-    Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude)
+  // Add final line with height from model surface
+  const basePositions = lineVertices.value.map((v) =>
+    Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, v.height || 0)
   )
+
+  // 沿模型表面密集采样，使线条贴附在 3D 图上
+  const positions = sampleSurfacePositions(viewer.scene, basePositions)
 
   const line = viewer.entities.add({
     polyline: {
@@ -464,16 +467,17 @@ function completeLineDrawing() {
         glowPower: 0.12,
         color: Cesium.Color.fromCssColorString(DEFAULT_STYLE.strokeColor),
       }),
-      clampToGround: true,
     },
   })
   entities.push(line)
 
   // Add length label at midpoint
   const midIndex = Math.floor(lineVertices.value.length / 2)
+  const midVert = lineVertices.value[midIndex]
   const midPoint = Cesium.Cartesian3.fromDegrees(
-    lineVertices.value[midIndex].longitude,
-    lineVertices.value[midIndex].latitude
+    midVert.longitude,
+    midVert.latitude,
+    (midVert.height || 0) + 5
   )
 
   const lengthText =
@@ -549,7 +553,8 @@ function updateCirclePreview() {
   if (!circlePreview.value) {
     const centerPos = Cesium.Cartesian3.fromDegrees(
       circleCenter.value.longitude,
-      circleCenter.value.latitude
+      circleCenter.value.latitude,
+      circleCenter.value.height || 0
     )
 
     circlePreview.value = viewer.entities.add({
@@ -587,7 +592,8 @@ function completeCircleMeasurement() {
 
   const centerPos = Cesium.Cartesian3.fromDegrees(
     circleCenter.value.longitude,
-    circleCenter.value.latitude
+    circleCenter.value.latitude,
+    circleCenter.value.height || 0
   )
 
   // Add circle
@@ -676,8 +682,8 @@ function cartesianToCoordinate(cartesian: any): Coordinate {
 }
 
 function calculateDistance(coord1: Coordinate, coord2: Coordinate): number {
-  const pos1 = Cesium.Cartesian3.fromDegrees(coord1.longitude, coord1.latitude)
-  const pos2 = Cesium.Cartesian3.fromDegrees(coord2.longitude, coord2.latitude)
+  const pos1 = Cesium.Cartesian3.fromDegrees(coord1.longitude, coord1.latitude, coord1.height || 0)
+  const pos2 = Cesium.Cartesian3.fromDegrees(coord2.longitude, coord2.latitude, coord2.height || 0)
 
   const geodesic = new Cesium.EllipsoidGeodesic(
     Cesium.Cartographic.fromCartesian(pos1),

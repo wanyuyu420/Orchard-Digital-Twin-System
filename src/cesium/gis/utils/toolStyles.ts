@@ -8,93 +8,93 @@
 import * as Cesium from 'cesium'
 
 /**
- * 工具专属配色方案
+ * 工具专属配色方案 - 恢复彩色主题
  */
 export const TOOL_COLORS = {
   volume: {
-    fill: '#EF4444', // 红色 - 方量分析
-    stroke: '#DC2626',
-    accent: '#F87171',
-    glow: 'rgba(239, 68, 68, 0.4)',
-    light: 'rgba(239, 68, 68, 0.3)',
+    fill: 'rgba(34, 211, 238, 0.3)', // 青色填充
+    stroke: '#22D3EE', // 青色边框
+    accent: '#22D3EE',
+    glow: 'rgba(34, 211, 238, 0.4)',
+    light: 'rgba(34, 211, 238, 0.3)',
   },
   flood: {
-    fill: '#3B82F6', // 蓝色 - 淹没分析
-    stroke: '#2563EB',
-    accent: '#60A5FA',
+    fill: 'rgba(59, 130, 246, 0.3)', // 蓝色填充
+    stroke: '#3B82F6', // 蓝色边框
+    accent: '#3B82F6',
     glow: 'rgba(59, 130, 246, 0.4)',
     light: 'rgba(59, 130, 246, 0.3)',
   },
   profile: {
-    fill: '#10B981', // 绿色 - 剖面分析
-    stroke: '#059669',
-    accent: '#34D399',
-    glow: 'rgba(16, 185, 129, 0.4)',
-    light: 'rgba(16, 185, 129, 0.3)',
+    fill: 'rgba(34, 197, 94, 0.3)', // 绿色填充
+    stroke: '#22C55E', // 绿色边框
+    accent: '#22C55E',
+    glow: 'rgba(34, 197, 94, 0.4)',
+    light: 'rgba(34, 197, 94, 0.3)',
   },
   measure3d: {
-    fill: '#F59E0B', // 橙色 - 3D测量
-    stroke: '#D97706',
-    accent: '#FBBF24',
-    glow: 'rgba(245, 158, 11, 0.4)',
-    light: 'rgba(245, 158, 11, 0.3)',
+    fill: 'rgba(249, 115, 22, 0.3)', // 橙色填充
+    stroke: '#F97316', // 橙色边框
+    accent: '#F97316',
+    glow: 'rgba(249, 115, 22, 0.4)',
+    light: 'rgba(249, 115, 22, 0.3)',
   },
   // 通用色
   common: {
-    primary: '#22D3EE', // 青色 - 高亮数值
-    secondary: '#94A3B8', // 灰色 - 次要文本
-    white: '#F8FAFC', // 白色 - 主文本
+    primary: '#22D3EE', // 青色主色
+    secondary: '#666666',
+    white: '#FFFFFF',
     black: '#000000',
-    bgDark: 'rgba(0, 0, 0, 0.85)',
-    bgSemi: 'rgba(0, 0, 0, 0.7)',
-    border: 'rgba(255, 255, 255, 0.2)',
+    bgDark: 'rgba(15, 23, 42, 0.9)',
+    bgSemi: 'rgba(15, 23, 42, 0.8)',
+    border: 'rgba(255, 255, 255, 0.1)',
   },
 } as const
 
 /**
- * 标签样式配置
+ * 标签样式配置 - 黑色主题
  */
 export const LABEL_STYLES = {
   // 结果标签（主要展示）
   result: {
     font: 'bold 18px "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    fillColor: '#F8FAFC',
-    backgroundColor: 'rgba(5, 10, 30, 0.92)',
+    fillColor: '#000000',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     outlineWidth: 2,
-    outlineColor: 'rgba(34, 211, 238, 0.8)',
+    outlineColor: 'rgba(0, 0, 0, 0.8)',
     padding: new Cesium.Cartesian2(20, 14),
     pixelOffset: new Cesium.Cartesian2(0, -30),
   },
   // 实时提示标签
   hint: {
     font: '1 4px "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    fillColor: '#94A3B8',
-    backgroundColor: 'rgba(10, 15, 35, 0.85)',
+    fillColor: '#000000',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     outlineWidth: 2,
-    outlineColor: 'rgba(34, 211, 238, 0.6)',
+    outlineColor: 'rgba(0, 0, 0, 0.6)',
     padding: new Cesium.Cartesian2(14, 10),
     pixelOffset: new Cesium.Cartesian2(20, -20),
   },
   // 紧凑型标签（小尺寸）
   compact: {
     font: '12px "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    fillColor: TOOL_COLORS.common.white,
-    backgroundColor: TOOL_COLORS.common.bgSemi,
+    fillColor: '#000000',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     outlineWidth: 2,
-    outlineColor: TOOL_COLORS.common.black,
+    outlineColor: 'rgba(0, 0, 0, 0.8)',
     padding: new Cesium.Cartesian2(10, 6),
     pixelOffset: new Cesium.Cartesian2(15, -15),
   },
 } as const
 
 /**
- * 点标记样式
+ * 点标记样式 - 黑色主题
  */
 export const POINT_STYLES = {
   // 顶点标记（绘制中）
   vertex: {
     pixelSize: 12,
-    color: '#FBBF24', // 金色
+    color: '#000000', // 黑色
     outlineColor: '#FFFFFF',
     outlineWidth: 2.5,
     disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -102,7 +102,7 @@ export const POINT_STYLES = {
   // 普通标记点
   marker: {
     pixelSize: 10,
-    color: '#22D3EE', // 青色
+    color: '#000000', // 黑色
     outlineColor: '#FFFFFF',
     outlineWidth: 2,
     disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -110,7 +110,7 @@ export const POINT_STYLES = {
   // 高亮标记点
   highlight: {
     pixelSize: 14,
-    color: '#FF3333',
+    color: '#000000',
     outlineColor: '#FFFFFF',
     outlineWidth: 3,
     disableDepthTestDistance: Number.POSITIVE_INFINITY,

@@ -75,5 +75,6 @@ defineExpose({
   top: 0;
   left: 0;
   z-index: 0;
+  pointer-events: auto;
 }
 </style>

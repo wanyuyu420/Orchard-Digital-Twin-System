@@ -13,3 +13,4 @@ shapely
 pydantic-settings
 python-dotenv
 aiosqlite
+httpx>=0.27.0

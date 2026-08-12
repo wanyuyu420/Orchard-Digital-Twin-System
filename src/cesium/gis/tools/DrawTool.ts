@@ -81,14 +81,14 @@ export class DrawTool extends BaseTool {
   /** 样式配置 */
   private style: Required<NonNullable<DrawToolOptions['style']>>
 
-  /** 默认样式 - 使用统一的颜色常量 */
+  /** 默认样式 - 无填充，黑色边框 */
   private static readonly DEFAULT_STYLE = {
-    fillColor: TOOL_COLORS.common.primary,
-    fillOpacity: 0.3,
-    strokeColor: TOOL_COLORS.common.primary,
+    fillColor: '#000000',
+    fillOpacity: 0, // 完全透明填充
+    strokeColor: '#000000', // 黑色边框
     strokeWidth: LINE_STYLES.result.width,
     pointSize: POINT_STYLES.marker.pixelSize,
-    pointColor: POINT_STYLES.marker.color,
+    pointColor: '#000000', // 黑色点
     lineType: 'solid' as LineType,
     iconType: 'dot' as string,
   }
@@ -357,8 +357,24 @@ export class DrawTool extends BaseTool {
     // 计算已完成线段的总长度
     const completedLength = this.calculateCompletedLineLength()
 
-    // 使用 CallbackProperty 动态更新位置
-    const strokeColor = Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.5)
+    // 显示已确定的边框线段（连接已确定的顶点）
+    if (this.vertices.length >= 2) {
+      const staticPositions = this.vertices.map((v) =>
+        Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, this.getHeight(v))
+      )
+
+      const confirmedLine = this.viewer.entities.add({
+        polyline: {
+          positions: staticPositions,
+          width: this.style.strokeWidth,
+          material: Cesium.Color.fromCssColorString(this.style.strokeColor),
+        },
+      })
+      this.previewEntities.push(confirmedLine)
+    }
+
+    // 显示从最后一个顶点到光标的预览线段
+    const strokeColor = Cesium.Color.fromCssColorString(this.style.strokeColor)
     const previewLine = this.viewer.entities.add({
       polyline: {
         positions: new Cesium.CallbackProperty(() => {
@@ -366,7 +382,6 @@ export class DrawTool extends BaseTool {
         }, false) as any,
         width: this.style.strokeWidth,
         material: this.createLineMaterial(strokeColor, this.style.lineType),
-        clampToGround: true,
       },
     })
     this.previewEntities.push(previewLine)
@@ -395,30 +410,6 @@ export class DrawTool extends BaseTool {
       },
     })
     this.previewEntities.push(lengthLabel)
-
-    // 完整线预览(仅在有多个顶点时)
-    if (this.vertices.length >= 2) {
-      const staticPositions = this.vertices.map((v) =>
-        Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, this.getHeight(v))
-      )
-
-      const completeStrokeColor = Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(
-        0.3
-      )
-      const completeLine = this.viewer.entities.add({
-        polyline: {
-          positions: new Cesium.CallbackProperty(() => {
-            return this.drawCursorPosition
-              ? [...staticPositions, this.drawCursorPosition]
-              : staticPositions
-          }, false),
-          width: this.style.strokeWidth,
-          material: this.createLineMaterial(completeStrokeColor, this.style.lineType),
-          clampToGround: true,
-        },
-      })
-      this.previewEntities.push(completeLine)
-    }
   }
 
   /**
@@ -484,42 +475,62 @@ export class DrawTool extends BaseTool {
    * 更新多边形预览 (使用 CallbackProperty 优化性能)
    */
   private updatePolygonPreview(): void {
-    if (this.vertices.length < 2 || !this.drawCursorPosition) return
+    if (this.vertices.length === 0 || !this.drawCursorPosition) return
 
     const staticPositions = this.vertices.map((v) =>
       Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, this.getHeight(v))
     )
 
-    // 使用 CallbackProperty 动态更新多边形层级结构
-    const previewPolygon = this.viewer.entities.add({
-      polygon: {
-        hierarchy: new Cesium.CallbackProperty(() => {
-          if (!this.drawCursorPosition) return new Cesium.PolygonHierarchy(staticPositions)
-          return new Cesium.PolygonHierarchy([...staticPositions, this.drawCursorPosition])
-        }, false),
-        material: Cesium.Color.fromCssColorString(this.style.fillColor).withAlpha(
-          this.style.fillOpacity * 0.5
-        ),
-        classificationType: Cesium.ClassificationType.TERRAIN,
-      },
+    // 显示已确定的边框线段（连接已确定的顶点）
+    if (this.vertices.length >= 2) {
+      const confirmedOutline = this.viewer.entities.add({
+        polyline: {
+          positions: staticPositions,
+          width: this.style.strokeWidth,
+          material: Cesium.Color.fromCssColorString(this.style.strokeColor),
+        },
+      })
+      this.previewEntities.push(confirmedOutline)
+    }
+
+    // 显示从最后一个顶点到光标的预览线段
+    const lastVertex = this.vertices[this.vertices.length - 1]
+    const lastCartesian = Cesium.Cartesian3.fromDegrees(
+      lastVertex.longitude,
+      lastVertex.latitude,
+      this.getHeight(lastVertex)
+    )
+
+    const previewLine = this.viewer.entities.add({
       polyline: {
         positions: new Cesium.CallbackProperty(() => {
-          return this.drawCursorPosition
-            ? [...staticPositions, this.drawCursorPosition]
-            : staticPositions
-        }, false),
+          return this.drawCursorPosition ? [lastCartesian, this.drawCursorPosition] : []
+        }, false) as any,
         width: this.style.strokeWidth,
-        material: Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.7),
-        clampToGround: true,
+        material: Cesium.Color.fromCssColorString(this.style.strokeColor),
       },
     })
-    this.previewEntities.push(previewPolygon)
+    this.previewEntities.push(previewLine)
+
+    // 只有2个以上顶点才显示多边形填充预览
+    if (this.vertices.length >= 2) {
+      const previewPolygon = this.viewer.entities.add({
+        polygon: {
+          hierarchy: new Cesium.CallbackProperty(() => {
+            if (!this.drawCursorPosition) return new Cesium.PolygonHierarchy(staticPositions)
+            return new Cesium.PolygonHierarchy([...staticPositions, this.drawCursorPosition])
+          }, false),
+          material: Cesium.Color.TRANSPARENT, // 完全透明填充
+          outline: false,
+        },
+      })
+      this.previewEntities.push(previewPolygon)
+    }
 
     // 实时面积/周长标签 (3个顶点以上才显示)
     if (this.vertices.length >= 2) {
       const measurementLabel = this.viewer.entities.add({
         position: new Cesium.CallbackProperty(() => {
-          // 计算多边形质心作为标签位置
           const positions = this.drawCursorPosition
             ? [...staticPositions, this.drawCursorPosition]
             : staticPositions
@@ -529,11 +540,7 @@ export class DrawTool extends BaseTool {
           text: new Cesium.CallbackProperty(() => {
             if (!this.drawCursorPosition) return ''
             const positions = [...staticPositions, this.drawCursorPosition]
-
-            // 计算周长
             const perimeter = this.calculatePolygonPerimeter(positions)
-
-            // 只有3个点以上才计算面积
             if (positions.length >= 3) {
               const area = this.calculatePolygonArea(positions)
               return `面积: ${this.formatArea(area)}\n周长: ${this.formatLength(perimeter)}`
@@ -554,7 +561,7 @@ export class DrawTool extends BaseTool {
       this.previewEntities.push(measurementLabel)
     }
 
-    // 闭合预览线 - 显示到第一个点的闭合线
+    // 闭合预览线 - 显示到第一个点的闭合线（虚线）
     if (this.vertices.length >= 2) {
       const firstVertex = this.vertices[0]
       const firstCartesian = Cesium.Cartesian3.fromDegrees(
@@ -570,10 +577,9 @@ export class DrawTool extends BaseTool {
           }, false),
           width: this.style.strokeWidth,
           material: new Cesium.PolylineDashMaterialProperty({
-            color: Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.5),
+            color: Cesium.Color.fromCssColorString(this.style.strokeColor),
             dashLength: 8.0,
           }),
-          clampToGround: true,
         },
       })
       this.previewEntities.push(closingLine)
@@ -663,6 +669,9 @@ export class DrawTool extends BaseTool {
       this.getHeight(center)
     )
 
+    const ellipsoid = this.viewer.scene.globe.ellipsoid
+    const centerCartographic = ellipsoid.cartesianToCartographic(centerCartesian)
+
     // 使用 CallbackProperty 动态计算半径 (大地测量距离)
     const previewCircle = this.viewer.entities.add({
       position: centerCartesian,
@@ -677,16 +686,43 @@ export class DrawTool extends BaseTool {
             ? this.calculateGeodesicDistance(centerCartesian, this.drawCursorPosition)
             : 0
         }, false),
-        material: Cesium.Color.fromCssColorString(this.style.fillColor).withAlpha(
-          this.style.fillOpacity * 0.5
-        ),
-        outline: true,
-        outlineColor: Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.7),
-        outlineWidth: this.style.strokeWidth,
-        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        material: Cesium.Color.TRANSPARENT, // 完全透明填充
+        outline: false,
       },
     })
     this.previewEntities.push(previewCircle)
+
+    // 使用独立 Polyline 显示虚线边框
+    const outlineLine = this.viewer.entities.add({
+      polyline: {
+        positions: new Cesium.CallbackProperty(() => {
+          if (!this.drawCursorPosition) return []
+          const radius = this.calculateGeodesicDistance(centerCartesian, this.drawCursorPosition)
+          // 生成圆形边界点（64个点）
+          const numPoints = 64
+          const outlinePositions: Cesium.Cartesian3[] = []
+          for (let i = 0; i <= numPoints; i++) {
+            const angle = (i / numPoints) * 2 * Math.PI
+            const geodesic = new Cesium.EllipsoidGeodesic(
+              centerCartographic,
+              new Cesium.Cartographic(
+                centerCartographic.longitude + (radius / ellipsoid.maximumRadius) * Math.cos(angle),
+                centerCartographic.latitude + (radius / ellipsoid.maximumRadius) * Math.sin(angle)
+              )
+            )
+            const pointCartographic = geodesic.interpolateUsingFraction(1.0)
+            outlinePositions.push(ellipsoid.cartographicToCartesian(pointCartographic))
+          }
+          return outlinePositions
+        }, false) as any,
+        width: this.style.strokeWidth,
+        material: new Cesium.PolylineDashMaterialProperty({
+          color: Cesium.Color.fromCssColorString(this.style.strokeColor),
+          dashLength: 8.0,
+        }),
+      },
+    })
+    this.previewEntities.push(outlineLine)
 
     // 动态半径和面积标签
     const radiusLabel = this.viewer.entities.add({
@@ -722,8 +758,22 @@ export class DrawTool extends BaseTool {
     const ellipsoid = this.viewer.scene.globe.ellipsoid
     const carto1 = ellipsoid.cartesianToCartographic(p1)
     const carto2 = ellipsoid.cartesianToCartographic(p2)
+    
+    // 防御性检查：确保坐标转换成功
+    if (!carto1 || !carto2) {
+      // 回退到简单的笛卡尔距离计算
+      return Cesium.Cartesian3.distance(p1, p2)
+    }
+    
     const geodesic = new Cesium.EllipsoidGeodesic(carto1, carto2)
-    return geodesic.surfaceDistance
+    const distance = geodesic.surfaceDistance
+    
+    // 检查距离是否有效
+    if (isNaN(distance) || !isFinite(distance)) {
+      return Cesium.Cartesian3.distance(p1, p2)
+    }
+    
+    return distance
   }
 
   /**
@@ -733,6 +783,7 @@ export class DrawTool extends BaseTool {
     if (this.vertices.length === 0 || !this.drawCursorPosition) return
 
     const corner1 = this.vertices[0]
+    const corner1Height = this.getHeight(corner1)
     const corner1Carto = Cesium.Cartographic.fromDegrees(corner1.longitude, corner1.latitude)
 
     // 使用 CallbackProperty 动态计算矩形边界
@@ -749,16 +800,46 @@ export class DrawTool extends BaseTool {
 
           return Cesium.Rectangle.fromRadians(west, south, east, north)
         }, false),
-        material: Cesium.Color.fromCssColorString(this.style.fillColor).withAlpha(
-          this.style.fillOpacity * 0.5
-        ),
-        outline: true,
-        outlineColor: Cesium.Color.fromCssColorString(this.style.strokeColor).withAlpha(0.7),
-        outlineWidth: this.style.strokeWidth,
-        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        material: Cesium.Color.TRANSPARENT, // 完全透明填充
+        outline: false,
       },
     })
     this.previewEntities.push(previewRectangle)
+
+    // 使用独立 Polyline 显示虚线边框（使用拾取的实际高度）
+    const outlineLine = this.viewer.entities.add({
+      polyline: {
+        positions: new Cesium.CallbackProperty(() => {
+          if (!this.drawCursorPosition) return []
+
+          const corner2Carto = Cesium.Cartographic.fromCartesian(this.drawCursorPosition)
+          const west = Math.min(corner1Carto.longitude, corner2Carto.longitude)
+          const east = Math.max(corner1Carto.longitude, corner2Carto.longitude)
+          const south = Math.min(corner1Carto.latitude, corner2Carto.latitude)
+          const north = Math.max(corner1Carto.latitude, corner2Carto.latitude)
+
+          const westDeg = Cesium.Math.toDegrees(west)
+          const eastDeg = Cesium.Math.toDegrees(east)
+          const southDeg = Cesium.Math.toDegrees(south)
+          const northDeg = Cesium.Math.toDegrees(north)
+
+          // 使用拾取高度让矩形边框贴合3D模型表面
+          const useHeight = corner1Height
+          const nw = Cesium.Cartesian3.fromDegrees(westDeg, northDeg, useHeight)
+          const ne = Cesium.Cartesian3.fromDegrees(eastDeg, northDeg, useHeight)
+          const se = Cesium.Cartesian3.fromDegrees(eastDeg, southDeg, useHeight)
+          const sw = Cesium.Cartesian3.fromDegrees(westDeg, southDeg, useHeight)
+
+          return [nw, ne, se, sw, nw]
+        }, false) as any,
+        width: this.style.strokeWidth,
+        material: new Cesium.PolylineDashMaterialProperty({
+          color: Cesium.Color.fromCssColorString(this.style.strokeColor),
+          dashLength: 8.0,
+        }),
+      },
+    })
+    this.previewEntities.push(outlineLine)
 
     // 动态尺寸和面积标签
     const dimensionsLabel = this.viewer.entities.add({
@@ -1040,10 +1121,28 @@ export class DrawTool extends BaseTool {
 
   /**
    * 拾取地形位置
-   * 优先使用地形拾取，回退到椭球面拾取（无地形时）
+   * 优先使用深度缓冲区拾取（支持3D模型表面），然后场景拾取，最后回退到椭球面拾取
    */
   protected pickPosition(screenPosition: Cesium.Cartesian2): Cesium.Cartesian3 | null {
-    // 方法1: 尝试在地形/3D Tiles上拾取
+    // 方法1: 使用 pickPosition 从深度缓冲区获取世界坐标
+    // 这适用于所有渲染对象，包括 GLB 模型、3D Tiles 等
+    try {
+      const depthPosition = this.viewer.scene.pickPosition(screenPosition)
+      if (depthPosition && Cesium.defined(depthPosition) &&
+          !Cesium.Cartesian3.equals(depthPosition, Cesium.Cartesian3.ZERO)) {
+        return depthPosition
+      }
+    } catch (e) {
+      // pickPosition 可能在空白区域抛出异常，忽略
+    }
+
+    // 方法2: 尝试场景拾取（包括3D Tiles/GDB模型表面）
+    const scenePick = this.viewer.scene.pick(screenPosition)
+    if (scenePick && scenePick.position) {
+      return scenePick.position
+    }
+
+    // 方法3: 尝试在地形上拾取
     const ray = this.viewer.scene.camera.getPickRay(screenPosition)
     if (ray) {
       const globePosition = this.viewer.scene.globe.pick(ray, this.viewer.scene)
@@ -1052,7 +1151,7 @@ export class DrawTool extends BaseTool {
       }
     }
 
-    // 方法2: 回退到椭球面拾取（无地形时使用）
+    // 方法4: 回退到椭球面拾取（无地形时使用）
     const ellipsoidPosition = this.viewer.camera.pickEllipsoid(
       screenPosition,
       this.viewer.scene.globe.ellipsoid

@@ -7,8 +7,9 @@
 
 import * as Cesium from 'cesium'
 import { BaseTool, type BaseToolOptions } from '../core/BaseTool'
-import type { Coordinate } from '@/types/geometry'
+import { HeightReference, type Coordinate } from '@/types/geometry'
 import type { Measurement, MeasureToolType } from '@/types/measure'
+import { sampleSurfacePositions } from '@/utils/surfaceSampler'
 
 /**
  * 测量工具配置
@@ -388,24 +389,28 @@ export class MeasureTool extends BaseTool {
 
     const pos1 = Cesium.Cartesian3.fromDegrees(
       measurement.startPoint.longitude,
-      measurement.startPoint.latitude
+      measurement.startPoint.latitude,
+      measurement.startPoint.height || 0
     )
     const pos2 = Cesium.Cartesian3.fromDegrees(
       measurement.endPoint.longitude,
-      measurement.endPoint.latitude
+      measurement.endPoint.latitude,
+      measurement.endPoint.height || 0
     )
 
-    // 线
+    // 沿模型表面密集采样，使线条贴附在 3D 图上
+    const positions = sampleSurfacePositions(this.viewer.scene, [pos1, pos2])
+
+    // 线（密采样，贴附模型表面）
     this.viewer.entities.add({
       id: `${measurement.id}_line`,
       polyline: {
-        positions: [pos1, pos2],
+        positions,
         width: 3,
         material: new Cesium.PolylineDashMaterialProperty({
           color: Cesium.Color.CYAN,
           dashLength: 16,
         }),
-        clampToGround: true,
       },
     })
 
@@ -435,11 +440,14 @@ export class MeasureTool extends BaseTool {
     if (measurement.type !== 'area') return
     if (!measurement.vertices || measurement.vertices.length < 3) return
 
-    const positions = measurement.vertices.map((v) =>
-      Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude)
+    const basePositions = measurement.vertices.map((v) =>
+      Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, v.height || 0)
     )
 
-    // 多边形
+    // 沿模型表面密集采样边界，使多边形贴附在 3D 图上
+    const positions = sampleSurfacePositions(this.viewer.scene, basePositions)
+
+    // 多边形（使用顶点高度，贴在模型面上）
     this.viewer.entities.add({
       id: `${measurement.id}_polygon`,
       polygon: {
@@ -448,7 +456,7 @@ export class MeasureTool extends BaseTool {
         outline: true,
         outlineColor: Cesium.Color.YELLOW,
         outlineWidth: 3,
-        perPositionHeight: false,
+        perPositionHeight: true,
       },
     })
 
@@ -603,6 +611,8 @@ export class MeasureTool extends BaseTool {
     return {
       longitude: Cesium.Math.toDegrees(cartographic.longitude),
       latitude: Cesium.Math.toDegrees(cartographic.latitude),
+      height: cartographic.height,
+      heightReference: HeightReference.ABSOLUTE,
     }
   }
 

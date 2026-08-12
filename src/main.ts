@@ -1,17 +1,24 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import ElementPlus from 'element-plus'
+import 'element-plus/dist/index.css'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
 
 // Global Styles
 import './assets/styles/main.scss'
 
-// Cesium is loaded globally via index.html from /Cesium-1.82-epawse/
-// Widget styles are also loaded in index.html
-
 const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
+app.use(ElementPlus, { locale: zhCn })
+
+// 注册所有Element Plus图标
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+  app.component(key, component)
+}
 
 app.mount('#app')

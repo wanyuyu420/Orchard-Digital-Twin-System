@@ -9,6 +9,7 @@ import { useCesiumStore } from '@/stores/cesium'
 import { useAppStore } from '@/stores/app'
 import { GController } from '@/utils/ctrlCesium/Controller'
 import { getBaseMapConfig, getBaseMapImageryList } from '@/mock/baseMapData'
+import { setupOrchardPreviewBasemap } from '@/utils/orchardPreview'
 
 declare const Cesium: any
 
@@ -18,7 +19,7 @@ const appStore = useAppStore()
 const viewMode = computed(() => appStore.viewMode)
 const isMeteoPage = computed(() => appStore.currentModule === 'meteo')
 
-onMounted(() => {
+onMounted(async () => {
 	// Get configurations
 	const baseMapConfig = getBaseMapConfig()
 	const imageryList = getBaseMapImageryList()
@@ -30,7 +31,12 @@ onMounted(() => {
 	cesiumStore.setViewer(viewer)
 		; (window as any).Gviewer = viewer
 
-	// Set initial view directly (no fly animation for faster startup)
+	// Terrain is NOT loaded — the orchard GLB model provides its own terrain mesh
+	// Cesium World Terrain would conflict with the model's built-in terrain
+
+	// 对齐果园预览:关闭太阳光照,顶点色全亮(预览默认 enableLighting=false)
+	viewer.scene.globe.enableLighting = false
+
 	// Set initial view directly (no fly animation for faster startup)
 	const { lon, lat, height, heading, pitch, roll } = cesiumStore.defaultView
 	viewer.camera.setView({
@@ -41,6 +47,9 @@ onMounted(() => {
 			roll: Cesium.Math.toRadians(roll),
 		},
 	})
+
+	// 对齐果园预览:高德卫星 + DOM 无人机影像 + DEM 地形(async, non-blocking)
+	setupOrchardPreviewBasemap(viewer)
 })
 
 onUnmounted(() => {
@@ -58,6 +67,7 @@ onUnmounted(() => {
 	left: 0;
 	z-index: 0;
 	background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+	pointer-events: auto;
 }
 
 .cesium-container.is-blurred {

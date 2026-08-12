@@ -97,30 +97,6 @@
 								</div>
 							</div>
 
-							<div class="panel-section">
-								<div class="section-label">底图样式</div>
-								<div class="basemap-grid">
-									<div class="basemap-item" :class="{ active: mapType === 'amap' }" @click="selectBasemap('amap')">
-										<div class="thumb amap"></div>
-										<span>高德</span>
-									</div>
-									<div class="basemap-item" :class="{ active: mapType === 'tdt_vec' }"
-										@click="selectBasemap('tdt_vec')">
-										<div class="thumb vec"></div>
-										<span>矢量</span>
-									</div>
-									<div class="basemap-item" :class="{ active: mapType === 'tdt_ter' }"
-										@click="selectBasemap('tdt_ter')">
-										<div class="thumb ter"></div>
-										<span>地形</span>
-									</div>
-									<div class="basemap-item" :class="{ active: mapType === 'tdt_img' }"
-										@click="selectBasemap('tdt_img')">
-										<div class="thumb img"></div>
-										<span>影像</span>
-									</div>
-								</div>
-							</div>
 						</div>
 					</transition>
 				</div>
@@ -140,7 +116,6 @@ import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useCesiumStore } from '@/stores/cesium'
 import { useGISStore } from '@/stores/gis'
-import { baseInkStyle, baseColorStyle } from '@/mock/baseMapData'
 import type { DrawToolType, AnalysisToolType } from '@/types/draw'
 
 declare const Cesium: any
@@ -169,10 +144,6 @@ const filterState = reactive({
 	color: '#4E70A6',
 })
 
-// Map type
-// Default basemap: AutoNavi (Gaode)
-const mapType = ref('amap')
-
 // Preset colors
 const presetColors = [
 	{ name: '科技蓝', color: '#4E70A6' },
@@ -185,14 +156,6 @@ const presetColors = [
 
 // Track imagery layers
 let originalLayers: any[] = []
-const mapLayers: Record<string, any[]> = {
-	amap: [],
-	tdt_vec: [],
-	tdt_ter: [],
-	tdt_img: [],
-}
-// 天地图 Key 请在 .env 中配置 VITE_TIANDITU_KEY
-const tdtKey = import.meta.env.VITE_TIANDITU_KEY || 'YOUR_TIANDITU_KEY'
 
 const updateTime = () => {
 	const now = new Date()
@@ -221,18 +184,6 @@ function flyToDefault() {
 	cesiumStore.flyToDefault(1.5)
 }
 
-// Apply style to layers
-const applyLayerStyle = (layers: any[], style: typeof baseInkStyle) => {
-	if (!layers || !layers.length) return
-	layers.forEach((layer: any) => {
-		layer.saturation = style.saturation
-		layer.brightness = style.brightness
-		layer.contrast = style.contrast
-		layer.gamma = style.gamma
-		layer.hue = style.hue
-	})
-}
-
 // Update globe filter uniforms
 const updateUniforms = () => {
 	const viewer = (window as any).Gviewer
@@ -247,9 +198,6 @@ const updateUniforms = () => {
 		globe.filterExposure = 1.25
 		globe.filterContrast = 1.1
 	}
-
-	const activeLayers = mapLayers[mapType.value] || []
-	applyLayerStyle(activeLayers, filterState.enabled ? baseInkStyle : baseColorStyle)
 }
 
 function handleFilterChange() {
@@ -259,52 +207,6 @@ function handleFilterChange() {
 function applyPreset(color: string) {
 	filterState.color = color
 	filterState.enabled = true
-	updateUniforms()
-}
-
-// Ensure Tianditu layers exist
-const ensureTdtLayers = (val: string) => {
-	const viewer = (window as any).Gviewer
-	if (!viewer) return []
-	if (mapLayers[val] && mapLayers[val].length) return mapLayers[val]
-
-	let layersToAdd: string[] = []
-	if (val === 'tdt_vec') layersToAdd = ['vec_w', 'cva_w']
-	if (val === 'tdt_ter') layersToAdd = ['ter_w', 'cta_w']
-	if (val === 'tdt_img') layersToAdd = ['img_w', 'cia_w']
-
-	layersToAdd.forEach((layerName) => {
-		const provider = new Cesium.UrlTemplateImageryProvider({
-			url: `https://t{s}.tianditu.gov.cn/DataServer?T=${layerName}&x={x}&y={y}&l={z}&tk=${tdtKey}`,
-			subdomains: ['0', '1', '2', '3', '4', '5', '6', '7'],
-			maximumLevel: 18,
-		})
-		const layer = viewer.imageryLayers.addImageryProvider(provider)
-		mapLayers[val].push(layer)
-	})
-	return mapLayers[val]
-}
-
-const hideAllBaseLayers = () => {
-	Object.values(mapLayers).forEach((arr) => {
-		arr.forEach((layer: any) => {
-			layer.show = false
-		})
-	})
-}
-
-function selectBasemap(type: string) {
-	const viewer = (window as any).Gviewer
-	if (!viewer) return
-
-	mapType.value = type
-	hideAllBaseLayers()
-
-	const targetLayers = type === 'amap' ? mapLayers.amap : ensureTdtLayers(type)
-	targetLayers.forEach((layer: any) => {
-		layer.show = true
-	})
-
 	updateUniforms()
 }
 
@@ -333,11 +235,11 @@ const initGlobeFilter = () => {
 	const viewer = (window as any).Gviewer
 	if (!viewer || !viewer.scene || !viewer.scene.globe) return false
 
+	// Collect existing imagery layers for filter reference
 	const len = viewer.imageryLayers.length
 	for (let i = 0; i < len; i++) {
 		originalLayers.push(viewer.imageryLayers.get(i))
 	}
-	mapLayers.amap = originalLayers
 	updateUniforms()
 	return true
 }
@@ -357,8 +259,6 @@ onMounted(() => {
 	// Wait for Cesium viewer to be ready
 	const initTimer = setInterval(() => {
 		if (initGlobeFilter()) {
-			// Apply default basemap once viewer & base layers are ready
-			selectBasemap(mapType.value)
 			clearInterval(initTimer)
 		}
 	}, 300)
@@ -607,61 +507,6 @@ onUnmounted(() => {
 	&:hover {
 		transform: scale(1.15);
 		border-color: #fff;
-	}
-}
-
-.basemap-grid {
-	display: grid;
-	grid-template-columns: repeat(4, 1fr);
-	gap: 8px;
-}
-
-.basemap-item {
-	cursor: pointer;
-	text-align: center;
-	border: 1px solid transparent;
-	border-radius: 4px;
-	padding: 4px;
-	transition: all 0.2s;
-
-	.thumb {
-		height: 32px;
-		width: 100%;
-		border-radius: 3px;
-		margin-bottom: 4px;
-	}
-
-	.thumb.vec {
-		background: linear-gradient(135deg, #e8e8e8 0%, #c8c8c8 100%);
-	}
-
-	.thumb.ter {
-		background: linear-gradient(135deg, #5a6b48 0%, #3d4a32 100%);
-	}
-
-	.thumb.img {
-		background: linear-gradient(135deg, #1a3a5c 0%, #0a1a2a 100%);
-	}
-
-	.thumb.amap {
-		background: linear-gradient(135deg, #f0f0f0 0%, #d8d8d8 100%);
-	}
-
-	span {
-		font-size: 10px;
-		color: $text-sub;
-	}
-
-	&.active {
-		border-color: $neon-cyan;
-
-		span {
-			color: $neon-cyan;
-		}
-	}
-
-	&:hover {
-		border-color: rgba($neon-cyan, 0.4);
 	}
 }
 

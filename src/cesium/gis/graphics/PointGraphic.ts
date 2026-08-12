@@ -104,7 +104,7 @@ export class PointGraphic extends BaseGraphic {
         height: style.pointSize * 2,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        heightReference: Cesium.HeightReference.NONE,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       }
     } else if (iconType === 'dot') {
@@ -114,7 +114,7 @@ export class PointGraphic extends BaseGraphic {
         color: Cesium.Color.fromCssColorString(style.pointColor).withAlpha(style.opacity),
         outlineColor: Cesium.Color.fromCssColorString(style.strokeColor),
         outlineWidth: style.strokeWidth,
-        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        heightReference: Cesium.HeightReference.NONE,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       }
     } else {
@@ -128,7 +128,7 @@ export class PointGraphic extends BaseGraphic {
           ? Cesium.VerticalOrigin.BOTTOM 
           : Cesium.VerticalOrigin.CENTER,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        heightReference: Cesium.HeightReference.NONE,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       }
     }

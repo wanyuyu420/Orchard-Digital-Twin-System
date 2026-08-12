@@ -48,6 +48,12 @@ export default defineConfig(({ mode }) => {
         '/simulation/': {
           target: 'http://127.0.0.1:8081',
           changeOrigin: true
+        },
+        // Proxy for the remote GeoTIFF base map (avoids CORS issues)
+        '/geotiff-proxy': {
+          target: 'http://47.113.147.127',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/geotiff-proxy/, '')
         }
       }
     }

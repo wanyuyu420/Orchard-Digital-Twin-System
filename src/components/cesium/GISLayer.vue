@@ -6,6 +6,7 @@
 import { watch, onMounted, onUnmounted, shallowRef } from 'vue'
 import { useCesiumStore } from '@/stores/cesium'
 import { useGISStore } from '@/stores/gis'
+import { useOrchardStore } from '@/stores/orchard'
 import { DrawTool } from '@/cesium/gis/tools/DrawTool'
 import { VolumeTool, type VolumeAnalysisResult } from '@/cesium/gis/tools/VolumeTool'
 import { FloodTool, type FloodAnalysisResult } from '@/cesium/gis/tools/FloodTool'
@@ -24,6 +25,7 @@ declare const Cesium: any
 
 const cesiumStore = useCesiumStore()
 const gisStore = useGISStore()
+const orchardStore = useOrchardStore()
 
 // Current active tool instance
 const currentTool = shallowRef<
@@ -605,8 +607,16 @@ function deleteSelectedFeatures(): void {
 
 	console.log('Deleting selected features:', selectedIds)
 
-	// Remove each selected feature
+	// Remove each selected feature, sync with orchardStore sidebar
 	selectedIds.forEach((featureId) => {
+		// Sync remove from orchardStore sidebar
+		const geoIndex = orchardStore.drawnGeometries.findIndex(
+			(g) => g.featureId === featureId
+		)
+		if (geoIndex !== -1) {
+			orchardStore.drawnGeometries.splice(geoIndex, 1)
+		}
+		// Remove from gisStore (destroys graphic on map)
 		gisStore.removeFeature(featureId)
 	})
 
@@ -712,12 +722,24 @@ watch(
 
 /**
  * Check if tool type is a drawing tool
+ * Accepts both prefixed ('draw-point') and unprefixed ('point', 'rectangle') names
  */
 function isDrawTool(toolType: string | null): boolean {
 	if (!toolType) return false
-	return ['draw-point', 'draw-line', 'draw-circle', 'draw-rectangle', 'draw-polygon'].includes(
-		toolType
-	)
+	return [
+		'draw-point', 'draw-line', 'draw-circle', 'draw-rectangle', 'draw-polygon',
+		'point', 'line', 'circle', 'rectangle', 'polygon',
+	].includes(toolType)
+}
+
+/**
+ * Normalize tool type to always have the 'draw-' prefix
+ * Converts 'rectangle' → 'draw-rectangle', 'circle' → 'draw-circle', etc.
+ * Passes through already-prefixed names unchanged
+ */
+function normalizeDrawToolType(toolType: string): string {
+	if (toolType.startsWith('draw-')) return toolType
+	return `draw-${toolType}`
 }
 
 /**
@@ -726,6 +748,38 @@ function isDrawTool(toolType: string | null): boolean {
 function isAnalysisTool(toolType: string | null): boolean {
 	if (!toolType) return false
 	return ['volume', 'flood', 'profile', 'measure3d'].includes(toolType)
+}
+
+/**
+ * Convert a Feature to sidebar-compatible coordinate format
+ * Produces flat `[[lon, lat], ...]` arrays for zoom/display in LeftSidebar
+ */
+function featureToSidebarCoords(
+	feature: Feature,
+	type: 'rectangle' | 'circle' | 'polygon'
+): number[][] {
+	const f = feature as any
+	switch (type) {
+		case 'rectangle': {
+			const sw = f.southwest
+			const ne = f.northeast
+			return [
+				[sw.longitude, sw.latitude],
+				[ne.longitude, sw.latitude],
+				[ne.longitude, ne.latitude],
+				[sw.longitude, ne.latitude],
+			]
+		}
+		case 'circle': {
+			const center = f.center
+			return [[center.longitude, center.latitude]]
+		}
+		case 'polygon': {
+			return f.vertices.map((v: any) => [v.longitude, v.latitude])
+		}
+		default:
+			return []
+	}
 }
 
 /**
@@ -739,8 +793,11 @@ function activateTool(toolType: DrawToolType) {
 	}
 
 	try {
+		// Normalize tool type: ensure 'draw-' prefix for internal use
+		const normalizedType = normalizeDrawToolType(toolType as string)
+
 		// Get tool-specific style from store (with localStorage persistence)
-		const toolStyle = gisStore.getToolStyle(toolType as any)
+		const toolStyle = gisStore.getToolStyle(normalizedType as any)
 
 		// Merge with defaults (fallback to drawStyle for any missing properties)
 		const style = {
@@ -755,7 +812,7 @@ function activateTool(toolType: DrawToolType) {
 		}
 
 		const tool = new DrawTool(viewer, {
-			geometryType: toolType.replace('draw-', '') as any, // toolType is 'draw-point' etc., remove prefix
+			geometryType: normalizedType.replace('draw-', '') as any, // Use normalized type
 			style: style,
 			onComplete: (feature: Feature) => {
 				// Convert Feature to Graphic
@@ -767,6 +824,29 @@ function activateTool(toolType: DrawToolType) {
 
 				// Register feature and graphic to GISStore
 				gisStore.addFeature(feature, graphic)
+
+				// Bridge to orchardStore for left sidebar layer display
+				const geomType = normalizedType.replace('draw-', '') as 'rectangle' | 'circle' | 'polygon'
+				if (['rectangle', 'circle', 'polygon'].includes(geomType)) {
+					const nextNum = orchardStore.drawnGeometries.length + 1
+					const layerName = `#${nextNum}`
+
+					// Convert feature to sidebar-compatible coordinates
+					const coords = featureToSidebarCoords(feature, geomType)
+
+					orchardStore.saveDrawnGeometry({
+						name: layerName,
+						type: geomType,
+						coordinates: coords,
+						featureId: feature.id,
+					})
+
+					// 将绘制图形坐标同步到 selectionRange，供查询面板使用
+					orchardStore.setSelectionRange({
+						type: geomType,
+						coordinates: coords,
+					})
+				}
 
 				// For MVP: Keep tool active for easier use (user can click away to deactivate)
 				// Future: Add toggle for continuous mode in UI
@@ -787,8 +867,8 @@ function activateTool(toolType: DrawToolType) {
 		currentTool.value = tool
 		gisStore.currentTool = tool
 
-		// Update store state
-		gisStore.startDrawing()
+		// Update store state - use the original toolType so the UI can toggle correctly
+		gisStore.startDrawing(toolType as string)
 	} catch (error) {
 		console.error('Failed to activate drawing tool:', error)
 	}
@@ -992,22 +1072,23 @@ function createGraphicFromFeature(feature: Feature, viewer: any) {
 
 	try {
 		// Extract positions based on feature type
+		// 保留原始高度信息，不强制覆盖为固定值
 		if (feature.type === 'point') {
 			const p = feature.position
-			positions = [Cesium.Cartesian3.fromDegrees(p.longitude, p.latitude, (p as any).height || 0)]
+			positions = [Cesium.Cartesian3.fromDegrees(p.longitude, p.latitude, (p as any).height)]
 		} else if (feature.type === 'line') {
-			positions = feature.vertices.map(v => Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, (v as any).height || 0))
+			positions = feature.vertices.map(v => Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, (v as any).height))
 		} else if (feature.type === 'polygon') {
-			positions = feature.vertices.map(v => Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, (v as any).height || 0))
+			positions = feature.vertices.map(v => Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, (v as any).height))
 		} else if (feature.type === 'circle') {
 			const c = feature.center
-			positions = [Cesium.Cartesian3.fromDegrees(c.longitude, c.latitude, (c as any).height || 0)]
+			positions = [Cesium.Cartesian3.fromDegrees(c.longitude, c.latitude, (c as any).height)]
 		} else if (feature.type === 'rectangle') {
 			const sw = feature.southwest
 			const ne = feature.northeast
 			// Construct approximate corners for RectangleGraphic creation (opposite corners)
-			const p1 = Cesium.Cartesian3.fromDegrees(sw.longitude, sw.latitude, (sw as any).height || 0)
-			const p2 = Cesium.Cartesian3.fromDegrees(ne.longitude, ne.latitude, (ne as any).height || 0)
+			const p1 = Cesium.Cartesian3.fromDegrees(sw.longitude, sw.latitude, (sw as any).height)
+			const p2 = Cesium.Cartesian3.fromDegrees(ne.longitude, ne.latitude, (ne as any).height)
 			positions = [p1, p2]
 		}
 
@@ -1039,42 +1120,17 @@ function createGraphicFromFeature(feature: Feature, viewer: any) {
 					console.error('Circle missing radius property:', feature)
 					return null
 				}
-				// CircleGraphic.create() expects [center, edgePoint]
-				// Calculate edge point from center + radius using geodesic
+				// 直接使用 feature 的 center 和 radius 创建圆形
 				const centerPos = positions[0]
-				const centerCarto = Cesium.Cartographic.fromCartesian(centerPos)
-
-				// Use EllipsoidGeodesic to calculate accurate edge point
-				const destinationCarto = new Cesium.Cartographic(
-					centerCarto.longitude,
-					centerCarto.latitude
-				)
-				// Move east by radius meters using geodesic calculation
-				const geodesic = new Cesium.EllipsoidGeodesic(
-					centerCarto,
-					new Cesium.Cartographic(
-						centerCarto.longitude + 0.01, // small offset east
-						centerCarto.latitude
-					)
-				)
-				// Scale to get actual edge point at correct distance
-				const fraction = feature.radius / geodesic.surfaceDistance
-				const edgeCarto = geodesic.interpolateUsingSurfaceDistance(feature.radius)
-				const edgePos = Cesium.Cartesian3.fromRadians(
-					edgeCarto.longitude,
-					edgeCarto.latitude,
-					centerCarto.height
-				)
-				const circlePositions = [centerPos, edgePos]
-
-				graphic = new CircleGraphic(viewer, {
+				const circleGraphic = new CircleGraphic(viewer, {
 					name,
 					style,
 				})
-				graphic.create(circlePositions)
-				graphic.bindFeatureId(feature.id)
-				console.log(`Created circle graphic:`, feature.id, circlePositions.length, 'positions')
-				return graphic
+				// 直接设置 center 和 radius，不通过 positions 计算
+				circleGraphic.setCenterAndRadius(centerPos, feature.radius)
+				circleGraphic.bindFeatureId(feature.id)
+				console.log(`Created circle graphic:`, feature.id, 'center:', centerPos)
+				return circleGraphic
 			}
 			case 'rectangle': {
 				// Rectangle is stored as Polygon with 5 positions (4 corners + closing point)

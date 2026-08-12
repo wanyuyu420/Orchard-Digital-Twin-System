@@ -1,5 +1,5 @@
 # 类型安全的 Pydantic 出入港安检门——输入校验、输出序列化、看板统计
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from typing_extensions import Self
 from pydantic import BaseModel, Field, model_validator
 
@@ -80,3 +80,39 @@ class DiagnoseResultSchema(BaseModel):
     trees: List[OrangeTreeOut] = Field(default_factory=list, description="框选区域内的树木明细")
 
     model_config = {"from_attributes": True}
+
+
+# ── 动态单体化要素回传体 (3.6 规范) ──────────────────────
+
+
+class TreeFeature(BaseModel):
+    """单棵树GeoJSON Polygon要素 — 前端Cesium动态单体化渲染与拾取"""
+    id: int = Field(..., description="数据库唯一ID，前端点击拾取凭证")
+    growth_status: str = Field(..., description="长势属性 (优良/一般/较差/未知)")
+    fertilizer_kg: float = Field(..., description="变量施肥建议量 (公斤/棵)")
+    area_m2: float = Field(..., description="树冠投影面积 (平方米)")
+    geometry: Dict[str, Any] = Field(..., description="标准GeoJSON Polygon结构")
+
+
+def growth_index_to_status(index: float | None) -> str:
+    """生长指数 → 长势中文标签"""
+    if index is None:
+        return "未知"
+    if index >= 0.7:
+        return "优良"
+    elif index >= 0.4:
+        return "一般"
+    else:
+        return "较差"
+
+
+def fertilizer_level_to_kg(level: int) -> float:
+    """变量施肥等级 → 建议施肥量(公斤/棵)"""
+    mapping = {0: 0.0, 1: 0.5, 2: 1.2, 3: 2.0}
+    return mapping.get(level, 0.0)
+
+
+class HistoricalTreesOut(BaseModel):
+    """历史老树全量查询响应"""
+    total: int
+    trees: List[OrangeTreeOut]

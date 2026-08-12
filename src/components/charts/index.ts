@@ -12,6 +12,7 @@ export { default as NetworkTrendChart } from './NetworkTrendChart.vue'
 export { default as SparklineChart } from './SparklineChart.vue'
 export { default as FloodProgressChart } from './FloodProgressChart.vue'
 export { default as DisplacementTrendChart } from './DisplacementTrendChart.vue'
+export { default as OrchardChartDialog } from './OrchardChartDialog.vue'
 
 // Theme exports
 export * from './theme'

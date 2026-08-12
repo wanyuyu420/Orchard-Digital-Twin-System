@@ -605,9 +605,13 @@ export const useGISStore = defineStore('gis', () => {
 
   /**
    * Start drawing
+   * @param toolType - Optional tool type to activate
    */
-  function startDrawing() {
+  function startDrawing(toolTypeParam?: string) {
     mode.value = 'drawing'
+    if (toolTypeParam) {
+      toolType.value = toolTypeParam as ToolType
+    }
   }
 
   /**
@@ -625,6 +629,14 @@ export const useGISStore = defineStore('gis', () => {
    */
   function cancelDrawing() {
     mode.value = 'none'
+  }
+
+  /**
+   * Stop drawing (convenience alias for deactivateTool)
+   * Used by UI components like TopMenuBar to toggle drawing off
+   */
+  function stopDrawing() {
+    deactivateTool()
   }
 
   /**
@@ -1396,6 +1408,7 @@ export const useGISStore = defineStore('gis', () => {
     startDrawing,
     finishDrawing,
     cancelDrawing,
+    stopDrawing,
     enterEditMode,
     exitEditMode,
 

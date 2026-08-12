@@ -23,15 +23,19 @@ export interface CircleGraphicOptions extends BaseGraphicOptions {
  * CircleGraphic 类
  *
  * 功能：
- * - 使用 EllipseGraphics 渲染（半长轴=半短轴=半径）
+ * - 使用 EllipseGraphics 渲染填充（透明）
+ * - 使用独立 Polyline 渲染边框（支持自定义宽度）
  * - 半径和面积计算（大地测量）
  * - 标签显示（中心、半径、面积）
  * - 支持填充和边框样式
  * - 编辑模式（显示中心点和边界点）
  */
 export class CircleGraphic extends BaseGraphic {
-  /** 圆形实体 */
+  /** 圆形填充实体 */
   private circleEntity: Cesium.Entity | null = null
+
+  /** 圆形边框实体（独立 Polyline）*/
+  private outlineEntity: Cesium.Entity | null = null
 
   /** 半径标签实体 */
   private radiusLabelEntity: Cesium.Entity | null = null
@@ -65,8 +69,8 @@ export class CircleGraphic extends BaseGraphic {
 
   constructor(viewer: Cesium.Viewer, options: CircleGraphicOptions = {}) {
     super(viewer, { ...options, type: 'circle' })
-    this.showRadiusLabel = options.showRadiusLabel ?? true
-    this.showAreaLabel = options.showAreaLabel ?? true
+    this.showRadiusLabel = options.showRadiusLabel ?? false  // 默认不显示半径标签
+    this.showAreaLabel = options.showAreaLabel ?? false      // 默认不显示面积标签
     this.heightReference = options.heightReference ?? Cesium.HeightReference.CLAMP_TO_GROUND
   }
 
@@ -88,26 +92,62 @@ export class CircleGraphic extends BaseGraphic {
     // 计算面积
     this.area = Math.PI * this.radius * this.radius
 
-    // 创建圆形实体
+    // 创建圆形填充实体
     this.createCircleEntity()
+
+    // 创建独立边框
+    this.createOutlineEntity()
 
     // 创建标签
     if (this.showRadiusLabel) {
       this.createRadiusLabel(edgePosition)
     }
-    if (this.showAreaLabel) {
-      this.createAreaLabel()
-    }
-
-    // Circle creation complete
   }
 
   /**
-   * 创建圆形实体
+   * 直接设置圆心和半径创建圆形
+   * @param center 圆心位置
+   * @param radius 半径（米）
+   */
+  setCenterAndRadius(center: Cesium.Cartesian3, radius: number): void {
+    // 清除旧的实体
+    this.remove()
+
+    this.centerPosition = center
+    this.radius = radius
+    this.area = Math.PI * radius * radius
+
+    // 创建圆形填充实体
+    this.createCircleEntity()
+
+    // 创建独立边框
+    this.createOutlineEntity()
+
+    // 创建标签
+    if (this.showRadiusLabel) {
+      // 计算边缘点用于标签位置
+      const ellipsoid = this.viewer.scene.globe.ellipsoid
+      const centerCartographic = ellipsoid.cartesianToCartographic(center)
+      const edgeCartographic = new Cesium.Cartographic(
+        centerCartographic.longitude + radius / ellipsoid.maximumRadius,
+        centerCartographic.latitude,
+        centerCartographic.height
+      )
+      const edgePosition = ellipsoid.cartographicToCartesian(edgeCartographic)
+      this.createRadiusLabel(edgePosition)
+    }
+    if (this.showAreaLabel) {
+      this.createAreaLabel()
+    }
+  }
+
+  /**
+   * 创建圆形填充实体
    */
   private createCircleEntity(): void {
     if (!this.centerPosition) return
 
+    // 创建圆形实体（填充）
     this.circleEntity = this.viewer.entities.add({
       id: this.id,
       name: this.name,
@@ -115,14 +155,48 @@ export class CircleGraphic extends BaseGraphic {
       ellipse: {
         semiMinorAxis: this.radius,
         semiMajorAxis: this.radius,
-        material: this.getMaterial(),
-        classificationType: Cesium.ClassificationType.TERRAIN, // Classify on terrain to avoid Z-fighting
-        // Note: outline is disabled when using classificationType
+        material: Cesium.Color.TRANSPARENT, // 透明填充
         outline: false,
       },
     })
 
     this.entities.push(this.circleEntity)
+  }
+
+  /**
+   * 创建独立边框实体
+   * 使用 Polyline 生成圆形边框
+   */
+  private createOutlineEntity(): void {
+    if (!this.centerPosition) return
+
+    const ellipsoid = this.viewer.scene.globe.ellipsoid
+    const centerCartographic = ellipsoid.cartesianToCartographic(this.centerPosition)
+
+    // 生成圆形边界点（64个点，确保圆形足够平滑）
+    const numPoints = 64
+    const outlinePositions: Cesium.Cartesian3[] = []
+
+    for (let i = 0; i <= numPoints; i++) {
+      const angle = (i / numPoints) * 2 * Math.PI
+      const pointCartographic = new Cesium.Cartographic(
+        centerCartographic.longitude + (this.radius / ellipsoid.maximumRadius) * Math.cos(angle),
+        centerCartographic.latitude + (this.radius / ellipsoid.maximumRadius) * Math.sin(angle),
+      )
+      outlinePositions.push(ellipsoid.cartographicToCartesian(pointCartographic))
+    }
+
+    // 使用 Entity polyline 创建边框（clampToGround 使边框贴在地形/3D模型表面）
+    this.outlineEntity = this.viewer.entities.add({
+      polyline: {
+        positions: outlinePositions,
+        clampToGround: true,
+        width: this.style.strokeWidth || 2,
+        material: Cesium.Color.fromCssColorString(this.style.strokeColor || '#000000'),
+      },
+    })
+
+    this.entities.push(this.outlineEntity)
   }
 
   /**
@@ -198,8 +272,21 @@ export class CircleGraphic extends BaseGraphic {
     const centerCartographic = ellipsoid.cartesianToCartographic(center)
     const edgeCartographic = ellipsoid.cartesianToCartographic(edge)
 
+    // 防御性检查：确保坐标转换成功
+    if (!centerCartographic || !edgeCartographic) {
+      // 回退到简单的笛卡尔距离计算
+      return Cesium.Cartesian3.distance(center, edge)
+    }
+
     const geodesic = new Cesium.EllipsoidGeodesic(centerCartographic, edgeCartographic)
-    return geodesic.surfaceDistance
+    const distance = geodesic.surfaceDistance
+    
+    // 检查距离是否有效
+    if (isNaN(distance) || !isFinite(distance)) {
+      return Cesium.Cartesian3.distance(center, edge)
+    }
+    
+    return distance
   }
 
   /**
@@ -344,7 +431,14 @@ export class CircleGraphic extends BaseGraphic {
       this.viewer.entities.remove(entity)
     })
     this.entities = []
+    
+    // 移除 GroundPolylinePrimitive
+    if (this.outlineEntity) {
+      this.viewer.scene.primitives.remove(this.outlineEntity)
+    }
+    
     this.circleEntity = null
+    this.outlineEntity = null
     this.radiusLabelEntity = null
     this.areaLabelEntity = null
     this.centerMarker = null
@@ -415,16 +509,13 @@ export class CircleGraphic extends BaseGraphic {
    */
   protected applyStyle(): void {
     if (this.circleEntity && this.circleEntity.ellipse) {
-      const fillColor = Cesium.Color.fromCssColorString(
-        this.style.fillColor || '#22D3EE'
-      ).withAlpha(this.style.fillOpacity ?? this.style.opacity ?? 0.3)
-      const outlineColor = Cesium.Color.fromCssColorString(this.style.strokeColor || '#22D3EE')
-
-      this.circleEntity.ellipse.material = new Cesium.ColorMaterialProperty(fillColor)
-      this.circleEntity.ellipse.outlineColor = new Cesium.ConstantProperty(outlineColor)
-      this.circleEntity.ellipse.outlineWidth = new Cesium.ConstantProperty(
-        this.style.strokeWidth || 2
-      )
+      // 保持透明填充
+      this.circleEntity.ellipse.material = Cesium.Color.TRANSPARENT
+    }
+    if (this.outlineEntity && this.outlineEntity.polyline) {
+      // 使用配置的线条颜色
+      this.outlineEntity.polyline.material = Cesium.Color.fromCssColorString(this.style.strokeColor || '#000000')
+      this.outlineEntity.polyline.width = new Cesium.ConstantProperty(this.style.strokeWidth || 2)
     }
   }
 

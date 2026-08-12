@@ -10,6 +10,9 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# 浏览器调试临时目录
+edge_profile/
+
 # 敏感信息
 .env
 .env.local
@@ -85,3 +88,19 @@ last-chat.txt
 dev.sh
 .trae/
 temp/
+
+# 训练数据集（不在 git 中）
+datasets/
+*.pt
+*.pth
+
+# 本地推理产物（不在 git 中）
+backend/debug_tiles/
+backend/temp_storage/
+backend/runs/
+backend/*.tif
+backend/data/uploads/
+backend/data/new/
+backend/data/2019081929/
+backend/_patch*
+backend/temp_storage/

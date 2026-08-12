@@ -1,0 +1,6 @@
+names:
+- tree_crown
+nc: 1
+path: C:/Users/asus/Desktop/Esri_QC/water-digital-twin-platform/backend/data/qichengshuguan
+train: test1(img_rgb)/images/train
+val: test1(img_rgb)/images/val

@@ -426,7 +426,7 @@ interface StylePreset {
 const gisStore = useGISStore()
 const cesiumStore = useCesiumStore()
 
-// === Style Configuration ===
+// === Style Configuration - 恢复彩色主题 ===
 const styleConfig = reactive<StyleConfig>({
 	fillColor: '#22D3EE',
 	strokeColor: '#FFFFFF',
@@ -435,7 +435,7 @@ const styleConfig = reactive<StyleConfig>({
 	pointSize: 10,
 })
 
-// Style presets
+// Style presets - 恢复彩色主题
 const stylePresets: StylePreset[] = [
 	{ name: '青色', fillColor: '#22D3EE', strokeColor: '#FFFFFF', fillOpacity: 0.3, strokeWidth: 2 },
 	{ name: '红色', fillColor: '#EF4444', strokeColor: '#FFFFFF', fillOpacity: 0.3, strokeWidth: 2 },

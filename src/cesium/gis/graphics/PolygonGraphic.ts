@@ -64,7 +64,7 @@ export class PolygonGraphic extends BaseGraphic {
 
   constructor(viewer: Cesium.Viewer, options: PolygonGraphicOptions = {}) {
     super(viewer, { ...options, type: 'polygon' })
-    this.showAreaLabel = options.showAreaLabel ?? true
+    this.showAreaLabel = options.showAreaLabel ?? false // 默认不显示面积标签
     this.heightReference = options.heightReference ?? Cesium.HeightReference.CLAMP_TO_GROUND
     this.centerIcon = options.centerIcon
   }
@@ -113,9 +113,8 @@ export class PolygonGraphic extends BaseGraphic {
       name: this.name,
       polygon: {
         hierarchy: new Cesium.PolygonHierarchy(this.positions),
-        material: this.getMaterial(),
-        classificationType: Cesium.ClassificationType.TERRAIN, // Classify on terrain to avoid Z-fighting
-        // 不使用 Cesium 自带的 outline（classificationType 模式不支持）
+        material: Cesium.Color.TRANSPARENT, // 完全透明填充
+        classificationType: Cesium.ClassificationType.BOTH_3D_TILE, // 贴地形/3D Tile表面
         outline: false,
       },
     })
@@ -133,12 +132,13 @@ export class PolygonGraphic extends BaseGraphic {
     // 闭合多边形：最后一个点连回第一个点
     const outlinePositions = [...this.positions, this.positions[0]]
 
+    // 使用 Entity polyline 创建边框（clampToGround 使边框贴在地形/3D模型表面）
     this.outlineEntity = this.viewer.entities.add({
       polyline: {
         positions: outlinePositions,
+        clampToGround: true,
         width: this.style.strokeWidth || 2,
-        material: Cesium.Color.fromCssColorString(this.style.strokeColor || '#ffcc33'),
-        clampToGround: true, // Always clamp outline to ground for terrain-classified polygons
+        material: Cesium.Color.fromCssColorString(this.style.strokeColor || '#000000'),
       },
     })
 
@@ -432,6 +432,12 @@ export class PolygonGraphic extends BaseGraphic {
       this.viewer.entities.remove(entity)
     })
     this.entities = []
+    
+    // 移除 GroundPolylinePrimitive
+    if (this.outlineEntity) {
+      this.viewer.scene.primitives.remove(this.outlineEntity)
+    }
+    
     this.polygonEntity = null
     this.outlineEntity = null
     this.areaLabelEntity = null
@@ -483,18 +489,14 @@ export class PolygonGraphic extends BaseGraphic {
    * 覆盖基类方法以支持高亮效果
    */
   protected applyStyle(): void {
-    // Update polygon fill
+    // Update polygon fill - 保持透明
     if (this.polygonEntity && this.polygonEntity.polygon) {
-      const fillColor = Cesium.Color.fromCssColorString(
-        this.style.fillColor || '#ffcc33'
-      ).withAlpha(this.style.fillOpacity ?? this.style.opacity ?? 0.5)
-      this.polygonEntity.polygon.material = new Cesium.ColorMaterialProperty(fillColor)
+      this.polygonEntity.polygon.material = Cesium.Color.TRANSPARENT
     }
 
-    // Update outline
+    // Update outline - 使用配置的线条颜色
     if (this.outlineEntity && this.outlineEntity.polyline) {
-      const strokeColor = Cesium.Color.fromCssColorString(this.style.strokeColor || '#ffcc33')
-      this.outlineEntity.polyline.material = new Cesium.ColorMaterialProperty(strokeColor)
+      this.outlineEntity.polyline.material = Cesium.Color.fromCssColorString(this.style.strokeColor || '#000000')
       this.outlineEntity.polyline.width = new Cesium.ConstantProperty(this.style.strokeWidth || 2)
     }
   }

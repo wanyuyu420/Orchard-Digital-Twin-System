@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>水利数字孪生基础平台</title>
+    <title>脐橙冠层三维解析与精准农情决策系统</title>
     <!-- FontAwesome -->
     <link
       rel="stylesheet"
@@ -15,12 +15,13 @@
       href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <!-- Cesium 1.136 (modified build with globe filter support) -->
+    <!-- Cesium 官方 1.144(来自果园2.0,替换 epawse 魔改版以避免 WebGL context loss 崩溃) -->
+    <!-- 回退旧版:把下面 3 行改成 /Cesium-1.136-epawse/Build/CesiumUnminified/ 即可 -->
     <script>
-      window.CESIUM_BASE_URL = '/Cesium-1.136-epawse/Build/CesiumUnminified/';
+      window.CESIUM_BASE_URL = '/Cesium-1.144/';
     </script>
-    <script src="/Cesium-1.136-epawse/Build/CesiumUnminified/Cesium.js"></script>
-    <link rel="stylesheet" href="/Cesium-1.136-epawse/Build/CesiumUnminified/Widgets/widgets.css" />
+    <script src="/Cesium-1.144/Cesium.js"></script>
+    <link rel="stylesheet" href="/Cesium-1.144/Widgets/widgets.css" />
   </head>
   <body>
     <div id="app"></div>

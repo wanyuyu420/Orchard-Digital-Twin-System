@@ -34,8 +34,22 @@ export const useCesiumStore = defineStore('cesium', () => {
     roll: number
   } | null>(null)
 
+  // Saved "home" view after model loads (for "回到初始视角")
+  const homeView = ref<{
+    lon: number
+    lat: number
+    height: number
+    heading: number
+    pitch: number
+    roll: number
+  } | null>(null)
+
   function setViewer(v: any) {
     viewer.value = v
+  }
+
+  function setHomeView(view: typeof homeView.value) {
+    homeView.value = view
   }
 
   function toggle2D3D(mode2D: boolean) {
@@ -87,20 +101,44 @@ export const useCesiumStore = defineStore('cesium', () => {
   }
 
   function flyToDefault(duration = 2) {
-    if (!viewer.value) return
-    viewer.value.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(
-        defaultView.lon,
-        defaultView.lat,
-        defaultView.height
-      ),
-      orientation: {
-        heading: Cesium.Math.toRadians(defaultView.heading),
-        pitch: Cesium.Math.toRadians(defaultView.pitch),
-        roll: Cesium.Math.toRadians(defaultView.roll),
-      },
-      duration,
-    })
+    if (!viewer.value) {
+      console.warn('[cesiumStore] viewer not ready, cannot fly to default')
+      return
+    }
+    try {
+      viewer.value.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(
+          defaultView.lon,
+          defaultView.lat,
+          defaultView.height,
+        ),
+        orientation: {
+          heading: Cesium.Math.toRadians(defaultView.heading),
+          pitch: Cesium.Math.toRadians(defaultView.pitch),
+          roll: Cesium.Math.toRadians(defaultView.roll),
+        },
+        duration,
+      })
+    } catch (e) {
+      console.warn('[cesiumStore] flyToDefault failed, fallback to setView:', e)
+      // fallback: instant jump if flyTo fails
+      try {
+        viewer.value.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(
+            defaultView.lon,
+            defaultView.lat,
+            defaultView.height,
+          ),
+          orientation: {
+            heading: Cesium.Math.toRadians(defaultView.heading),
+            pitch: Cesium.Math.toRadians(defaultView.pitch),
+            roll: Cesium.Math.toRadians(defaultView.roll),
+          },
+        })
+      } catch (e2) {
+        console.error('[cesiumStore] setView fallback also failed:', e2)
+      }
+    }
   }
 
   function zoomIn() {
@@ -113,6 +151,36 @@ export const useCesiumStore = defineStore('cesium', () => {
     if (!viewer.value) return
     const camera = viewer.value.camera
     camera.zoomOut(camera.positionCartographic.height * 0.3)
+  }
+
+  /**
+   * Zoom to the home/default view
+   * Uses the saved home view (from model initial flyTo) if available,
+   * otherwise falls back to defaultView config.
+   */
+  function zoomToHome(duration = 1.5) {
+    if (!viewer.value) return
+    if (homeView.value) {
+      try {
+        viewer.value.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(
+            homeView.value.lon,
+            homeView.value.lat,
+            homeView.value.height,
+          ),
+          orientation: {
+            heading: homeView.value.heading,
+            pitch: homeView.value.pitch,
+            roll: homeView.value.roll,
+          },
+          duration,
+        })
+        return
+      } catch (e) {
+        console.warn('[cesiumStore] zoomToHome (homeView) failed, fallback to defaultView:', e)
+      }
+    }
+    flyToDefault(duration)
   }
 
   /**
@@ -164,12 +232,15 @@ export const useCesiumStore = defineStore('cesium', () => {
     videoEnabled,
     videoLoading,
     savedCameraState,
+    homeView,
     setViewer,
+    setHomeView,
     toggle2D3D,
     flyTo,
     flyToDefault,
     zoomIn,
     zoomOut,
+    zoomToHome,
     enableTerrain,
     disableTerrain,
     toggleTerrain,

@@ -23,7 +23,8 @@ export interface RectangleGraphicOptions extends BaseGraphicOptions {
  * RectangleGraphic 类
  *
  * 功能：
- * - 使用 RectangleGraphics 渲染（性能优化）
+ * - 使用 RectangleGraphics 渲染填充
+ * - 使用独立 Polyline 渲染边框（支持自定义宽度）
  * - 面积计算（平方米/平方公里）
  * - 尺寸标签（宽×高）
  * - 面积标签显示
@@ -31,8 +32,11 @@ export interface RectangleGraphicOptions extends BaseGraphicOptions {
  * - 编辑模式（显示4个角点标记）
  */
 export class RectangleGraphic extends BaseGraphic {
-  /** 矩形实体 */
+  /** 矩形填充实体 */
   private rectangleEntity: Cesium.Entity | null = null
+
+  /** 矩形边框实体（独立 Polyline）*/
+  private outlineEntity: Cesium.Entity | null = null
 
   /** 尺寸标签实体 */
   private dimensionsLabelEntity: Cesium.Entity | null = null
@@ -61,13 +65,16 @@ export class RectangleGraphic extends BaseGraphic {
   /** 高度（米）*/
   private height: number = 0
 
+  /** 矩形所在高度（用于边框贴合3D表面）*/
+  private rectHeight: number = 0
+
   /** 面积（平方米）*/
   private area: number = 0
 
   constructor(viewer: Cesium.Viewer, options: RectangleGraphicOptions = {}) {
     super(viewer, { ...options, type: 'rectangle' })
-    this.showDimensionsLabel = options.showDimensionsLabel ?? true
-    this.showAreaLabel = options.showAreaLabel ?? true
+    this.showDimensionsLabel = options.showDimensionsLabel ?? false
+    this.showAreaLabel = options.showAreaLabel ?? false
     this.heightReference = options.heightReference ?? Cesium.HeightReference.CLAMP_TO_GROUND
   }
 
@@ -90,6 +97,9 @@ export class RectangleGraphic extends BaseGraphic {
     const east = Math.max(cartographics[0].longitude, cartographics[1].longitude)
     const north = Math.max(cartographics[0].latitude, cartographics[1].latitude)
 
+    // 使用两个角点的平均高度，使边框贴合3D模型表面
+    this.rectHeight = (cartographics[0].height + cartographics[1].height) / 2
+
     this.rectangleBounds = Cesium.Rectangle.fromRadians(west, south, east, north)
 
     // 计算尺寸和面积
@@ -98,8 +108,11 @@ export class RectangleGraphic extends BaseGraphic {
     this.height = dimensions.height
     this.area = this.width * this.height
 
-    // 创建矩形实体
+    // 创建矩形实体（填充）
     this.createRectangleEntity()
+
+    // 创建独立边框
+    this.createOutlineEntity()
 
     // 创建标签
     if (this.showDimensionsLabel) {
@@ -113,7 +126,7 @@ export class RectangleGraphic extends BaseGraphic {
   }
 
   /**
-   * 创建矩形实体
+   * 创建矩形填充实体
    */
   private createRectangleEntity(): void {
     if (!this.rectangleBounds) return
@@ -123,14 +136,46 @@ export class RectangleGraphic extends BaseGraphic {
       name: this.name,
       rectangle: {
         coordinates: this.rectangleBounds,
-        material: this.getMaterial(),
-        classificationType: Cesium.ClassificationType.TERRAIN, // Classify on terrain to avoid Z-fighting
-        // Note: outline is disabled when using classificationType
+        material: Cesium.Color.TRANSPARENT, // 完全透明填充
         outline: false,
       },
     })
 
     this.entities.push(this.rectangleEntity)
+  }
+
+  /**
+   * 创建独立边框实体
+   * 解决 Cesium RectangleGraphics outlineWidth 限制和 classificationType 冲突问题
+   */
+  private createOutlineEntity(): void {
+    if (!this.rectangleBounds) return
+
+    const westDeg = Cesium.Math.toDegrees(this.rectangleBounds.west)
+    const eastDeg = Cesium.Math.toDegrees(this.rectangleBounds.east)
+    const southDeg = Cesium.Math.toDegrees(this.rectangleBounds.south)
+    const northDeg = Cesium.Math.toDegrees(this.rectangleBounds.north)
+
+    // 使用纯经纬度（不带高程），配合 clampToGround 使边框贴地
+    const nw = Cesium.Cartesian3.fromDegrees(westDeg, northDeg)
+    const ne = Cesium.Cartesian3.fromDegrees(eastDeg, northDeg)
+    const se = Cesium.Cartesian3.fromDegrees(eastDeg, southDeg)
+    const sw = Cesium.Cartesian3.fromDegrees(westDeg, southDeg)
+
+    // 边框位置（闭合）
+    const outlinePositions = [nw, ne, se, sw, nw]
+
+    // 使用 Entity polyline 创建边框（clampToGround 使边框贴在地形/3D模型表面）
+    this.outlineEntity = this.viewer.entities.add({
+      polyline: {
+        positions: outlinePositions,
+        clampToGround: true,
+        width: this.style.strokeWidth || 2,
+        material: Cesium.Color.fromCssColorString(this.style.strokeColor || '#000000'),
+      },
+    })
+
+    this.entities.push(this.outlineEntity)
   }
 
   /**
@@ -151,7 +196,7 @@ export class RectangleGraphic extends BaseGraphic {
 
     // 标签位置：矩形中心偏上
     const center = Cesium.Rectangle.center(this.rectangleBounds)
-    const centerCartesian = Cesium.Cartesian3.fromRadians(center.longitude, center.latitude, 0)
+    const centerCartesian = Cesium.Cartesian3.fromRadians(center.longitude, center.latitude, this.rectHeight)
 
     this.dimensionsLabelEntity = this.viewer.entities.add({
       position: centerCartesian,
@@ -179,7 +224,7 @@ export class RectangleGraphic extends BaseGraphic {
 
     // 标签位置：矩形中心偏下
     const center = Cesium.Rectangle.center(this.rectangleBounds)
-    const centerCartesian = Cesium.Cartesian3.fromRadians(center.longitude, center.latitude, 0)
+    const centerCartesian = Cesium.Cartesian3.fromRadians(center.longitude, center.latitude, this.rectHeight)
 
     this.areaLabelEntity = this.viewer.entities.add({
       position: centerCartesian,
@@ -369,7 +414,14 @@ export class RectangleGraphic extends BaseGraphic {
       this.viewer.entities.remove(entity)
     })
     this.entities = []
+    
+    // 移除 GroundPolylinePrimitive
+    if (this.outlineEntity) {
+      this.viewer.scene.primitives.remove(this.outlineEntity)
+    }
+    
     this.rectangleEntity = null
+    this.outlineEntity = null
     this.dimensionsLabelEntity = null
     this.areaLabelEntity = null
     this.cornerMarkers = []
@@ -391,7 +443,7 @@ export class RectangleGraphic extends BaseGraphic {
     const centerLon = (this.rectangleBounds.west + this.rectangleBounds.east) / 2
     const centerLat = (this.rectangleBounds.south + this.rectangleBounds.north) / 2
 
-    return Cesium.Cartesian3.fromRadians(centerLon, centerLat, 0)
+    return Cesium.Cartesian3.fromRadians(centerLon, centerLat, this.rectHeight)
   }
 
   /**
@@ -442,17 +494,15 @@ export class RectangleGraphic extends BaseGraphic {
    * 覆盖基类方法以支持高亮效果
    */
   protected applyStyle(): void {
+    // Update rectangle fill - 保持透明
     if (this.rectangleEntity && this.rectangleEntity.rectangle) {
-      const fillColor = Cesium.Color.fromCssColorString(
-        this.style.fillColor || '#22D3EE'
-      ).withAlpha(this.style.fillOpacity ?? this.style.opacity ?? 0.3)
-      const outlineColor = Cesium.Color.fromCssColorString(this.style.strokeColor || '#22D3EE')
+      this.rectangleEntity.rectangle.material = Cesium.Color.TRANSPARENT
+    }
 
-      this.rectangleEntity.rectangle.material = new Cesium.ColorMaterialProperty(fillColor)
-      this.rectangleEntity.rectangle.outlineColor = new Cesium.ConstantProperty(outlineColor)
-      this.rectangleEntity.rectangle.outlineWidth = new Cesium.ConstantProperty(
-        this.style.strokeWidth || 2
-      )
+    // Update outline - 使用配置的线条颜色
+    if (this.outlineEntity && this.outlineEntity.polyline) {
+      this.outlineEntity.polyline.material = Cesium.Color.fromCssColorString(this.style.strokeColor || '#000000')
+      this.outlineEntity.polyline.width = new Cesium.ConstantProperty(this.style.strokeWidth || 2)
     }
   }
 

@@ -55,12 +55,12 @@ export class LineGraphic extends BaseGraphic {
 
   /** 默认样式 */
   private static readonly DEFAULT_STYLE: Required<GraphicStyle> = {
-    fillColor: '#3B82F6',
-    fillOpacity: 1.0,
-    strokeColor: '#22D3EE',
+    fillColor: '#000000',
+    fillOpacity: 0,
+    strokeColor: '#000000', // 黑色边框
     strokeWidth: 3,
     pointSize: 8,
-    pointColor: '#FFFFFF',
+    pointColor: '#000000', // 黑色点
     opacity: 1.0,
   }
 
@@ -112,7 +112,6 @@ export class LineGraphic extends BaseGraphic {
         positions,
         width: style.strokeWidth,
         material,
-        clampToGround: true, // Enable terrain clamping
         show: this.visible,
       },
     })
@@ -436,8 +435,8 @@ export class LineGraphic extends BaseGraphic {
    */
   protected applyStyle(): void {
     if (this.lineEntity && this.lineEntity.polyline) {
-      const strokeColor = Cesium.Color.fromCssColorString(this.style.strokeColor || '#22D3EE')
-      this.lineEntity.polyline.material = new Cesium.ColorMaterialProperty(strokeColor)
+      // 保持黑色边框
+      this.lineEntity.polyline.material = Cesium.Color.BLACK
       this.lineEntity.polyline.width = new Cesium.ConstantProperty(this.style.strokeWidth || 2)
     }
   }

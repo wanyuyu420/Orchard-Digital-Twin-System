@@ -81,7 +81,8 @@ class Controller {
       timeline: false,
       shadows: false,
       shouldAnimate: true,
-      skyBox: false,
+      // 注意:skyBox 选项不传(保持默认)→ Viewer 自动 createEarthSkyBox()。
+      // 若传 true 会被直接赋给 scene.skyBox 导致 "this.skyBox.update is not a function" 崩溃。
       infoBox: false,
       fullscreenButton: false,
       homeButton: true,
@@ -94,18 +95,26 @@ class Controller {
 
     const viewer = new Cesium.Viewer(mapID, vConfig)
 
+    // WebGL 上下文丢失防护(见 installContextLossGuard 注释)
+    this.installContextLossGuard(viewer)
+
     // Hide Cesium logo if configured
     if (!baseMapConfig.logo) {
       const creditContainer = viewer.cesiumWidget.creditContainer as HTMLElement
       creditContainer.style.display = 'none'
     }
 
-    // Enable depth testing against terrain
-    viewer.scene.globe.depthTestAgainstTerrain = true
+    // Depth testing against terrain is disabled — the orchard GLB model provides its own terrain mesh
+    viewer.scene.globe.depthTestAgainstTerrain = false
 
-    // NOTE: Terrain is NOT loaded by default
-    // Use enableTerrain() to load terrain when needed (e.g., for 3D analysis)
-    // Vector base maps are incompatible with 3D terrain
+    // 对齐果园预览:关闭地面大气雾(预览 showGroundAtmosphere=false)
+    viewer.scene.globe.showGroundAtmosphere = false
+
+    // Globe base color — 对齐果园预览的 #20303a(深蓝灰,非近黑)
+    this.setGlobeBaseColor(viewer, '#20303a')
+
+    // Reduce scroll wheel zoom sensitivity (default 5.0 — too fast)
+    viewer.scene.screenSpaceCameraController.zoomFactor = 2.0
 
     // Initialize navigation controls
     this.initCesiumNavigation(viewer)
@@ -118,6 +127,49 @@ class Controller {
 
     this.viewer = viewer
     return viewer
+  }
+
+  /**
+   * Guard against WebGL context loss.
+   *
+   * On real GPUs, loading the heavy Orchard 3D Tiles (3.5 GB of b3dm geometry)
+   * can crash the GPU process → WebGL context lost. The modified Cesium 1.136
+   * build used here has NO context-lost handling: after loss the browser keeps
+   * `drawingBufferWidth` at 0 while Cesium still renders (its `_canRender`
+   * stays true) → GlobeDepth creates a 0-width texture → "Expected width to be
+   * greater than 0" crash.
+   *
+   * Calling `preventDefault()` lets the browser restore the context; once
+   * restored all GL resources are invalid, so we reload the page to rebuild.
+   */
+  private installContextLossGuard(viewer: any): void {
+    const canvas = viewer.scene.canvas
+    canvas.addEventListener('webglcontextlost', (e: any) => {
+      e.preventDefault()
+      console.warn('[ContextLoss] WebGL context lost — attempting to recover…')
+      try {
+        // 全屏提示,避免恢复/刷新期间黑屏造成困惑
+        let el = document.getElementById('context-loss-overlay') as HTMLElement | null
+        if (!el) {
+          el = document.createElement('div')
+          el.id = 'context-loss-overlay'
+          el.style.cssText =
+            'position:fixed;inset:0;z-index:999999;background:rgba(2,6,23,.85);' +
+            'color:#a5d6a7;display:flex;align-items:center;justify-content:center;' +
+            'font:14px/1.6 sans-serif;letter-spacing:.5px;'
+          el.textContent = '地图渲染异常,正在自动恢复…'
+          document.body.appendChild(el)
+        }
+      } catch (err) {
+        /* ignore */
+      }
+      // 兜底:若浏览器一直无法恢复,5 秒后强制刷新
+      setTimeout(() => window.location.reload(), 5000)
+    })
+    canvas.addEventListener('webglcontextrestored', () => {
+      console.warn('[ContextLoss] WebGL context restored — reloading to rebuild GL resources')
+      window.location.reload()
+    })
   }
 
   /**
@@ -277,22 +329,28 @@ class Controller {
     }
   }
 
+  /**
+   * Set globe base color for the ellipsoid when no imagery tiles are loaded
+   * Gives a dark background that matches the app's dark theme
+   * @param viewer Cesium viewer instance
+   * @param color CSS color string (default: dark navy)
+   */
+  setGlobeBaseColor(viewer: any, color: string = '#020617'): void {
+    viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString(color)
+  }
+
   removeJagged(viewer: any): void {
     // Enable FXAA for better edge smoothing
     viewer.scene.postProcessStages.fxaa.enabled = true
     viewer.scene.fxaa = true
 
-    // Adjust resolution for high-DPI displays
-    const supportsImageRenderingPixelated = viewer.cesiumWidget._supportsImageRenderingPixelated
-    if (supportsImageRenderingPixelated) {
-      // Use native device pixel ratio for sharpest rendering on Retina displays
-      // Only limit it if performance is a major concern (e.g. cap at 2.0)
-      let dpr = window.devicePixelRatio
-      if (dpr > 2.0) {
-        dpr = 2.0 // Cap at 2.0 to avoid excessive load on mobile/super-high-res
-      }
-      viewer.resolutionScale = dpr
-    }
+    // Keep the drawing-buffer resolution at 1.0 (do NOT scale by devicePixelRatio).
+    // On a real GPU, loading the Orchard 3D Tiles (3.5 GB b3dm) at a device-pixel
+    // resolution frame buffer pushes GPU memory/driver pressure high enough to
+    // crash the GPU process → WebGL context lost → width=0 render crash.
+    // The working 果园 preview uses the default resolutionScale (1.0); matching it
+    // cuts frame-buffer pixels ~56% and removes the context-loss trigger.
+    viewer.resolutionScale = 1
   }
 
   // Get current view center coordinates
