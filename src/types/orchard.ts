@@ -31,8 +31,6 @@ export interface TsomQueryParams {
   startDate?: string
   /** 时间范围结束 */
   endDate?: string
-  /** 品种筛选 */
-  varieties?: string[]
   /** 健康状态筛选 */
   healthStatuses?: string[]
 }
@@ -49,6 +47,8 @@ export interface TsomQueryResult {
 
 /** 园区统计数据 */
 export interface OrchardStatistics {
+  /** 平均长势/健康指数（UI 标签显示为平均NDVI） */
+  averageNdvi: number
   totalArea: number
   averageCanopyHeight: number
   averageCanopyVolume: number

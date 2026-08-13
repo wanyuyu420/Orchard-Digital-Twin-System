@@ -13,7 +13,7 @@ export const useOverlayStore = defineStore('overlay', () => {
   const visible = ref(false)
 
   /** 工具类型 */
-  const toolType = ref<'volume' | 'measure3d' | 'profile' | 'flood' | null>(null)
+  const toolType = ref<'volume' | 'measure3d' | 'profile' | null>(null)
 
   /** 屏幕坐标位置 */
   const screenPosition = ref<{ x: number; y: number } | null>(null)
@@ -27,7 +27,7 @@ export const useOverlayStore = defineStore('overlay', () => {
    * 显示overlay
    */
   function showOverlay(options: {
-    type: 'volume' | 'measure3d' | 'profile' | 'flood'
+    type: 'volume' | 'measure3d' | 'profile'
     position: { x: number; y: number }
     data: any
   }) {

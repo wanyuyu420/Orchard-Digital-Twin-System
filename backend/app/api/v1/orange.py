@@ -3,7 +3,7 @@ import shutil
 import uuid
 import math
 import json as json_mod
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, status
 from pydantic import BaseModel
@@ -28,6 +28,51 @@ import cv2
 import numpy as np
 
 router = APIRouter(prefix="/orange", tags=["脐橙三维空间大屏诊断API"])
+
+
+def _build_orange_tree(a: dict, g: dict) -> OrangeTreeOut:
+    """把 GeoScene FeatureServer 特征映射为 OrangeTreeOut（字段名与 FeatureServer 实际 schema 对齐）。"""
+    lng, lat = None, None
+    if g and "x" in g:
+        lng, lat = round(g["x"], 6), round(g["y"], 6)
+    return OrangeTreeOut(
+        id=a.get("id"),
+        batch_id=a.get("batch_id") or "",
+        lng=lng or 0.0,
+        lat=lat or 0.0,
+        confidence=a.get("confidence"),
+        compactness=a.get("compactness"),
+        shape_length=a.get("shape_length"),
+        shape_area=a.get("shape_area"),
+        value_field=a.get("value"),
+        count_field=a.get("count"),
+        area_m2=a.get("area_m2"),
+        height_m=a.get("height_m"),
+        crown_diameter=a.get("crown_diameter"),
+        volume_m3=a.get("volume_m3"),
+        growth_index=a.get("growth_index"),
+        slope_degree=a.get("slope_degree"),
+        aspect=a.get("aspect"),
+        fertilizer_level=a.get("fertilizer_level") or 0,
+    )
+
+
+def _health_label(index: float | None) -> str:
+    """growth_index → 前端 healthStatus 英文标签（镜像 src/utils/spatial.ts 的 growthIndexToHealth）。"""
+    if index is None:
+        return "warning"
+    if index >= 0.7:
+        return "healthy"
+    if index >= 0.4:
+        return "warning"
+    return "critical"
+
+
+class FilterQuerySchema(BaseModel):
+    """精确查询（全量果树，不按空间范围过滤）请求参数。"""
+    healthStatuses: Optional[List[str]] = None
+    startDate: Optional[str] = None
+    endDate: Optional[str] = None
 
 
 
@@ -67,7 +112,7 @@ async def spatial_diagnose(
     try:
         stats = GeoSceneService.query_stats(geometry=geometry)
         features = GeoSceneService.query_features(
-            geometry=json_mod.dumps(geometry),
+            geometry=geometry,
             geometry_type="esriGeometryPolygon",
             spatial_rel="esriSpatialRelContains",
             out_sr=4326,
@@ -80,34 +125,7 @@ async def spatial_diagnose(
             detail=f"GeoScene Server spatial query failed: {e}",
         )
 
-    trees_out = []
-    for feat in features:
-        a = feat.get("attributes", {})
-        g = feat.get("geometry", {})
-        lng, lat = None, None
-        if g and "x" in g:
-            lng, lat = round(g["x"], 6), round(g["y"], 6)
-
-        trees_out.append(OrangeTreeOut(
-            id=a.get("tree_id"),
-            batch_id=a.get("batch_id"),
-            lng=lng,
-            lat=lat,
-            confidence=a.get("confidence"),
-            compactness=a.get("compactness"),
-            shape_length=a.get("shape_len"),
-            shape_area=a.get("Shape__Area"),
-            value_field=a.get("val_field"),
-            count_field=a.get("cnt_field"),
-            area_m2=a.get("area_m2"),
-            height_m=a.get("height_m"),
-            crown_diameter=a.get("crown_diam"),
-            volume_m3=a.get("volume_m3"),
-            growth_index=a.get("growth_idx"),
-            slope_degree=a.get("slope_deg"),
-            aspect=a.get("aspect"),
-            fertilizer_level=a.get("fert_level"),
-        ))
+    trees_out = [_build_orange_tree(feat.get("attributes", {}), feat.get("geometry", {})) for feat in features]
 
     return DiagnoseResultSchema(
         total_count=stats["total_count"],
@@ -120,6 +138,57 @@ async def spatial_diagnose(
             heavy_level_count=stats["heavy_count"],
         ),
         trees=trees_out,
+    )
+
+
+@router.post(
+    "/trees/filter",
+    response_model=DiagnoseResultSchema,
+    status_code=status.HTTP_200_OK,
+    summary="精确查询 — 全量果树按条件过滤（不限制空间范围）",
+)
+async def filter_trees(payload: FilterQuerySchema):
+    """
+    菜单"精细查询"：全量扫描 FeatureServer 中所有果树，按健康状态过滤。
+    品种/时间字段在 FeatureServer 中不存在，过滤不生效（返回全量）。
+    """
+    try:
+        features = GeoSceneService.query_features(
+            where="1=1",
+            limit=1000,
+            return_geometry=True,
+            timeout=90,
+        )
+    except GeoSceneError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"GeoScene Server query failed: {e}",
+        )
+
+    trees = [_build_orange_tree(feat.get("attributes", {}), feat.get("geometry", {})) for feat in features]
+
+    if payload.healthStatuses:
+        allowed = set(payload.healthStatuses)
+        trees = [t for t in trees if _health_label(t.growth_index) in allowed]
+
+    heights = [t.height_m for t in trees if t.height_m]
+    areas = [t.area_m2 for t in trees if t.area_m2]
+    gis = [t.growth_index for t in trees if t.growth_index is not None]
+
+    def _fertilizer_count(level: int) -> int:
+        return sum(1 for t in trees if t.fertilizer_level == level)
+
+    return DiagnoseResultSchema(
+        total_count=len(trees),
+        avg_height=round(sum(heights) / len(heights), 2) if heights else 0.0,
+        avg_area=round(sum(areas) / len(areas), 2) if areas else 0.0,
+        avg_growth_index=round(sum(gis) / len(gis), 4) if gis else 0.0,
+        fertilizer_recommendation=FertilizerStat(
+            light_level_count=_fertilizer_count(1),
+            medium_level_count=_fertilizer_count(2),
+            heavy_level_count=_fertilizer_count(3),
+        ),
+        trees=trees,
     )
 
 @router.get(
@@ -148,34 +217,7 @@ async def get_historical_trees():
             detail=f"GeoScene Server query failed: {e}",
         )
 
-    trees_out = []
-    for feat in features:
-        a = feat.get("attributes", {})
-        g = feat.get("geometry", {})
-        lng, lat = None, None
-        if g and "x" in g:
-            lng, lat = round(g["x"], 6), round(g["y"], 6)
-
-        trees_out.append(OrangeTreeOut(
-            id=a.get("tree_id"),
-            batch_id=a.get("batch_id"),
-            lng=lng,
-            lat=lat,
-            confidence=a.get("confidence"),
-            compactness=a.get("compactness"),
-            shape_length=a.get("shape_len"),
-            shape_area=a.get("Shape__Area"),
-            value_field=a.get("val_field"),
-            count_field=a.get("cnt_field"),
-            area_m2=a.get("area_m2"),
-            height_m=a.get("height_m"),
-            crown_diameter=a.get("crown_diam"),
-            volume_m3=a.get("volume_m3"),
-            growth_index=a.get("growth_idx"),
-            slope_degree=a.get("slope_deg"),
-            aspect=a.get("aspect"),
-            fertilizer_level=a.get("fert_level"),
-        ))
+    trees_out = [_build_orange_tree(feat.get("attributes", {}), feat.get("geometry", {})) for feat in features]
 
     return HistoricalTreesOut(total=len(trees_out), trees=trees_out)
 

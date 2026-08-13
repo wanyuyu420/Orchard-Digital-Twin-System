@@ -21,10 +21,6 @@
 					@click="toggleAnalysisTool('volume')" title="方量分析">
 					<i class="fa-solid fa-cubes-stacked"></i>
 				</button>
-				<button class="btn-icon-text" :class="{ active: gisStore.toolType === 'flood' }"
-					@click="toggleAnalysisTool('flood')" title="淹没分析">
-					<i class="fa-solid fa-water"></i>
-				</button>
 				<button class="btn-icon-text" :class="{ active: gisStore.toolType === 'profile' }"
 					@click="toggleAnalysisTool('profile')" title="剖面分析">
 					<i class="fa-solid fa-chart-line"></i>

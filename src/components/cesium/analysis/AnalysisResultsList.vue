@@ -25,15 +25,10 @@
 					<VolumeResultContent v-if="result.type === 'volume'" :data="result.data" />
 					<Measure3DResultContent v-else-if="result.type === 'measure3d'" :data="result.data" />
 					<ProfileResultContent v-else-if="result.type === 'profile'" :data="result.data" />
-					<FloodResultContent v-else-if="result.type === 'flood'" :data="result.data" />
 				</div>
 
 				<!-- 操作按钮 -->
 				<div class="result-actions">
-					<button v-if="result.type === 'flood'" @click.stop="handleViewFloodPanel(result)" title="调节水位"
-						class="chart-btn flood-btn">
-						<i class="fa-solid fa-sliders"></i>
-					</button>
 					<button v-if="result.type === 'profile'" @click.stop="handleViewChart(result)" title="查看剖面图表"
 						class="chart-btn">
 						<i class="fa-solid fa-chart-line"></i>
@@ -63,7 +58,6 @@ import type { AnalysisResult } from '@/types/analysis'
 import VolumeResultContent from '../results/VolumeResultContent.vue'
 import Measure3DResultContent from '../results/Measure3DResultContent.vue'
 import ProfileResultContent from '../results/ProfileResultContent.vue'
-import FloodResultContent from '../results/FloodResultContent.vue'
 import * as Cesium from 'cesium'
 
 const gisStore = useGISStore()
@@ -74,7 +68,6 @@ function getToolIcon(type: string): string {
 		volume: 'fa-solid fa-cube',
 		measure3d: 'fa-solid fa-ruler',
 		profile: 'fa-solid fa-chart-area',
-		flood: 'fa-solid fa-water',
 	}
 	return icons[type as keyof typeof icons] || 'fa-solid fa-chart-line'
 }
@@ -85,7 +78,6 @@ function getToolColor(type: string): string {
 		volume: '#EF4444', // 红色
 		measure3d: '#F59E0B', // 橙色
 		profile: '#10B981', // 绿色
-		flood: '#3B82F6', // 蓝色
 	}
 	return colors[type as keyof typeof colors] || '#22D3EE'
 }
@@ -126,11 +118,6 @@ function handleSelect(id: string): void {
 	} else {
 		gisStore.selectAnalysisResult(id) // 选中
 	}
-}
-
-function handleViewFloodPanel(result: AnalysisResult): void {
-	if (result.type !== 'flood') return
-	gisStore.setAnalysisResult('flood', result.data)
 }
 
 // 定位到结果

@@ -48,7 +48,7 @@
         <!-- 搜索框 -->
         <div class="search-box">
           <i class="fa-solid fa-search"></i>
-          <input v-model="searchText" placeholder="搜索果树ID、品种..." />
+          <input v-model="searchText" placeholder="搜索果树ID..." />
         </div>
 
         <!-- 果树列表 -->
@@ -118,7 +118,7 @@ const hasFilters = computed(() => {
   const r = props.result
   if (!r?.queryParams) return false
   const q = r.queryParams
-  return !!(q.varieties?.length || q.healthStatuses?.length || q.startDate)
+  return !!(q.healthStatuses?.length || q.startDate)
 })
 
 const filteredTrees = computed(() => {

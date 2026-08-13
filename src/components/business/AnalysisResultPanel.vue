@@ -112,22 +112,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Flood Result -->
-        <div v-else-if="resultType === 'flood'" class="result-content">
-          <div class="result-item highlight">
-            <div class="item-label">当前水位</div>
-            <div class="item-value">{{ result.waterLevel?.toFixed(1) }} m</div>
-          </div>
-          <div class="result-item">
-            <div class="item-label">淹没面积</div>
-            <div class="item-value">{{ formatArea(result.floodedArea) }}</div>
-          </div>
-          <div class="result-item">
-            <div class="item-label">淹没体积</div>
-            <div class="item-value">{{ formatVolume(result.floodedVolume) }}</div>
-          </div>
-        </div>
       </div>
 
       <div class="panel-footer">
@@ -141,10 +125,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 
 interface Props {
-  resultType?: 'volume' | 'measure3d' | 'profile' | 'flood' | null
+  resultType?: 'volume' | 'measure3d' | 'profile' | null
   result?: any
 }
 
@@ -171,10 +155,6 @@ const toolConfig = {
   profile: {
     title: '剖面分析结果',
     icon: 'fa-solid fa-chart-line',
-  },
-  flood: {
-    title: '淹没分析结果',
-    icon: 'fa-solid fa-water',
   },
 }
 

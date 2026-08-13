@@ -4,12 +4,12 @@
 
 <script setup lang="ts">
 import { watch, onMounted, onUnmounted, shallowRef } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useCesiumStore } from '@/stores/cesium'
 import { useGISStore } from '@/stores/gis'
 import { useOrchardStore } from '@/stores/orchard'
 import { DrawTool } from '@/cesium/gis/tools/DrawTool'
 import { VolumeTool, type VolumeAnalysisResult } from '@/cesium/gis/tools/VolumeTool'
-import { FloodTool, type FloodAnalysisResult } from '@/cesium/gis/tools/FloodTool'
 import { ProfileTool, type ProfileAnalysisResult } from '@/cesium/gis/tools/ProfileTool'
 import { Measure3DTool, type Measure3DResult } from '@/cesium/gis/tools/Measure3DTool'
 import { PointGraphic } from '@/cesium/gis/graphics/PointGraphic'
@@ -29,14 +29,11 @@ const orchardStore = useOrchardStore()
 
 // Current active tool instance
 const currentTool = shallowRef<
-	DrawTool | VolumeTool | FloodTool | ProfileTool | Measure3DTool | null
+	DrawTool | VolumeTool | ProfileTool | Measure3DTool | null
 >(null)
 
 // Volume analysis tool instance (persistent for result display)
 const volumeTool = shallowRef<VolumeTool | null>(null)
-
-// Flood analysis tool instance
-const floodTool = shallowRef<FloodTool | null>(null)
 
 // Profile analysis tool instance
 const profileTool = shallowRef<ProfileTool | null>(null)
@@ -747,7 +744,7 @@ function normalizeDrawToolType(toolType: string): string {
  */
 function isAnalysisTool(toolType: string | null): boolean {
 	if (!toolType) return false
-	return ['volume', 'flood', 'profile', 'measure3d'].includes(toolType)
+	return ['volume', 'profile', 'measure3d'].includes(toolType)
 }
 
 /**
@@ -842,10 +839,14 @@ function activateTool(toolType: DrawToolType) {
 					})
 
 					// 将绘制图形坐标同步到 selectionRange，供查询面板使用
-					orchardStore.setSelectionRange({
-						type: geomType,
-						coordinates: coords,
-					})
+					orchardStore
+						.setSelectionRange({
+							type: geomType,
+							coordinates: coords,
+							// featureToSidebarCoords 把圆压成单中心点，这里透传半径供后端多边形构造
+							radius: geomType === 'circle' ? (feature as any).radius : undefined,
+						})
+						.catch(() => ElMessage.error('查询失败，请重试'))
 				}
 
 				// For MVP: Keep tool active for easier use (user can click away to deactivate)
@@ -905,9 +906,6 @@ function activateAnalysisTool(toolType: string) {
 			case 'volume':
 				activateVolumeTool(viewer)
 				break
-			case 'flood':
-				activateFloodTool(viewer)
-				break
 			case 'profile':
 				activateProfileTool(viewer)
 				break
@@ -945,55 +943,6 @@ function activateVolumeTool(viewer: any) {
 		gisStore.startDrawing()
 	} else {
 		// Activation failed (e.g. no terrain), reset tool type selection
-		gisStore.setTool(null)
-	}
-}
-
-/**
- * Activate flood simulation tool
- */
-function activateFloodTool(viewer: any) {
-	// Clear previous flood result if any
-	if (floodTool.value) {
-		floodTool.value.clear()
-	}
-
-	const tool = new FloodTool(viewer, {
-		mode: 'polygon', // 默认使用多边形绘制模式
-		requiresTerrain: true, // 强制要求地形
-		initialWaterLevel: 5,
-		waterLevelStep: 1,
-		waterColor: '#1E90FF',
-		waterOpacity: 0.6,
-		dataSource: {
-			type: 'polygon',
-			minWaterLevel: 0,
-			maxWaterLevel: 50,
-		},
-		onWaterLevelChange: (level: number, result: FloodAnalysisResult) => {
-			console.log(`Water level: ${level}m, Area: ${result.floodedArea.toFixed(0)}m²`)
-		},
-		onComplete: (result: FloodAnalysisResult) => {
-			console.log('Flood analysis complete:', result)
-		},
-		onCancel: () => {
-			console.log('Flood analysis cancelled')
-		},
-	})
-
-	if (tool.activate()) {
-		currentTool.value = tool
-		floodTool.value = tool
-		gisStore.setFloodController({
-			setWaterLevel: (level: number) => tool.setWaterLevel(level),
-			raise: () => tool.raiseWaterLevel(),
-			lower: () => tool.lowerWaterLevel(),
-			toggleAnimation: () => tool.toggleAnimation(),
-			setRiseRateMps: (mps: number) => tool.setRiseRateMps(mps),
-			getRiseRateMps: () => tool.getRiseRateMps(),
-		})
-		gisStore.startDrawing()
-	} else {
 		gisStore.setTool(null)
 	}
 }

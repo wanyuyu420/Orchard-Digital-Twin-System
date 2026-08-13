@@ -36,7 +36,7 @@ import { computed } from 'vue'
 
 interface Props {
   visible?: boolean
-  toolType?: 'volume' | 'flood' | 'profile' | 'measure3d' | null
+  toolType?: 'volume' | 'profile' | 'measure3d' | null
   screenPosition?: { x: number; y: number } | null
 }
 
@@ -54,10 +54,6 @@ const toolConfig = {
   volume: {
     title: '方量分析',
     icon: 'fa-solid fa-cubes-stacked',
-  },
-  flood: {
-    title: '淹没分析',
-    icon: 'fa-solid fa-water',
   },
   profile: {
     title: '剖面分析',

@@ -13,10 +13,10 @@
 /**
  * OrchardTilesetLayer - Loads the Orchard 2.0 real 3D Tiles into the current map.
  *
- * Data source: 果园2.0 (C:\Users\BAI\Desktop\果园2.0), served statically on
- * port 8765 by scripts/serve_orchard.py (CORS-enabled). Both tilesets carry
- * ECEF world transforms, so they land at the correct geographic position
- * (116.4973°E, 27.1322°N) automatically — no BIMAlignment placement needed.
+ * Data source: 云服务器部署的果园 tiles(http://100.101.73.76:8765, CORS-enabled,
+ * 内容与原 果园2.0 一致:dem.js/tileset.json md5 相同,树模型 batch table 字段一致)。
+ * Both tilesets carry ECEF world transforms, so they land at the correct geographic
+ * position (116.4973°E, 27.1322°N) automatically — no BIMAlignment placement needed.
  *
  *  - trees/tileset.json   253 per-tree detailed b3dm
  *  - orchard/tileset.json 246 orchard refined-model b3dm
@@ -32,7 +32,7 @@ declare const Cesium: any
 
 const cesiumStore = useCesiumStore()
 
-const DATA_BASE = 'http://localhost:8765'
+const DATA_BASE = 'http://100.101.73.76:8765'
 
 const isLoading = ref(false)
 let viewer: any = null

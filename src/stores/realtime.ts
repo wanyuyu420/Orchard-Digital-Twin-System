@@ -3,7 +3,7 @@
  * Maintains sliding windows of data for charts.
  */
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import {
   realtimeWs,
   type WebSocketMessage,
@@ -37,112 +37,6 @@ export const useRealtimeStore = defineStore('realtime', () => {
   // Recent alerts
   const recentAlerts = ref<AlertMessage[]>([])
   const maxAlerts = 20
-
-  // Computed: latest water level readings
-  const waterLevelHistory = computed(() => {
-    const result: SensorHistory[] = []
-    sensorHistories.value.forEach((sensor) => {
-      if (sensor.metric === 'water_level') {
-        result.push(sensor)
-      }
-    })
-    return result
-  })
-
-  // Computed: latest rainfall readings
-  const rainfallHistory = computed(() => {
-    const result: SensorHistory[] = []
-    sensorHistories.value.forEach((sensor) => {
-      if (sensor.metric === 'rainfall') {
-        result.push(sensor)
-      }
-    })
-    return result
-  })
-
-  // Computed: latest flow rate readings
-  const flowRateHistory = computed(() => {
-    const result: SensorHistory[] = []
-    sensorHistories.value.forEach((sensor) => {
-      if (sensor.metric === 'flow_rate') {
-        result.push(sensor)
-      }
-    })
-    return result
-  })
-
-  // Computed: latest velocity readings
-  const velocityHistory = computed(() => {
-    const result: SensorHistory[] = []
-    sensorHistories.value.forEach((sensor) => {
-      if (sensor.metric === 'velocity') {
-        result.push(sensor)
-      }
-    })
-    return result
-  })
-
-  // Computed: aggregated water level data for chart (average across stations)
-  const waterLevelChartData = computed(() => {
-    const histories = waterLevelHistory.value
-    if (histories.length === 0) return []
-
-    // Get timestamps from first sensor with data
-    const firstWithData = histories.find((h) => h.history.length > 0)
-    if (!firstWithData) return []
-
-    return firstWithData.history.map((point, idx) => {
-      // Average across all sensors at same index
-      let sum = 0
-      let count = 0
-      histories.forEach((h) => {
-        if (h.history[idx]) {
-          sum += h.history[idx].value
-          count++
-        }
-      })
-      return {
-        time: point.timestamp,
-        value: count > 0 ? Math.round((sum / count) * 100) / 100 : 0,
-      }
-    })
-  })
-
-  // Computed: rainfall data grouped by station for bar chart
-  const rainfallChartData = computed(() => {
-    return rainfallHistory.value.map((sensor) => {
-      const latest = sensor.history[sensor.history.length - 1]
-      return {
-        station: sensor.station_name,
-        value: latest?.value ?? 0,
-        unit: sensor.unit,
-      }
-    })
-  })
-
-  // Computed: flow rate chart data (aggregated from all hydrological stations)
-  const flowRateChartData = computed(() => {
-    const histories = flowRateHistory.value
-    if (histories.length === 0) return []
-
-    const firstWithData = histories.find((h) => h.history.length > 0)
-    if (!firstWithData) return []
-
-    return firstWithData.history.map((point, idx) => {
-      let sum = 0
-      let count = 0
-      histories.forEach((h) => {
-        if (h.history[idx]) {
-          sum += h.history[idx].value
-          count++
-        }
-      })
-      return {
-        time: point.timestamp,
-        value: count > 0 ? Math.round((sum / count) * 1000) / 1000 : 0,
-      }
-    })
-  })
 
   // Handle incoming WebSocket messages
   function handleMessage(message: WebSocketMessage) {
@@ -241,15 +135,6 @@ export const useRealtimeStore = defineStore('realtime', () => {
     lastHeartbeat,
     sensorHistories,
     recentAlerts,
-
-    // Computed
-    waterLevelHistory,
-    rainfallHistory,
-    flowRateHistory,
-    velocityHistory,
-    waterLevelChartData,
-    rainfallChartData,
-    flowRateChartData,
 
     // Actions
     connect,

@@ -17,7 +17,7 @@ import { ref, computed, shallowRef } from 'vue'
 import * as Cesium from 'cesium'
 
 // Types
-import type { AnalysisResult, AnalysisToolType } from '@/types/analysis'
+import type { AnalysisResult } from '@/types/analysis'
 import type { BaseTool, ToolType } from '@/cesium/gis/core/BaseTool'
 import type { BaseGraphic } from '@/cesium/gis/core/BaseGraphic'
 import type { DrawMode, DrawToolType } from '@/types/draw'
@@ -227,26 +227,10 @@ export const useGISStore = defineStore('gis', () => {
   const analysisResults = ref<AnalysisResult[]>([])
   const selectedResultId = ref<string | null>(null)
 
-  // ========== Flood Control (wired by GISLayer) ==========
-  type FloodController = {
-    setWaterLevel: (level: number) => void
-    raise: () => void
-    lower: () => void
-    toggleAnimation: () => void
-    setRiseRateMps: (mps: number) => void
-    getRiseRateMps: () => number
-  }
-
-  const floodController = shallowRef<FloodController | null>(null)
-
-  function setFloodController(controller: FloodController | null) {
-    floodController.value = controller
-  }
-
   // ========== Analysis Results (for UI Panel) ==========
 
   /** Current analysis result type */
-  const analysisResultType = ref<'volume' | 'measure3d' | 'profile' | 'flood' | null>(null)
+  const analysisResultType = ref<'volume' | 'measure3d' | 'profile' | null>(null)
 
   /** Current analysis result data */
   const analysisResultData = ref<any>(null)
@@ -1248,7 +1232,7 @@ export const useGISStore = defineStore('gis', () => {
    * @param data - Data associated with the analysis result
    */
   function setAnalysisResult(
-    type: 'volume' | 'measure3d' | 'profile' | 'flood' | null,
+    type: 'volume' | 'measure3d' | 'profile' | null,
     data: any = null
   ): void {
     analysisResultType.value = type
@@ -1436,10 +1420,6 @@ export const useGISStore = defineStore('gis', () => {
     removeAnalysisResult,
     selectAnalysisResult,
     clearAllAnalysisResults,
-
-    // ========== Flood Control ==========
-    floodController,
-    setFloodController,
 
     // ========== Import/Export ==========
     exportGeoJSON,

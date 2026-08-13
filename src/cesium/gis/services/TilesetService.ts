@@ -74,7 +74,7 @@ export class TilesetService {
    *
    * @example
    * ```ts
-   * const tileset = await tilesetService.loadFromUrl('/mock/flood/tileset.json', {
+   * const tileset = await tilesetService.loadFromUrl('/tiles/orchard.json', {
    *   maximumScreenSpaceError: 8,
    *   style: new Cesium.Cesium3DTileStyle({ color: "color('blue', 0.5)" })
    * })

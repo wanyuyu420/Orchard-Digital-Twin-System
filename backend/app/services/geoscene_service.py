@@ -2,10 +2,15 @@
 """
 GeoScene Server REST API client - all spatial data operations go through this service.
 """
+import json
 import time
 from typing import Any
 
 import httpx
+import urllib3
+
+# 内部 GeoScene Server 使用自签名证书，跳过 TLS 校验
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from app.config import get_settings
 
@@ -34,11 +39,12 @@ class GeoSceneService:
                 data={
                     "username": settings.geoscene_username,
                     "password": settings.geoscene_password,
-                    "client": "referer",
-                    "referer": settings.geoscene_server_url,
+                    # 服务端到服务端调用用 requestip（referer 型 token 要求浏览器携带 Referer 头）
+                    "client": "requestip",
                     "expiration": settings.geoscene_token_duration,
                     "f": "json",
                 },
+                verify=False,
                 timeout=15,
             )
             resp.raise_for_status()
@@ -60,6 +66,7 @@ class GeoSceneService:
             info = httpx.get(
                 f'{settings.geoscene_server_url}/rest/info',
                 params={'f': 'json'},
+                verify=False,
                 timeout=15,
             )
             info.raise_for_status()
@@ -72,6 +79,7 @@ class GeoSceneService:
             fs = httpx.get(
                 f'{settings.geoscene_feature_server_url}',
                 params={'f': 'json', 'token': token},
+                verify=False,
                 timeout=15,
             )
             fs.raise_for_status()
@@ -100,6 +108,7 @@ class GeoSceneService:
         out_sr: int = 4326,
         limit: int = 500,
         return_geometry: bool = True,
+        timeout: int = 30,
     ) -> list[dict]:
         settings = get_settings()
         token = cls._get_token()
@@ -115,7 +124,9 @@ class GeoSceneService:
         }
 
         if geometry is not None:
-            params['geometry'] = geometry
+            # ArcGIS REST geometry 参数必须是合法 JSON 字符串（双引号），httpx 对 dict 值
+            # 会序列化成 Python repr（单引号），GeoScene 解析失败 → 400
+            params['geometry'] = json.dumps(geometry)
             params['geometryType'] = geometry_type
             params['spatialRel'] = spatial_rel
             params['inSR'] = 4326
@@ -124,7 +135,8 @@ class GeoSceneService:
             resp = httpx.get(
                 f'{settings.geoscene_feature_server_url}/0/query',
                 params=params,
-                timeout=30,
+                verify=False,
+                timeout=timeout,
             )
             resp.raise_for_status()
             data = resp.json()
@@ -167,10 +179,10 @@ class GeoSceneService:
         attrs = [f['attributes'] for f in features]
         heights = [a.get('height_m') for a in attrs if a.get('height_m')]
         areas = [a.get('area_m2') for a in attrs if a.get('area_m2')]
-        gis = [a.get('growth_idx') for a in attrs if a.get('growth_idx')]
+        gis = [a.get('growth_index') for a in attrs if a.get('growth_index')]
 
         def _count_level(level: int) -> int:
-            return sum(1 for a in attrs if a.get('fert_level') == level)
+            return sum(1 for a in attrs if a.get('fertilizer_level') == level)
 
         return {
             'total_count': len(features),
@@ -192,6 +204,7 @@ class GeoSceneService:
                 f'{settings.geoscene_feature_server_url}/0/applyEdits',
                 params={'f': 'json', 'token': token},
                 json={'adds': features},
+                verify=False,
                 timeout=120,
             )
             resp.raise_for_status()

@@ -26,7 +26,6 @@ export type DrawToolType =
  */
 export type AnalysisToolType =
   | 'volume' // 方量分析
-  | 'flood' // 淹没分析
   | 'profile' // 剖面分析
   | 'measure3d' // 3D测量
 

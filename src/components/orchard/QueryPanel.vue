@@ -23,22 +23,6 @@
           </el-select>
         </div>
 
-        <!-- 品种筛选 -->
-        <div class="form-group">
-          <label>品种筛选</label>
-          <el-select
-            v-model="selectedVarieties"
-            multiple
-            placeholder="不限品种"
-            style="width: 100%"
-            collapse-tags
-          >
-            <el-option label="纽荷尔脐橙" value="纽荷尔脐橙" />
-            <el-option label="朋娜脐橙" value="朋娜脐橙" />
-            <el-option label="奈维林娜" value="奈维林娜" />
-          </el-select>
-        </div>
-
         <!-- 时间范围 -->
         <div class="form-group">
           <label>时间范围</label>
@@ -86,7 +70,6 @@ const orchardStore = useOrchardStore()
 const querying = ref(false)
 
 const queryType = ref('poi')
-const selectedVarieties = ref<string[]>([])
 const dateRange = ref<[Date, Date] | null>(null)
 const healthFilter = ref<string[]>(['healthy', 'warning', 'critical'])
 
@@ -94,7 +77,6 @@ async function executeQuery() {
   querying.value = true
   try {
     const params: TsomQueryParams = {
-      varieties: selectedVarieties.value.length > 0 ? selectedVarieties.value : undefined,
       healthStatuses: healthFilter.value.length > 0 ? healthFilter.value : undefined,
     }
     if (dateRange.value) {

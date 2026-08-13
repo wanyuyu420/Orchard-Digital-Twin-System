@@ -114,10 +114,12 @@ function setupDrawListener(tool: 'rectangle' | 'circle' | 'polygon') {
                 coordinates.push([...coordinates[0]])
               }
 
-              orchardStore.setSelectionRange({
-                type: tool,
-                coordinates: tool === 'polygon' ? [coordinates] : coordinates,
-              })
+              orchardStore
+                .setSelectionRange({
+                  type: tool,
+                  coordinates: tool === 'polygon' ? [coordinates] : coordinates,
+                })
+                .catch(() => ElMessage.error('查询失败，请重试'))
 
               ElMessage.success(`${getRangeLabel()}已选定，正在查询TSOM数据...`)
               stopWatch()

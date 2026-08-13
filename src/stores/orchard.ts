@@ -214,7 +214,7 @@ export const useOrchardStore = defineStore('orchard', () => {
       coordinates: range.coordinates,
       radius: range.radius,
     }
-    executeTsomQuery(params)
+    return executeTsomQuery(params)
   }
 
   function saveDrawnGeometry(geometry: Omit<DrawnGeometry, 'id' | 'createdAt'>) {

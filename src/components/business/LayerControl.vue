@@ -686,12 +686,6 @@ const analysisTools: Array<{
 			tooltip: '方量分析 - 绘制多边形计算体积',
 		},
 		{
-			id: 'flood',
-			name: '淹没分析',
-			icon: 'fa-solid fa-water',
-			tooltip: '淹没分析 - 绘制多边形模拟水位变化',
-		},
-		{
 			id: 'profile',
 			name: '剖面分析',
 			icon: 'fa-solid fa-chart-line',

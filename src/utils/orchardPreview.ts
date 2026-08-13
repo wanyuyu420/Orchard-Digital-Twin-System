@@ -3,10 +3,10 @@
  *
  * 对齐 C:\Users\BAI\Desktop\果园2.0\tiles\viewer.html 的渲染配置:
  *  1) 高德卫星影像 —— 园外大范围背景(GCJ-02 与 WGS84 偏移约 599m,仅作外围参考)
- *  2) DOM 无人机 1.4cm 正射影像 —— 果园范围内,本地 8765 瓦片(17-23 级)
+ *  2) DOM 无人机 1.4cm 正射影像 —— 果园范围内,云服务器 8765 瓦片(17-23 级)
  *  3) DEM 起伏地形 —— 树根贴地(IDW 插值高程,数据来自 dem.js)
  *
- * 数据源全部来自本地 orchard 静态服务(http://localhost:8765),CORS 已开启。
+ * 数据源全部来自云服务器 orchard 静态服务(http://100.101.73.76:8765),CORS 已开启。
  * 依赖: 需先运行 scripts/serve_orchard.py(与 OrchardTilesetLayer 同一数据源)。
  */
 declare const Cesium: any
@@ -19,7 +19,7 @@ const DOM_RECT = {
   north: 27.133232838,
 }
 
-const DOM_BASE = 'http://localhost:8765'
+const DOM_BASE = 'http://100.101.73.76:8765'
 
 /** 高德卫星影像:园外大范围底图 */
 function addGaodeImagery(viewer: any): void {
@@ -63,7 +63,7 @@ export async function setupOrchardPreviewBasemap(viewer: any): Promise<void> {
 }
 
 /**
- * DEM 起伏地形:从 8765 拉取 dem.js(window.DEM),再注入自定义 TerrainProvider。
+ * DEM 起伏地形:从云服务器 8765 拉取 dem.js(window.DEM),再注入自定义 TerrainProvider。
  * 移植自 viewer.html 的 DemTerrainProvider,使树根贴合果园真实地表。
  */
 export async function setupDemTerrain(viewer: any): Promise<void> {

@@ -29,11 +29,6 @@ const routes: RouteRecordRaw[] = [
     redirect: '/orchard-dashboard',
   },
   {
-    path: '/simulation',
-    name: 'simulation',
-    component: () => import('@/views/Simulation.vue'),
-  },
-  {
     path: '/meteo',
     name: 'meteo',
     component: () => import('@/views/Meteorology.vue'),

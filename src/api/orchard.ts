@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import { normalizeToClosedRing, growthIndexToHealth } from '@/utils/spatial'
 import type {
   FruitTreePoi,
   TsomQueryParams,
@@ -15,14 +16,49 @@ export function getFruitTreeById(id: string) {
   return apiClient.get<FruitTreePoi>(`/orchard/trees/${id}`)
 }
 
-/** TSOM空间查询 - 根据绘制范围查询果树POI */
-export function queryTsom(params: TsomQueryParams) {
-  return apiClient.post<TsomQueryResult>('/orchard/tsom/query', params)
+/**
+ * TSOM空间查询 - 根据绘制范围查询果树POI
+ *
+ * 走后端已有的 /orange/spatial-diagnose 接口：
+ * 只发送闭合平铺坐标环 {coordinates: [[lng,lat],...]}，
+ * rangeType/radius/日期/健康过滤等字段后端不接收，一律不发送。
+ */
+export async function queryTsom(params: TsomQueryParams): Promise<{ data: TsomQueryResult }> {
+  const payload = {
+    coordinates: normalizeToClosedRing({
+      type: params.rangeType,
+      coordinates: params.coordinates,
+      radius: params.radius,
+    }),
+  }
+  // GeoScene FeatureServer 空间查询较慢，覆盖默认 5s 超时
+  const res = await apiClient.post<DiagnoseResult>(
+    '/orange/spatial-diagnose',
+    payload,
+    { timeout: 30000 },
+  )
+  return { data: mapDiagnoseToTsomResult(params, res.data) }
 }
 
-/** 精细查询 - 查询所有符合条件的果树（不需要绘制范围） */
-export function queryTreesByFilter(params: TsomQueryParams) {
-  return apiClient.post<TsomQueryResult>('/orchard/trees/filter', params)
+/**
+ * 精确查询 - 全量果树按条件过滤（不需要绘制范围）
+ *
+ * 走后端 /orange/trees/filter：全量扫描 FeatureServer 后按健康状态过滤，
+ * 时间字段在 FeatureServer 中不存在，不参与过滤。响应与拉框一致（DiagnoseResult），
+ * 复用 mapDiagnoseToTsomResult 映射。GeoScene 全量扫描较慢，覆盖默认 5s 超时。
+ */
+export async function queryTreesByFilter(params: TsomQueryParams): Promise<{ data: TsomQueryResult }> {
+  const payload = {
+    healthStatuses: params.healthStatuses,
+    startDate: params.startDate,
+    endDate: params.endDate,
+  }
+  const res = await apiClient.post<DiagnoseResult>(
+    '/orange/trees/filter',
+    payload,
+    { timeout: 90000 },
+  )
+  return { data: mapDiagnoseToTsomResult(params, res.data) }
 }
 
 /** 获取园区统计数据 */
@@ -118,4 +154,74 @@ export function getChildFiles(parentId: string) {
 /** 获取冠层图表统计数据 */
 export function getChartStatistics() {
   return apiClient.get('/orchard/chart-data')
+}
+
+// ── /orange/spatial-diagnose 响应映射 ──────────────────────────────
+
+/** 后端 DiagnoseResultSchema / OrangeTreeOut 响应形状 */
+interface DiagnoseResult {
+  total_count: number
+  avg_height: number | null
+  avg_area: number | null
+  avg_growth_index: number | null
+  fertilizer_recommendation: {
+    light_level_count: number
+    medium_level_count: number
+    heavy_level_count: number
+  }
+  trees: Array<{
+    id: number
+    batch_id: string
+    lng: number
+    lat: number
+    height_m?: number | null
+    crown_diameter?: number | null
+    volume_m3?: number | null
+    growth_index?: number | null
+    area_m2?: number | null
+  }>
+}
+
+/** 把后端诊断结果映射为前端 TsomQueryResult，保持 UI 契约不变 */
+function mapDiagnoseToTsomResult(params: TsomQueryParams, d: DiagnoseResult): TsomQueryResult {
+  const pois: FruitTreePoi[] = d.trees.map((t) => ({
+    id: String(t.id),
+    name: t.batch_id || `树${t.id}`,
+    longitude: t.lng,
+    latitude: t.lat,
+    altitude: undefined,
+    canopyHeight: t.height_m ?? 0, // ?? 0 防止 DetailPanel .toFixed 崩溃
+    canopyDiameter: t.crown_diameter ?? 0,
+    canopyVolume: t.volume_m3 ?? 0,
+    healthStatus: growthIndexToHealth(t.growth_index),
+    orchardId: '',
+    orchardName: '',
+  }))
+
+  const counts = { healthy: 0, warning: 0, critical: 0 }
+  for (const t of d.trees) {
+    counts[growthIndexToHealth(t.growth_index)]++
+  }
+
+  const volumes = d.trees.map((t) => t.volume_m3 ?? 0)
+  const areas = d.trees.map((t) => t.area_m2 ?? 0)
+
+  return {
+    id: 'q-' + Date.now().toString(36),
+    queryParams: params,
+    totalTrees: d.total_count,
+    pois,
+    statistics: {
+      averageNdvi: d.avg_growth_index ?? 0,
+      totalArea: areas.reduce((a, b) => a + b, 0),
+      averageCanopyHeight: d.avg_height ?? 0,
+      averageCanopyVolume: volumes.length
+        ? volumes.reduce((a, b) => a + b, 0) / volumes.length
+        : 0,
+      healthyCount: counts.healthy,
+      warningCount: counts.warning,
+      criticalCount: counts.critical,
+    },
+    executedAt: new Date().toISOString(),
+  }
 }
