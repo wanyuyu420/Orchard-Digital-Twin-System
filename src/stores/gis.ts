@@ -1269,7 +1269,7 @@ export const useGISStore = defineStore('gis', () => {
 
   /**
    * Update an existing analysis result in-place.
-   * Useful for tools with live parameters (e.g., flood water level slider).
+   * Useful for tools with live parameters (e.g., a live parameter slider).
    */
   function updateAnalysisResult(
     id: string,

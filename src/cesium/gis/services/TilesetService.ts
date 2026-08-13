@@ -5,7 +5,6 @@
  * 支持本地 tileset.json 和 Cesium Ion 资产
  *
  * 使用场景：
- * - 洪水水面 3D Tiles
  * - BIM 建筑模型
  * - 倾斜摄影数据
  */
@@ -206,19 +205,6 @@ export class TilesetService {
     }
 
     tileset.style = new Cesium.Cesium3DTileStyle(styleOptions)
-  }
-
-  /**
-   * 创建洪水水面样式
-   *
-   * @param waterLevel - 当前水位
-   * @param opacity - 透明度 (0-1)
-   */
-  createFloodStyle(waterLevel: number, opacity: number = 0.6): Cesium.Cesium3DTileStyle {
-    return new Cesium.Cesium3DTileStyle({
-      color: `color('rgba(30, 144, 255, ${opacity})')`, // 道奇蓝
-      show: `\${waterLevel} <= ${waterLevel}`,
-    })
   }
 
   /**

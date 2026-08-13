@@ -1,6 +1,6 @@
 <template>
 	<div id="cesiumContainer" class="cesium-container"
-		:class="{ 'is-blurred': viewMode === 'focus', 'is-hidden': isMeteoPage }"></div>
+		:class="{ 'is-blurred': viewMode === 'focus' }"></div>
 </template>
 
 <script setup lang="ts">
@@ -17,7 +17,6 @@ const cesiumStore = useCesiumStore()
 const appStore = useAppStore()
 
 const viewMode = computed(() => appStore.viewMode)
-const isMeteoPage = computed(() => appStore.currentModule === 'meteo')
 
 onMounted(async () => {
 	// Get configurations
@@ -72,11 +71,5 @@ onUnmounted(() => {
 
 .cesium-container.is-blurred {
 	filter: blur(2px);
-}
-
-/* 气象页面时隐藏主Cesium，让MeteoSplitLayer的Cesium接收事件 */
-.cesium-container.is-hidden {
-	visibility: hidden;
-	pointer-events: none;
 }
 </style>

@@ -81,7 +81,7 @@ function setTool(tool: 'rectangle' | 'circle' | 'polygon') {
   }
   activeTool.value = tool
 
-  // 激活Cesium绘制工具 (draw/volume/flood/profile/measure3d)
+  // 激活Cesium绘制工具 (draw/volume/profile/measure3d)
   gisStore.activateTool('draw')
 
   // 监听绘制完成事件

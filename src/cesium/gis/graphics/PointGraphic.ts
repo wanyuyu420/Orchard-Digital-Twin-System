@@ -28,7 +28,7 @@ export interface PointGraphicOptions extends BaseGraphicOptions {
  * const point = new PointGraphic(viewer, {
  *   name: '测站A',
  *   position: Cesium.Cartesian3.fromDegrees(114.3, 30.5, 100),
- *   label: '水位站',
+ *   label: '监测点',
  *   style: {
  *     pointColor: '#22D3EE',
  *     pointSize: 12

@@ -18,13 +18,6 @@ export const TOOL_COLORS = {
     glow: 'rgba(34, 211, 238, 0.4)',
     light: 'rgba(34, 211, 238, 0.3)',
   },
-  flood: {
-    fill: 'rgba(59, 130, 246, 0.3)', // 蓝色填充
-    stroke: '#3B82F6', // 蓝色边框
-    accent: '#3B82F6',
-    glow: 'rgba(59, 130, 246, 0.4)',
-    light: 'rgba(59, 130, 246, 0.3)',
-  },
   profile: {
     fill: 'rgba(34, 197, 94, 0.3)', // 绿色填充
     stroke: '#22C55E', // 绿色边框
@@ -138,7 +131,6 @@ export const LINE_STYLES = {
  */
 export const TOOL_ICONS = {
   volume: '📊', // 可选替换为: fa-chart-area
-  flood: '💧', // 可选替换为: fa-water
   profile: '📈', // 可选替换为: fa-chart-line
   measure3d: '📏', // 可选替换为: fa-ruler-combined
   area: '⬛',

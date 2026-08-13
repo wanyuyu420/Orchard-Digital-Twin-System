@@ -121,9 +121,6 @@ const overlayStyle = computed(() => {
   &.tool-volume .card-accent {
     background: linear-gradient(90deg, #ef4444, #dc2626);
   }
-  &.tool-flood .card-accent {
-    background: linear-gradient(90deg, #3b82f6, #2563eb);
-  }
   &.tool-profile .card-accent {
     background: linear-gradient(90deg, #10b981, #059669);
   }

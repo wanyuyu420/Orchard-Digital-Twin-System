@@ -103,14 +103,14 @@ describe('PointGraphic', () => {
 
   it('应该创建带标签的点', () => {
     const point = new PointGraphic(mockViewer, {
-      label: '水位站A',
+      label: '监测点A',
     })
     point.create([mockCartesian3])
 
     expect(mockViewer.entities.add).toHaveBeenCalledWith(
       expect.objectContaining({
         label: expect.objectContaining({
-          text: '水位站A',
+          text: '监测点A',
         }),
       })
     )

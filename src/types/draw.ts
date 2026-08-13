@@ -135,7 +135,7 @@ export interface StylePreset {
 }
 
 /**
- * 预设样式库（水利行业主题）
+ * 预设样式库（行业主题）
  */
 export const STYLE_PRESETS: StylePreset[] = [
   {
@@ -173,17 +173,6 @@ export const STYLE_PRESETS: StylePreset[] = [
       strokeColor: '#4caf50',
       strokeWidth: 3,
       pointSize: 10,
-      opacity: 1,
-    },
-  },
-  {
-    id: 'water',
-    name: '水域',
-    style: {
-      fillColor: 'rgba(33, 150, 243, 0.4)',
-      strokeColor: '#2196f3',
-      strokeWidth: 2,
-      pointSize: 8,
       opacity: 1,
     },
   },

@@ -323,17 +323,6 @@ function handleClearAll(): void {
 					}
 				}
 
-				.chart-btn.flood-btn {
-					background: rgba(59, 130, 246, 0.14);
-					border-color: rgba(59, 130, 246, 0.25);
-					color: #60a5fa;
-
-					&:hover {
-						background: rgba(59, 130, 246, 0.22);
-						border-color: rgba(59, 130, 246, 0.45);
-						color: #bfdbfe;
-					}
-				}
 			}
 		}
 	}

@@ -753,22 +753,8 @@ const quickTemplates: QuickTemplate[] = [
 		toolType: 'draw-polygon',
 		style: { fillColor: '#10B981', strokeColor: '#34D399', fillOpacity: 0.35, strokeWidth: 2 },
 	},
-	{
-		id: 'evacuation-route',
-		name: '撤离路线',
-		icon: 'fa-solid fa-person-running',
-		toolType: 'draw-line',
-		style: { fillColor: '#F59E0B', strokeColor: '#F59E0B', fillOpacity: 1, strokeWidth: 4, lineType: 'solid' },
-	},
 
-	// === Water & Environment ===
-	{
-		id: 'water-body',
-		name: '水体',
-		icon: 'fa-solid fa-water',
-		toolType: 'draw-polygon',
-		style: { fillColor: '#3B82F6', strokeColor: '#60A5FA', fillOpacity: 0.4, strokeWidth: 1 },
-	},
+	// === Environment ===
 	{
 		id: 'vegetation',
 		name: '植被',
@@ -791,20 +777,6 @@ const quickTemplates: QuickTemplate[] = [
 		icon: 'fa-solid fa-arrows-left-right',
 		toolType: 'draw-line',
 		style: { fillColor: '#6366F1', strokeColor: '#6366F1', fillOpacity: 1, strokeWidth: 5, lineType: 'solid' },
-	},
-	{
-		id: 'dam-line',
-		name: '坝线',
-		icon: 'fa-solid fa-grip-lines',
-		toolType: 'draw-line',
-		style: { fillColor: '#78716C', strokeColor: '#A8A29E', fillOpacity: 1, strokeWidth: 6, lineType: 'solid' },
-	},
-	{
-		id: 'pump-station',
-		name: '泵站',
-		icon: 'fa-solid fa-building',
-		toolType: 'draw-point',
-		style: { fillColor: '#0EA5E9', strokeColor: '#E0F2FE', fillOpacity: 1, strokeWidth: 2, pointColor: '#0EA5E9', pointSize: 14, iconType: 'diamond' },
 	},
 
 	// === Monitoring ===

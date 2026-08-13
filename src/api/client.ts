@@ -33,17 +33,3 @@ apiClient.interceptors.response.use(
     return Promise.reject(error)
   }
 )
-
-// Define API methods using the apiClient instance
-const api = {
-  getHydrologicalData: () => apiClient.get('/hydrological/data'),
-  
-  // New Generalization Endpoints
-  getHydrologicalStations: (params?: { is_simulated?: boolean }) => 
-    apiClient.get<any[]>('/hydrological_stations', { params }),
-
-  getFacilities: (params?: { facility_type?: string; is_simulated?: boolean; page?: number; page_size?: number }) => 
-    apiClient.get<any>('/admin/facilities', { params }),
-}
-
-export default api

@@ -24,10 +24,6 @@ export const useCesiumStore = defineStore('cesium', () => {
   // BIM 3D Tiles state
   const bimEnabled = ref(false)
   const bimLoading = ref(false)
-  const stationsEnabled = ref(false)
-  const stationsLoading = ref(false)
-  const videoEnabled = ref(false)
-  const videoLoading = ref(false)
 
   // Store the last 3D camera position and orientation before switching to 2D
   const savedCameraState = ref<{
@@ -236,10 +232,6 @@ export const useCesiumStore = defineStore('cesium', () => {
     orchardModelsVisible,
     bimEnabled,
     bimLoading,
-    stationsEnabled,
-    stationsLoading,
-    videoEnabled,
-    videoLoading,
     savedCameraState,
     homeView,
     setViewer,

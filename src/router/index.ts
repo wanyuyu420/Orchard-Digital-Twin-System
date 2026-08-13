@@ -29,26 +29,6 @@ const routes: RouteRecordRaw[] = [
     redirect: '/orchard-dashboard',
   },
   {
-    path: '/meteo',
-    name: 'meteo',
-    component: () => import('@/views/Meteorology.vue'),
-  },
-  {
-    path: '/data',
-    name: 'data',
-    component: () => import('@/views/DataGovernance.vue'),
-  },
-  {
-    path: '/device',
-    name: 'device',
-    component: () => import('@/views/DeviceManager.vue'),
-  },
-  {
-    path: '/ai',
-    name: 'ai',
-    component: () => import('@/views/AiEngineering.vue'),
-  },
-  {
     path: '/gis-test',
     name: 'gis-test',
     component: () => import('@/views/GISTestPage.vue'),
