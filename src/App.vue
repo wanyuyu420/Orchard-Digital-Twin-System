@@ -6,6 +6,9 @@
     <!-- Orchard 2.0 real 3D Tiles (trees + orchard refined model) -->
     <OrchardTilesetLayer />
 
+    <!-- Orchard 3D Tiles 底部控制条(树透明度/显隐/果园精模懒加载) -->
+    <OrchardControlBar />
+
     <!-- Measure Layer (Persistent across pages) -->
     <MeasureLayer />
 
@@ -20,6 +23,7 @@
 <script setup lang="ts">
 import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
 import OrchardTilesetLayer from '@/components/cesium/OrchardTilesetLayer.vue'
+import OrchardControlBar from '@/components/orchard/OrchardControlBar.vue'
 import MeasureLayer from '@/components/cesium/MeasureLayer.vue'
 import DrawLayer from '@/components/cesium/DrawLayer.vue'
 import OrchardMainLayout from '@/layout/OrchardMainLayout.vue'

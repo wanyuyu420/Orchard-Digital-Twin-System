@@ -189,18 +189,19 @@ function setupClickHandler(): void {
   viewer.scene.postRender.addEventListener(updatePropCardPos)
 }
 
-// ==================== 瓦片加载(原逻辑不变) ====================
+// ==================== 瓦片加载 ====================
+// 树(trees)启动即加载;果园精模(orchard)懒加载,点击控制条才真正加载(1.8GB 数据)
 watch(
   () => cesiumStore.viewer,
   (v) => {
     if (v && !treesTileset && !isLoading.value) {
-      loadTilesets()
+      loadTrees()
     }
   },
   { immediate: true }
 )
 
-async function loadTilesets() {
+async function loadTrees() {
   viewer = cesiumStore.viewer
   if (!viewer || isLoading.value) return
 
@@ -239,11 +240,18 @@ async function loadTilesets() {
         }
       }, 500)
     })
+
+    // Click-to-inspect works for trees immediately
+    setupClickHandler()
   } catch (e) {
     console.error('[OrchardTilesetLayer] Failed to load trees tileset:', e)
   }
+}
 
-  // 2) Orchard refined-model tileset (independent of trees)
+/** 果园精模懒加载(独立于树)。仅当用户点"显示果园精模"才调用。 */
+async function loadOrchard() {
+  if (orchardTileset || !viewer) return
+
   try {
     const orchardTiles = await Cesium.Cesium3DTileset.fromUrl(`${DATA_BASE}/orchard/tileset.json`, {
       maximumScreenSpaceError: 4,
@@ -253,14 +261,47 @@ async function loadTilesets() {
     viewer.scene.primitives.add(orchardTiles)
     orchardTileset = orchardTiles
     ;(window as any).__orchardOrchardTileset = orchardTiles
+    orchardTiles.show = cesiumStore.orchardModelsVisible
+    cesiumStore.orchardModelsLoaded = true
     console.log('[OrchardTilesetLayer] orchard tileset loaded (246 models)')
   } catch (e) {
+    // 加载失败:回退显隐状态,让控制条按钮回到"显示果园精模"而非卡在"加载中…"
+    cesiumStore.orchardModelsVisible = false
     console.error('[OrchardTilesetLayer] Failed to load orchard tileset:', e)
   }
-
-  // 3) Click-to-inspect after the layers are in
-  setupClickHandler()
 }
+
+// ==================== 响应控制条状态(移植自 viewer.html 工具栏) ====================
+// 树透明度:通过 style color alpha 控制(与 viewer.html: color('white', alpha) 一致)
+watch(
+  () => cesiumStore.orchardTreeOpacity,
+  (a) => {
+    if (treesTileset) {
+      treesTileset.style = new Cesium.Cesium3DTileStyle({ color: `color('white', ${a})` })
+    }
+  }
+)
+
+// 树显隐
+watch(
+  () => cesiumStore.orchardTreesVisible,
+  (v) => {
+    if (treesTileset) treesTileset.show = v
+  }
+)
+
+// 果园精模显隐:首次显示触发懒加载
+watch(
+  () => cesiumStore.orchardModelsVisible,
+  (v) => {
+    if (v) {
+      if (!orchardTileset) loadOrchard()
+      else orchardTileset.show = true
+    } else if (orchardTileset) {
+      orchardTileset.show = false
+    }
+  }
+)
 
 onUnmounted(() => {
   if (viewer) {
