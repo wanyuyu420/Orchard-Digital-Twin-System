@@ -17,6 +17,7 @@ import type {
 import { DEFAULT_RENDER_PARAMS } from '@/types/orchard'
 import { useGISStore } from '@/stores/gis'
 import * as orchardApi from '@/api/orchard'
+import { growthIndexToHealth } from '@/utils/spatial'
 
 export const useOrchardStore = defineStore('orchard', () => {
   // ---- 模块菜单 ----
@@ -54,6 +55,11 @@ export const useOrchardStore = defineStore('orchard', () => {
   const selectedPois = ref<FruitTreePoi[]>([])
   const tsomQueryResult = ref<TsomQueryResult | null>(null)
   const orchardStatistics = ref<OrchardStatistics | null>(null)
+
+  // ---- 历史老树（开屏拾取点） ----
+  const historicalTreesLoading = ref(false)
+  const historicalTreePois = ref<FruitTreePoi[]>([])
+  const historicalTreesVisible = ref(true)
 
   // ---- 选择范围 ----
   const selectionRange = ref<{
@@ -272,52 +278,90 @@ export const useOrchardStore = defineStore('orchard', () => {
     }
   }
 
-  // ---- 文件操作 ----
-  async function fetchUploadedFiles() {
-    try {
-      const res = await orchardApi.getUploadedFiles()
-      uploadedFiles.value = res.data
-    } catch (err) {
-      console.error('Failed to fetch uploaded files:', err)
+  // ---- 文件操作（TIF 上传 → 后端推理任务，轮询进度） ----
+  /** 任务轮询定时器表（本地行 id → intervalId） */
+  const pollTimers = new Map<string, number>()
+
+  function stopPolling(fileId: string) {
+    const timer = pollTimers.get(fileId)
+    if (timer !== undefined) {
+      clearInterval(timer)
+      pollTimers.delete(fileId)
     }
   }
 
-  async function uploadSingleFile(file: File) {
-    try {
-      const res = await orchardApi.uploadFile(file, (progress) => {
-        const idx = uploadedFiles.value.findIndex((f) => f.name === file.name && f.status === 'uploading')
-        if (idx >= 0) {
-          uploadedFiles.value[idx].uploadProgress = progress
+  function startPolling(row: UploadedFile, taskId: string) {
+    stopPolling(row.id)
+    const timer = window.setInterval(async () => {
+      try {
+        const res = await orchardApi.getTaskStatus(taskId)
+        const status = res.data.status
+        const idx = uploadedFiles.value.findIndex((f) => f.id === row.id)
+        if (idx < 0) {
+          stopPolling(row.id)
+          return
         }
-      })
-      uploadedFiles.value.push(res.data)
-      activeFileId.value = res.data.id
+        uploadedFiles.value[idx].status = status
+        uploadedFiles.value[idx].message = res.data.message
+        uploadedFiles.value[idx].uploadProgress = Math.round(res.data.progress * 100)
+        uploadedFiles.value[idx].totalTrees = res.data.total_trees
 
-      // 默认弹出分析窗口和施肥窗口
-      if (autoShowAnalysis.value) {
-        showAnalysisWindow.value = true
+        if (status === 'completed' || status === 'failed') {
+          stopPolling(row.id)
+        }
+      } catch (err) {
+        console.error('[orchardStore] task poll failed:', err)
+        stopPolling(row.id)
       }
-      if (autoShowFertilization.value) {
-        showFertilizationWindow.value = true
-      }
+    }, 2000)
+    pollTimers.set(row.id, timer)
+  }
 
-      return res.data
+  async function uploadSingleFile(file: File) {
+    // 仅支持无人机正射影像 .tif/.tiff
+    const lower = file.name.toLowerCase()
+    if (!lower.endsWith('.tif') && !lower.endsWith('.tiff')) {
+      const err = new Error('仅支持 .tif/.tiff 无人机正射影像文件')
+      console.error('[orchardStore]', err.message)
+      throw err
+    }
+
+    const row: UploadedFile = {
+      id: 'local-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+      name: file.name,
+      size: file.size,
+      type: 'image/tiff',
+      uploadProgress: 0,
+      status: 'pending',
+      uploadedAt: new Date().toISOString(),
+      analysisResults: [],
+      childFiles: [],
+    }
+    uploadedFiles.value.push(row)
+    activeFileId.value = row.id
+
+    try {
+      const res = await orchardApi.uploadFile(file)
+      row.taskId = res.data.task_id
+      startPolling(row, res.data.task_id)
+      return row
     } catch (err) {
-      console.error('Upload failed:', err)
+      const idx = uploadedFiles.value.findIndex((f) => f.id === row.id)
+      if (idx >= 0) {
+        uploadedFiles.value[idx].status = 'failed'
+        uploadedFiles.value[idx].message = '上传失败'
+      }
+      console.error('[orchardStore] Upload failed:', err)
       throw err
     }
   }
 
   async function deleteFile(fileId: string) {
-    try {
-      await orchardApi.deleteUploadedFile(fileId)
-      uploadedFiles.value = uploadedFiles.value.filter((f) => f.id !== fileId)
-      if (activeFileId.value === fileId) {
-        activeFileId.value = null
-      }
-    } catch (err) {
-      console.error('Delete failed:', err)
-      throw err
+    // 后端无删除接口，仅从本地会话列表移除并停止轮询
+    stopPolling(fileId)
+    uploadedFiles.value = uploadedFiles.value.filter((f) => f.id !== fileId)
+    if (activeFileId.value === fileId) {
+      activeFileId.value = null
     }
   }
 
@@ -371,11 +415,37 @@ export const useOrchardStore = defineStore('orchard', () => {
     }
   }
 
+  // ---- 历史老树 ----
+  async function fetchHistoricalTrees() {
+    if (historicalTreesLoading.value) return
+    historicalTreesLoading.value = true
+    try {
+      const res = await orchardApi.getHistoricalTrees()
+      const pois: FruitTreePoi[] = res.data.trees.map((t) => ({
+        id: String(t.id),
+        name: t.batch_id || `历史树${t.id}`,
+        longitude: t.lng,
+        latitude: t.lat,
+        altitude: undefined,
+        canopyHeight: t.height_m ?? 0,
+        canopyDiameter: t.crown_diameter ?? 0,
+        canopyVolume: t.volume_m3 ?? 0,
+        healthStatus: growthIndexToHealth(t.growth_index),
+        orchardId: '',
+        orchardName: '历史老树',
+      }))
+      historicalTreePois.value = pois
+      console.log(`[orchardStore] historical trees loaded (${pois.length})`)
+    } catch (err) {
+      console.error('[orchardStore] fetchHistoricalTrees failed:', err)
+    } finally {
+      historicalTreesLoading.value = false
+    }
+  }
+
   // ---- 初始化 ----
   async function init() {
     await Promise.all([
-      fetchUploadedFiles(),
-      // fetchGeoServerLayers removed,
       fetchAnalysisResults(),
     ])
   }
@@ -393,6 +463,9 @@ export const useOrchardStore = defineStore('orchard', () => {
     selectedPoiDetail,
     orchardStatistics,
     selectionRange,
+    historicalTreesLoading,
+    historicalTreePois,
+    historicalTreesVisible,
     renderParams,
     useDefaultParams,
     showRenderSettings,
@@ -432,6 +505,7 @@ export const useOrchardStore = defineStore('orchard', () => {
     // chart actions
     fetchChartData,
     // actions
+    fetchHistoricalTrees,
     openQueryPanel,
     openResultPanel,
     openDetailPanel,
@@ -444,7 +518,6 @@ export const useOrchardStore = defineStore('orchard', () => {
     updateRenderParams,
     resetRenderParams,
     toggleDefaultParams,
-    fetchUploadedFiles,
     uploadSingleFile,
     deleteFile,
     fetchAnalysisResults,

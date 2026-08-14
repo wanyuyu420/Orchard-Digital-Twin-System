@@ -28,6 +28,12 @@
 		<div class="tab-content">
 			<!-- Tab 1: Resource Layers (Dynamic from Backend) -->
 			<div v-show="activeTab === 'resources'" class="layer-list">
+				<div class="layer-list-header">
+					<span class="layer-list-title">资源图层</span>
+					<button class="add-layer-btn" @click.stop="openCreateDialog">
+						<i class="fa-solid fa-plus"></i> 新增图层
+					</button>
+				</div>
 				<!-- All Layers from Store (grouped) -->
 				<template v-for="(layers, groupName) in layerStore.layersByGroup" :key="groupName">
 					<div class="layer-group-header" v-if="layers.length > 0">{{ getGroupDisplayName(groupName) }}</div>
@@ -37,8 +43,16 @@
 							<i :class="layer.icon || 'fa-solid fa-layer-group'" class="layer-icon"></i>
 							<span>{{ layer.name }}</span>
 						</div>
-						<i class="fa-solid toggle-icon"
-							:class="layerStore.isLayerActive(layer.id) ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
+						<div class="layer-actions">
+							<button class="layer-action-btn" title="编辑图层" @click.stop="openEditDialog(layer)">
+								<i class="fa-solid fa-pen"></i>
+							</button>
+							<button class="layer-action-btn del" title="删除图层" @click.stop="onDeleteLayer(layer)">
+								<i class="fa-solid fa-trash-can"></i>
+							</button>
+							<i class="fa-solid toggle-icon"
+								:class="layerStore.isLayerActive(layer.id) ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
+						</div>
 					</div>
 				</template>
 			</div>
@@ -389,15 +403,76 @@
 			</div>
 		</div>
 	</GlassPanel>
+
+	<!-- 新增/编辑图层弹窗 -->
+	<el-dialog
+		v-model="layerDialogVisible"
+		:title="layerDialogMode === 'create' ? '新增图层' : '编辑图层'"
+		width="460px"
+		:close-on-click-modal="false"
+		@closed="resetLayerForm"
+	>
+		<el-form label-width="88px" label-position="right">
+			<el-form-item label="图层名称" required>
+				<el-input v-model="layerForm.name" placeholder="如：2025 正射影像" />
+			</el-form-item>
+			<el-form-item label="图层编码" required>
+				<el-input
+					v-model="layerForm.code"
+					:disabled="layerDialogMode === 'edit'"
+					placeholder="唯一编码，如 imagery_2025"
+				/>
+			</el-form-item>
+			<el-form-item label="图层类型" required>
+				<el-select v-model="layerForm.layer_type" style="width: 100%">
+					<el-option label="影像服务" value="imagery" />
+					<el-option label="3D 瓦片" value="3dtiles" />
+					<el-option label="点位接口" value="api_point" />
+					<el-option label="地形" value="terrain" />
+				</el-select>
+			</el-form-item>
+			<el-form-item label="分组">
+				<el-input v-model="layerForm.group_name" placeholder="如：基础底图 / 专题图层" />
+			</el-form-item>
+			<el-form-item label="服务地址">
+				<el-input v-model="layerForm.url" placeholder="https://... (留空可稍后配置)" />
+			</el-form-item>
+			<el-form-item label="图标">
+				<el-input v-model="layerForm.icon" placeholder="fa-solid fa-layer-group" />
+			</el-form-item>
+			<el-form-item label="排序">
+				<el-input-number v-model="layerForm.order" :min="0" controls-position="right" />
+			</el-form-item>
+			<el-form-item label="启用">
+				<el-switch v-model="layerForm.is_enabled" />
+			</el-form-item>
+			<el-form-item label="默认显示">
+				<el-switch v-model="layerForm.is_visible" />
+			</el-form-item>
+			<el-form-item label="描述">
+				<el-input v-model="layerForm.description" type="textarea" :rows="2" />
+			</el-form-item>
+			<el-form-item label="配置JSON">
+				<el-input v-model="layerForm.configText" type="textarea" :rows="4"
+					placeholder='可选，如 {"provider":"cesium_world_terrain"}' />
+			</el-form-item>
+		</el-form>
+		<template #footer>
+			<el-button @click="layerDialogVisible = false">取消</el-button>
+			<el-button type="primary" :loading="layerDialogSaving" @click="onSaveLayer">保存</el-button>
+		</template>
+	</el-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, reactive } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import GlassPanel from '@/components/common/GlassPanel.vue'
 import AnalysisResultsList from '@/components/cesium/analysis/AnalysisResultsList.vue'
 import { useGISStore } from '@/stores/gis'
 import { useCesiumStore } from '@/stores/cesium'
 import { useLayerStore, type GISLayer } from '@/stores/layers'
+import { applyDemTerrain } from '@/utils/orchardPreview'
 import type { GISToolType } from '@/types/draw'
 
 interface Layer {
@@ -946,10 +1021,11 @@ async function applyTerrain(layer: any, isActivating: boolean) {
 	const config = layer.config || {}
 
 	if (!isActivating) {
-		// Deactivating - switch back to ellipsoid (no terrain)
-		viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider()
-		cesiumStore.terrainEnabled = false
-		console.log('[LayerControl] Terrain disabled, using ellipsoid')
+		// Deactivating - restore DEM baseline terrain (orchard ground truth),
+		// never fall back to flat ellipsoid (would make trees float in the air)
+		const demOn = await applyDemTerrain(viewer)
+		cesiumStore.terrainEnabled = demOn
+		console.log('[LayerControl] Terrain layer off, restored DEM terrain')
 		return
 	}
 
@@ -967,8 +1043,9 @@ async function applyTerrain(layer: any, isActivating: boolean) {
 		cesiumStore.terrainEnabled = true
 	} catch (e) {
 		console.error('[LayerControl] Failed to load terrain:', e)
-		viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider()
-		cesiumStore.terrainEnabled = false
+		// 失败时恢复 DEM 基准地形,而不是回落到扁平椭球(否则树会悬浮)
+		const demOn = await applyDemTerrain(viewer)
+		cesiumStore.terrainEnabled = demOn
 	}
 }
 
@@ -985,6 +1062,162 @@ function getGroupDisplayName(groupName: string): string {
 		'Other': '其他'
 	}
 	return groupNames[groupName] || groupName
+}
+
+// === 图层 CRUD（新增/编辑/删除，调后端 /layers） ===
+const layerDialogVisible = ref(false)
+const layerDialogMode = ref<'create' | 'edit'>('create')
+const layerDialogSaving = ref(false)
+const editingLayerId = ref<number | null>(null)
+
+interface LayerFormState {
+	name: string
+	code: string
+	layer_type: string
+	group_name: string
+	url: string
+	icon: string
+	order: number
+	is_enabled: boolean
+	is_visible: boolean
+	description: string
+	configText: string
+}
+
+const layerForm = reactive<LayerFormState>({
+	name: '',
+	code: '',
+	layer_type: 'imagery',
+	group_name: '',
+	url: '',
+	icon: 'fa-solid fa-layer-group',
+	order: 0,
+	is_enabled: true,
+	is_visible: false,
+	description: '',
+	configText: '',
+})
+
+function resetLayerForm() {
+	layerForm.name = ''
+	layerForm.code = ''
+	layerForm.layer_type = 'imagery'
+	layerForm.group_name = ''
+	layerForm.url = ''
+	layerForm.icon = 'fa-solid fa-layer-group'
+	layerForm.order = 0
+	layerForm.is_enabled = true
+	layerForm.is_visible = false
+	layerForm.description = ''
+	layerForm.configText = ''
+	editingLayerId.value = null
+}
+
+function openCreateDialog() {
+	layerDialogMode.value = 'create'
+	resetLayerForm()
+	layerDialogVisible.value = true
+}
+
+function openEditDialog(layer: GISLayer) {
+	layerDialogMode.value = 'edit'
+	editingLayerId.value = layer.id
+	layerForm.name = layer.name
+	layerForm.code = layer.code
+	layerForm.layer_type = layer.layer_type
+	layerForm.group_name = layer.group_name || ''
+	layerForm.url = layer.url || ''
+	layerForm.icon = layer.icon || 'fa-solid fa-layer-group'
+	layerForm.order = layer.order ?? 0
+	layerForm.is_enabled = layer.is_enabled
+	layerForm.is_visible = layer.is_visible
+	layerForm.description = layer.description || ''
+	layerForm.configText = layer.config ? JSON.stringify(layer.config, null, 2) : ''
+	layerDialogVisible.value = true
+}
+
+async function onSaveLayer() {
+	if (!layerForm.name.trim()) {
+		ElMessage.warning('请填写图层名称')
+		return
+	}
+	if (layerDialogMode.value === 'create' && !layerForm.code.trim()) {
+		ElMessage.warning('请填写图层编码')
+		return
+	}
+
+	// 可选配置 JSON，解析失败则提示
+	let config: Record<string, unknown> | null = null
+	if (layerForm.configText.trim()) {
+		try {
+			config = JSON.parse(layerForm.configText)
+		} catch {
+			ElMessage.warning('配置 JSON 格式不正确')
+			return
+		}
+	}
+
+	layerDialogSaving.value = true
+	try {
+		if (layerDialogMode.value === 'create') {
+			await layerStore.createLayer({
+				code: layerForm.code.trim(),
+				name: layerForm.name.trim(),
+				layer_type: layerForm.layer_type,
+				group_name: layerForm.group_name.trim() || null,
+				url: layerForm.url.trim() || null,
+				icon: layerForm.icon.trim() || null,
+				order: layerForm.order,
+				is_enabled: layerForm.is_enabled,
+				is_visible: layerForm.is_visible,
+				description: layerForm.description.trim() || null,
+				config,
+			})
+			ElMessage.success('图层创建成功')
+		} else {
+			await layerStore.updateLayer(editingLayerId.value as number, {
+				name: layerForm.name.trim(),
+				group_name: layerForm.group_name.trim() || null,
+				url: layerForm.url.trim() || null,
+				icon: layerForm.icon.trim() || null,
+				order: layerForm.order,
+				is_enabled: layerForm.is_enabled,
+				is_visible: layerForm.is_visible,
+				description: layerForm.description.trim() || null,
+				config,
+			})
+			ElMessage.success('图层已更新')
+		}
+		layerDialogVisible.value = false
+	} catch (e: any) {
+		console.error('[LayerControl] Save layer failed:', e)
+		ElMessage.error(e?.response?.data?.detail || '保存失败，请检查控制台')
+	} finally {
+		layerDialogSaving.value = false
+	}
+}
+
+async function onDeleteLayer(layer: GISLayer) {
+	try {
+		await ElMessageBox.confirm(
+			`确定删除图层「${layer.name}」吗？此操作不可撤销。`,
+			'删除图层',
+			{
+				confirmButtonText: '删除',
+				cancelButtonText: '取消',
+				type: 'warning',
+			}
+		)
+	} catch {
+		return // 用户取消
+	}
+	try {
+		await layerStore.deleteLayer(layer.id)
+		ElMessage.success('图层已删除')
+	} catch (e: any) {
+		console.error('[LayerControl] Delete layer failed:', e)
+		ElMessage.error(e?.response?.data?.detail || '删除失败，请检查控制台')
+	}
 }
 
 /**
@@ -1419,6 +1652,38 @@ onMounted(async () => {
 	@include custom-scrollbar;
 }
 
+.layer-list-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.layer-list-title {
+	font-size: 11px;
+	font-weight: 600;
+	color: $text-sub;
+	letter-spacing: 0.5px;
+}
+
+.add-layer-btn {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 10px;
+	font-size: 11px;
+	color: #fff;
+	background: rgba(251, 146, 60, 0.25);
+	border: 1px solid rgba(251, 146, 60, 0.5);
+	border-radius: 6px;
+	cursor: pointer;
+	transition: all 0.2s;
+
+	&:hover {
+		background: rgba(251, 146, 60, 0.4);
+	}
+}
+
 .layer-group-header {
 	font-size: 10px;
 	font-weight: 600;
@@ -1477,6 +1742,41 @@ onMounted(async () => {
 .toggle-icon {
 	color: #555;
 	transition: color 0.2s;
+}
+
+.layer-actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.layer-action-btn {
+	display: none; /* hover 时显示 */
+	width: 22px;
+	height: 22px;
+	align-items: center;
+	justify-content: center;
+	font-size: 11px;
+	color: $text-sub;
+	background: transparent;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	transition: all 0.2s;
+
+	&:hover {
+		color: #fff;
+		background: rgba(255, 255, 255, 0.15);
+	}
+
+	&.del:hover {
+		color: #ef4444;
+		background: rgba(239, 68, 68, 0.15);
+	}
+}
+
+.layer-item:hover .layer-action-btn {
+	display: flex;
 }
 
 .loading-indicator {

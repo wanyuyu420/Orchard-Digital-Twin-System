@@ -85,6 +85,11 @@
 
     <!-- 右侧操作区 -->
     <div class="actions-section">
+      <el-tooltip content="图层管理" placement="bottom">
+        <button class="action-btn" :class="{ active: layerStore.showManager }" @click="toggleLayerManager">
+          <i class="fa-solid fa-layer-group"></i>
+        </button>
+      </el-tooltip>
       <el-tooltip content="查询" placement="bottom">
         <button class="action-btn query-btn" @click="openQueryPanel">
           <i class="fa-solid fa-magnifying-glass"></i>
@@ -121,6 +126,7 @@ import { useAppStore } from '@/stores/app'
 import { useOrchardStore } from '@/stores/orchard'
 import { useGISStore } from '@/stores/gis'
 import { useCesiumStore } from '@/stores/cesium'
+import { useLayerStore } from '@/stores/layers'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ModuleMenuItem } from '@/types/orchard'
 
@@ -129,6 +135,7 @@ const appStore = useAppStore()
 const orchardStore = useOrchardStore()
 const gisStore = useGISStore()
 const cesiumStore = useCesiumStore()
+const layerStore = useLayerStore()
 
 const activeTool = ref<'rectangle' | 'circle' | 'polygon' | null>(null)
 // 选择模式：点击地图图形进行选中/取消选中
@@ -206,6 +213,10 @@ const deleteSelected = () => {
 
 const openQueryPanel = () => {
   orchardStore.showQueryPanel = !orchardStore.showQueryPanel
+}
+
+const toggleLayerManager = () => {
+  layerStore.toggleManager()
 }
 
 const resetView = () => {
@@ -400,6 +411,12 @@ $orchard-orange: #fb923c;
   &:hover {
     color: $text-main;
     background: rgba(100, 100, 100, 0.4);
+  }
+
+  &.active {
+    color: #ffffff;
+    background: rgba(251, 146, 60, 0.35);
+    border: 1px solid rgba(251, 146, 60, 0.5);
   }
 }
 

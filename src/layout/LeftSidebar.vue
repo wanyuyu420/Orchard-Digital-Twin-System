@@ -145,7 +145,7 @@
               <span>上传文件 (最大1GB)</span>
             </button>
           </el-upload>
-          <div class="upload-hint">支持栅格、矢量、点云等数据格式</div>
+          <div class="upload-hint">仅支持 .tif/.tiff 无人机正射影像</div>
         </div>
 
         <!-- 文件列表 -->
@@ -173,9 +173,9 @@
                   {{ fileStatusLabel(file.status) }}
                 </span>
               </div>
-              <!-- 上传进度条 -->
+              <!-- 上传/推理进度条 -->
               <el-progress
-                v-if="file.status === 'uploading'"
+                v-if="file.status === 'uploading' || file.status === 'pending' || file.status === 'processing'"
                 :percentage="file.uploadProgress"
                 :stroke-width="4"
                 :show-text="false"
@@ -283,6 +283,7 @@ function fertStatusLabel(status: string) {
 function fileStatusLabel(status: string) {
   const map: Record<string, string> = {
     uploading: '上传中',
+    pending: '等待中',
     processing: '分析中',
     completed: '完成',
     failed: '失败',
@@ -310,13 +311,18 @@ function beforeUpload(file: File) {
     ElMessage.error(`文件 ${file.name} 超过1GB大小限制`)
     return false
   }
+  const lower = file.name.toLowerCase()
+  if (!lower.endsWith('.tif') && !lower.endsWith('.tiff')) {
+    ElMessage.error('仅支持 .tif/.tiff 无人机正射影像文件')
+    return false
+  }
   return true
 }
 
 async function handleUpload(options: { file: File }) {
   try {
     await orchardStore.uploadSingleFile(options.file)
-    ElMessage.success(`${options.file.name} 上传成功`)
+    ElMessage.success(`${options.file.name} 已上传，解析任务已启动`)
   } catch {
     ElMessage.error(`${options.file.name} 上传失败`)
   }
