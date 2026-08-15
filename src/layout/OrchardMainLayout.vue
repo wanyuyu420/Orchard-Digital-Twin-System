@@ -12,6 +12,14 @@
     <!-- Dynamic Layers -->
     <DynamicLayerRenderer />
 
+    <!-- 历史老树拾取点图层 -->
+    <HistoricalTreeLayer />
+
+    <!-- 图层管理面板（顶栏按钮开关） -->
+    <div v-if="layerStore.showManager" class="layer-manager">
+      <LayerControl />
+    </div>
+
     <!-- Layer 2: UI Layer (Router View) -->
     <div class="ui-layer">
       <router-view v-slot="{ Component }">
@@ -51,6 +59,9 @@ import TopMenuBar from '@/layout/TopMenuBar.vue'
 import LeftSidebar from '@/layout/LeftSidebar.vue'
 import GISLayer from '@/components/cesium/GISLayer.vue'
 import DynamicLayerRenderer from '@/components/cesium/DynamicLayerRenderer.vue'
+import HistoricalTreeLayer from '@/components/cesium/HistoricalTreeLayer.vue'
+import LayerControl from '@/components/business/LayerControl.vue'
+import { useLayerStore } from '@/stores/layers'
 import QueryPanel from '@/components/orchard/QueryPanel.vue'
 import QueryResultPanel from '@/components/orchard/QueryResultPanel.vue'
 import DetailPanel from '@/components/orchard/DetailPanel.vue'
@@ -64,6 +75,7 @@ declare const Cesium: any
 
 const cesiumStore = useCesiumStore()
 const orchardStore = useOrchardStore()
+const layerStore = useLayerStore()
 
 // ── 果树 POI 地图标记 ──
 let treeEntities: any[] = []
@@ -130,12 +142,14 @@ function renderTreeMarkers() {
 
     const entity = viewer.entities.add({
       id: `${TREE_ENTITY_ID}_${index}`,
-      position: Cesium.Cartesian3.fromDegrees(poi.longitude, poi.latitude, (poi.altitude || 0) + 2),
+      // 地表是 DEM 地形(~185m),点必须吸附地表,否则会悬空在地底
+      position: Cesium.Cartesian3.fromDegrees(poi.longitude, poi.latitude, 0),
       point: {
         pixelSize: 10,
         color: color,
         outlineColor: Cesium.Color.WHITE,
         outlineWidth: 1,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
     })
@@ -183,5 +197,16 @@ onUnmounted(() => {
   height: calc(100% - 50px);
   z-index: $z-layer-2;
   pointer-events: none;
+}
+
+.layer-manager {
+  position: absolute;
+  top: 56px;
+  right: 16px;
+  width: 340px;
+  max-height: calc(100vh - 72px);
+  overflow-y: auto;
+  z-index: $z-layer-4;
+  pointer-events: auto;
 }
 </style>

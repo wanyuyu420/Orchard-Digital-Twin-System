@@ -4,6 +4,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { apiClient } from '@/api/client'
+import * as layersApi from '@/api/layers'
+import type { LayerCreateInput, LayerUpdateInput } from '@/api/layers'
 
 export interface LayerConfig {
   mapping?: {
@@ -96,6 +98,8 @@ export const useLayerStore = defineStore('layers', () => {
   const activeLayerIds = ref<Set<number>>(new Set())
   const isLoading = ref(false)
   const lastError = ref<string | null>(null)
+  /** 图层管理面板显隐 */
+  const showManager = ref(false)
 
   // Getters
   const activeLayers = computed(() => 
@@ -135,14 +139,23 @@ export const useLayerStore = defineStore('layers', () => {
     }
   }
 
+  /** 把图层显隐状态 PATCH 到后端（fire-and-forget，失败只记日志） */
+  function persistVisibility(layerId: number, visible: boolean) {
+    layersApi.setLayerVisibility(layerId, visible).catch((err) => {
+      console.error('[LayerStore] Failed to persist layer visibility:', err)
+    })
+  }
+
   function toggleLayer(layerId: number) {
-    if (activeLayerIds.value.has(layerId)) {
-      activeLayerIds.value.delete(layerId)
-    } else {
+    const nowActive = !activeLayerIds.value.has(layerId)
+    if (nowActive) {
       activeLayerIds.value.add(layerId)
+    } else {
+      activeLayerIds.value.delete(layerId)
     }
     // Force reactivity
     activeLayerIds.value = new Set(activeLayerIds.value)
+    persistVisibility(layerId, nowActive)
   }
 
   function setLayerActive(layerId: number, active: boolean) {
@@ -152,6 +165,29 @@ export const useLayerStore = defineStore('layers', () => {
       activeLayerIds.value.delete(layerId)
     }
     activeLayerIds.value = new Set(activeLayerIds.value)
+    persistVisibility(layerId, active)
+  }
+
+  function toggleManager() {
+    showManager.value = !showManager.value
+  }
+
+  // ---- CRUD（调后端 /layers） ----
+  async function createLayer(data: LayerCreateInput) {
+    const res = await layersApi.createLayer(data)
+    await fetchLayers()
+    return res.data
+  }
+
+  async function updateLayer(id: number, data: LayerUpdateInput) {
+    const res = await layersApi.updateLayer(id, data)
+    await fetchLayers()
+    return res.data
+  }
+
+  async function deleteLayer(id: number) {
+    await layersApi.deleteLayer(id)
+    await fetchLayers()
   }
 
   function isLayerActive(layerId: number): boolean {
@@ -169,6 +205,7 @@ export const useLayerStore = defineStore('layers', () => {
     activeLayerIds,
     isLoading,
     lastError,
+    showManager,
     // Getters
     activeLayers,
     layersByGroup,
@@ -179,5 +216,9 @@ export const useLayerStore = defineStore('layers', () => {
     setLayerActive,
     isLayerActive,
     isLayerActiveByCode,
+    toggleManager,
+    createLayer,
+    updateLayer,
+    deleteLayer,
   }
 })

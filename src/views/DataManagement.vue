@@ -18,7 +18,7 @@
           >
             <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
             <div class="upload-text">拖拽文件到此处或点击上传</div>
-            <div class="upload-limit">支持 TIF / GeoJSON / CSV / LAS / ZIP, 最大1GB</div>
+            <div class="upload-limit">仅支持 .tif / .tiff 无人机正射影像, 最大1GB</div>
           </el-upload>
         </div>
       </div>
@@ -90,7 +90,6 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
 import { useOrchardStore } from '@/stores/orchard'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadedFile } from '@/types/orchard'
@@ -118,6 +117,7 @@ function statusType(status: string) {
   switch (status) {
     case 'completed': return 'success'
     case 'uploading': return 'info'
+    case 'pending': return 'info'
     case 'processing': return 'warning'
     case 'failed': return 'danger'
     default: return 'info'
@@ -127,6 +127,7 @@ function statusType(status: string) {
 function statusLabel(status: string): string {
   switch (status) {
     case 'uploading': return '上传中'
+    case 'pending': return '等待中'
     case 'processing': return '分析中'
     case 'completed': return '完成'
     case 'failed': return '失败'
@@ -142,6 +143,11 @@ function formatDate(dateStr: string): string {
 function beforeUpload(file: File) {
   if (file.size > MAX_FILE_SIZE) {
     ElMessage.error(`文件 ${file.name} 超过1GB限制`)
+    return false
+  }
+  const lower = file.name.toLowerCase()
+  if (!lower.endsWith('.tif') && !lower.endsWith('.tiff')) {
+    ElMessage.error('仅支持 .tif/.tiff 无人机正射影像文件')
     return false
   }
   return true
@@ -175,9 +181,7 @@ function deleteFile(row: UploadedFile) {
   })
 }
 
-onMounted(() => {
-  orchardStore.fetchUploadedFiles()
-})
+// 后端无上传列表接口，上传列表为会话内本地数据，无需挂载时拉取
 </script>
 
 <style scoped lang="scss">

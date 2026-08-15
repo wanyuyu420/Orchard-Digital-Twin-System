@@ -8,7 +8,6 @@ import type {
   TsomQueryResult,
   FertilizationPlan,
   AnalysisResult,
-  UploadedFile,
   RenderParams,
   GeoServerLayer,
   InterpretTask,
@@ -64,6 +63,21 @@ export async function queryTreesByFilter(params: TsomQueryParams): Promise<{ dat
   return { data: mapDiagnoseToTsomResult(params, res.data) }
 }
 
+/**
+ * 历史老树 - 大屏开屏拉取全部历史老树坐标与属性
+ *
+ * 走后端 /orange/historical-trees：GeoScene FeatureServer 中 batch_id='historical_zone'
+ * 的全量坐标 + 长势/施肥属性，用于在地图上铺设可拾取点。
+ */
+export async function getHistoricalTrees(): Promise<{ data: HistoricalTreesResponse }> {
+  // GeoScene 全量查询较慢，覆盖默认 5s 超时
+  const res = await apiClient.get<HistoricalTreesResponse>(
+    '/orange/historical-trees',
+    { timeout: 60000 },
+  )
+  return { data: res.data }
+}
+
 /** 获取园区统计数据 */
 export function getOrchardStatistics(orchardId: string) {
   return apiClient.get(`/orchard/${orchardId}/statistics`)
@@ -116,42 +130,46 @@ export function getGeoserverLayers() {
   return apiClient.get<GeoServerLayer[]>('/geoserver/layers')
 }
 
-/** 上传文件 - 返回上传任务信息 */
-export function uploadFile(
-  file: File,
-  onProgress?: (progress: number) => void,
-): Promise<{ data: UploadedFile }> {
+/** TIF 上传响应（POST /orange/upload-tif） */
+export interface TifUploadResponse {
+  success: boolean
+  message: string
+  file_path: string
+  spatial_info: {
+    crs: string
+    transform: number[]
+  }
+  task_id: string
+}
+
+/** 推理任务状态（GET /orange/upload-and-interpret/{task_id}） */
+export interface TaskStatus {
+  task_id: string
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  message: string
+  total_trees: number
+  fresh_trees: any[]
+  progress: number // 0.0 ~ 1.0
+}
+
+/** 上传 TIF - 触发 YOLO+SAM 推理任务，返回 task_id */
+export function uploadFile(file: File): Promise<{ data: TifUploadResponse }> {
   const formData = new FormData()
   formData.append('file', file)
-  return apiClient.post('/upload/file', formData, {
+  return apiClient.post('/orange/upload-tif', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 600000, // 10分钟超时
-    onUploadProgress: (event) => {
-      if (event.total && onProgress) {
-        onProgress(Math.round((event.loaded * 100) / event.total))
-      }
-    },
+    timeout: 600000, // 10分钟超时（上传+首响应可能较慢）
   })
 }
 
-/** 获取上传文件列表 */
-export function getUploadedFiles() {
-  return apiClient.get<UploadedFile[]>('/upload/files')
-}
-
-/** 删除上传文件 */
-export function deleteUploadedFile(fileId: string) {
-  return apiClient.delete(`/upload/files/${fileId}`)
+/** 查询推理任务状态（轮询用） */
+export function getTaskStatus(taskId: string) {
+  return apiClient.get<TaskStatus>(`/orange/upload-and-interpret/${taskId}`)
 }
 
 /** 下载分析结果文件 */
 export function downloadAnalysisFile(fileId: string) {
   return apiClient.get(`/download/${fileId}`, { responseType: 'blob' })
-}
-
-/** 获取上传文件的子级分析文件 */
-export function getChildFiles(parentId: string) {
-  return apiClient.get<UploadedFile[]>(`/upload/files/${parentId}/children`)
 }
 
 /** 获取冠层图表统计数据 */
@@ -264,6 +282,12 @@ interface DiagnoseResult {
     growth_index?: number | null
     area_m2?: number | null
   }>
+}
+
+/** 历史老树接口响应（trees 与 DiagnoseResult.trees 同形状） */
+export interface HistoricalTreesResponse {
+  total: number
+  trees: DiagnoseResult['trees']
 }
 
 /** 把后端诊断结果映射为前端 TsomQueryResult，保持 UI 契约不变 */

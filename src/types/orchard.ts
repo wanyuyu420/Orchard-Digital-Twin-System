@@ -141,13 +141,19 @@ export interface UploadedFile {
   size: number
   type: string
   uploadProgress: number
-  status: 'uploading' | 'processing' | 'completed' | 'failed'
+  status: 'pending' | 'uploading' | 'processing' | 'completed' | 'failed'
   /** 上传时间 */
   uploadedAt: string
   /** 分析结果列表 */
   analysisResults: AnalysisResult[]
   /** 子级文件列表 (后端分析后返回) */
   childFiles: UploadedFile[]
+  /** 后端推理任务 ID（POST /orange/upload-tif 返回），用于轮询任务进度 */
+  taskId?: string
+  /** 任务状态消息（推理中/失败原因等） */
+  message?: string
+  /** 检测到的果树数量（任务完成时） */
+  totalTrees?: number
 }
 
 /** GeoServer图层配置 */
