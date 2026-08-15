@@ -91,8 +91,6 @@ temp/
 
 # 训练数据集（不在 git 中）
 datasets/
-*.pt
-*.pth
 
 # 本地推理产物（不在 git 中）
 backend/debug_tiles/
