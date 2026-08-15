@@ -29,7 +29,17 @@ class HeightService:
         height_map = estimator.predict(image_path, output_path=output_path, batch_size=4)
         if os.path.exists(output_path):
             os.remove(output_path)
+        # 预测完成即释放 SSLhuge 大模型显存（后续 YOLO+SAM 分割不再需要它）
+        HeightService.release()
         return height_map
+
+    @classmethod
+    def release(cls):
+        """释放冠层高度模型，归还 GPU 显存。"""
+        cls._estimator = None
+        cls._instance = None
+        import torch
+        torch.cuda.empty_cache()
 
     @staticmethod
     def get_tree_height(height_map: np.ndarray, mask: np.ndarray) -> float:

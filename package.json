@@ -17,6 +17,9 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
+    "@gltf-transform/core": "^4.4.2",
+    "@gltf-transform/extensions": "^4.4.2",
+    "@gltf-transform/functions": "^4.4.2",
     "@types/leaflet": "^1.9.21",
     "@vueuse/core": "^10.9.0",
     "axios": "^1.13.2",

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { ElNotification } from 'element-plus'
 import type {
   FruitTreePoi,
   TsomQueryParams,
@@ -13,6 +14,7 @@ import type {
   QueryLevel,
   ModuleMenuItem,
   ChartStatistics,
+  UploadPlotTask,
 } from '@/types/orchard'
 import { DEFAULT_RENDER_PARAMS } from '@/types/orchard'
 import { useGISStore } from '@/stores/gis'
@@ -351,6 +353,109 @@ export const useOrchardStore = defineStore('orchard', () => {
     }
   }
 
+  // ---- 上传地块任务（地2 切换） ----
+  const plotTasks = ref<UploadPlotTask[]>([])
+  const activePlotTaskId = ref<string | null>(null)
+
+  const activePlotTask = computed(() =>
+    plotTasks.value.find((t) => t.id === activePlotTaskId.value) ?? null,
+  )
+
+  const POLL_INTERVAL_MS = 2000
+
+  function removePlotTask(id: string) {
+    plotTasks.value = plotTasks.value.filter((t) => t.id !== id)
+    if (activePlotTaskId.value === id) activePlotTaskId.value = null
+  }
+
+  /** 上传 TIF 并启动后台分割 + 轮询（异步，不阻塞主界面） */
+  async function uploadTifAndInterpret(file: File) {
+    const domRect = await orchardApi.readTifBounds(file)
+
+    const id = 'plot-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)
+    plotTasks.value.unshift({
+      id,
+      taskId: '',
+      fileName: file.name,
+      fileSize: file.size,
+      status: 'uploading',
+      uploadProgress: 0,
+      analysisProgress: 0,
+      totalTrees: 0,
+      freshTrees: [],
+      domRect,
+      createdAt: new Date().toISOString(),
+    })
+
+    // 始终通过 find 取 reactive proxy 更新，否则修改原始对象不会触发 Vue 响应式
+    const findTask = () => plotTasks.value.find((t) => t.id === id)
+
+    try {
+      const res = await orchardApi.uploadTifAndInterpret(file, (p) => {
+        const t = findTask()
+        if (t) t.uploadProgress = p
+      })
+      const t = findTask()
+      if (t) {
+        t.uploadProgress = 100
+        t.taskId = res.task_id
+        t.status = 'processing'
+      }
+      startPlotPolling(id)
+    } catch (err) {
+      const t = findTask()
+      if (t) t.status = 'failed'
+      console.error('Upload TIF failed:', err)
+      throw err
+    }
+  }
+
+  /** 轮询后端分割进度，完成/失败后停止并通知 */
+  function startPlotPolling(id: string) {
+    const timer = setInterval(async () => {
+      const t = plotTasks.value.find((task) => task.id === id)
+      if (!t || t.status !== 'processing') {
+        clearInterval(timer)
+        return
+      }
+      try {
+        const res = await orchardApi.getInterpretTask(t.taskId)
+        t.analysisProgress = Math.round((res.progress ?? 0) * 100)
+        if (res.status === 'completed') {
+          t.status = 'completed'
+          t.analysisProgress = 100
+          t.totalTrees = res.total_trees
+          t.freshTrees = res.fresh_trees ?? []
+          clearInterval(timer)
+          ElNotification({
+            title: '地块分析完成',
+            message: `${t.fileName}：提取树冠 ${t.totalTrees} 棵`,
+            type: 'success',
+            duration: 5000,
+          })
+        } else if (res.status === 'failed') {
+          t.status = 'failed'
+          clearInterval(timer)
+          ElNotification({
+            title: '地块分析失败',
+            message: res.message || t.fileName,
+            type: 'error',
+            duration: 6000,
+          })
+        }
+      } catch (err) {
+        // 单次轮询失败忽略，下个周期重试
+      }
+    }, POLL_INTERVAL_MS)
+  }
+
+  /** 点击"已完成"任务卡片 → 触发加载地2 */
+  function loadPlot(taskId: string) {
+    const task = plotTasks.value.find((t) => t.id === taskId)
+    if (!task || task.status !== 'completed') return
+    activePlotTaskId.value = taskId
+  }
+
   // ---- 冠层图表统计 ----
   const showChartDialog = ref(false)
   const chartData = ref<ChartStatistics | null>(null)
@@ -424,6 +529,13 @@ export const useOrchardStore = defineStore('orchard', () => {
     activeAnalysisResult,
     activeFertilizationPlan,
     activeUploadedFile,
+    // plot task state
+    plotTasks,
+    activePlotTaskId,
+    activePlotTask,
+    removePlotTask,
+    uploadTifAndInterpret,
+    loadPlot,
     // chart state
     showChartDialog,
     chartData,

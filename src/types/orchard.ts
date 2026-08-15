@@ -173,6 +173,53 @@ export interface ModuleMenuItem {
 /** 查询窗口层级 */
 export type QueryLevel = 'menu' | 'query' | 'result' | 'detail'
 
+// ---- 上传 TIF 分割（地2 切换） ----
+
+/** 后端返回的单棵分割树冠（fresh_trees 元素） */
+export interface FreshTree {
+  id: string
+  batch_id: string
+  lng: number
+  lat: number
+  area_m2?: number | null
+  height_m?: number | null
+  crown_diameter?: number | null
+  volume_m3?: number | null
+  growth_index?: number | null
+  compactness?: number | null
+  shape_length?: number | null
+  fertilizer_level?: number
+  fertilizer_kg?: number
+  growth_status?: string
+  geometry?: any
+}
+
+/** 后端 /orange/upload-and-interpret/{task_id} 任务状态响应 */
+export interface InterpretTask {
+  task_id: string
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  message: string
+  total_trees: number
+  fresh_trees: FreshTree[]
+  progress: number
+}
+
+/** 前端侧边栏"上传地块"任务卡片 */
+export interface UploadPlotTask {
+  id: string
+  taskId: string
+  fileName: string
+  fileSize: number
+  status: 'uploading' | 'processing' | 'completed' | 'failed'
+  uploadProgress: number
+  analysisProgress: number
+  totalTrees: number
+  freshTrees: FreshTree[]
+  /** 上传 TIF 的 WGS84 边界 [west, south, east, north]，用于地2 DOM 底图贴位 */
+  domRect: [number, number, number, number] | null
+  createdAt: string
+}
+
 // ---- 冠层图表统计 ----
 
 /** 图表分桶/分类项 */

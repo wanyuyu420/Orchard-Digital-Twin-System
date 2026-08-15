@@ -6,7 +6,7 @@
  *  2) DOM 无人机 1.4cm 正射影像 —— 果园范围内,云服务器 8765 瓦片(17-23 级)
  *  3) DEM 起伏地形 —— 树根贴地(IDW 插值高程,数据来自 dem.js)
  *
- * 数据源全部来自云服务器 orchard 静态服务(http://100.101.73.76:8765),CORS 已开启。
+ * 数据源全部来自本机 orchard 静态服务(http://100.69.181.81:8765),CORS 已开启。
  * 依赖: 需先运行 scripts/serve_orchard.py(与 OrchardTilesetLayer 同一数据源)。
  */
 declare const Cesium: any
@@ -19,7 +19,7 @@ const DOM_RECT = {
   north: 27.133232838,
 }
 
-const DOM_BASE = 'http://100.101.73.76:8765'
+const DOM_BASE = 'http://100.69.181.81:8766'
 
 /** 高德卫星影像:园外大范围底图 */
 function addGaodeImagery(viewer: any): void {

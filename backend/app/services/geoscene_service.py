@@ -85,7 +85,7 @@ class GeoSceneService:
             fs.raise_for_status()
             fs_data = fs.json()
             if 'error' in fs_data:
-                raise GeoSceneError(f'FeatureServer unavailable: {fs_data['error']}')
+                raise GeoSceneError(f"FeatureServer unavailable: {fs_data['error']}")
         except GeoSceneError:
             raise
         except Exception as e:
@@ -141,7 +141,7 @@ class GeoSceneService:
             resp.raise_for_status()
             data = resp.json()
             if 'error' in data:
-                raise GeoSceneError(f'Query failed: {data['error']}')
+                raise GeoSceneError(f"Query failed: {data['error']}")
             return data.get('features', [])
         except GeoSceneError:
             raise

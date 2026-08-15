@@ -3,7 +3,7 @@ import math, os
 import numpy as np
 import rasterio
 
-_LOCAL_DSM = os.path.join(os.path.dirname(__file__), "../../data/2019081929/3_dsm_ortho/1_dsm/2019081929_dsm_smooth.tif")
+_LOCAL_DSM = r"D:\Esri_data_4people\dem2.tif"
 
 class ElevationService:
     _dsm_ds = None

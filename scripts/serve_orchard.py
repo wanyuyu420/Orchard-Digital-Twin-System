@@ -15,9 +15,7 @@ import sys
 import threading
 
 # Directory that contains tiles/{trees,orchard,dom,...}. Adjust if moved.
-DEFAULT_ROOT = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "果园2.0", "tiles")
-)
+DEFAULT_ROOT = r"D:\Esri_data_4people\qc_data"
 
 MIME = {
     ".html": "text/html; charset=utf-8",
@@ -65,7 +63,7 @@ class CORSHandler(http.server.SimpleHTTPRequestHandler):
 
 def main():
     parser = argparse.ArgumentParser(description="Serve orchard 3D Tiles with CORS")
-    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--port", type=int, default=8766)
     parser.add_argument("--dir", default=DEFAULT_ROOT)
     args = parser.parse_args()
 

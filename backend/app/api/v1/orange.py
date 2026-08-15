@@ -496,6 +496,8 @@ def _run_inference_task(task_id: str, file_path: str):
         all_detected_trees = []
         tile_count = 0
         rio_ds = rasterio.open(file_path)
+        # 预读整张单波段进内存，循环里每棵树直接内存索引，避免逐像素磁盘 I/O
+        band1 = rio_ds.read(1)
 
         tiles = list(TifService.slice_tif_generator(file_path, overlap=112))
         total_tiles = len(tiles)
@@ -536,7 +538,9 @@ def _run_inference_task(task_id: str, file_path: str):
                 tree_h = float(np.median(height_map[max(0,int(global_py)-2):min(height_map.shape[0],int(global_py)+3), max(0,int(global_px)-2):min(height_map.shape[1],int(global_px)+3)][height_map[max(0,int(global_py)-2):min(height_map.shape[0],int(global_py)+3), max(0,int(global_px)-2):min(height_map.shape[1],int(global_px)+3)] > 0])) if height_map is not None and 0 <= int(global_py) < height_map.shape[0] and 0 <= int(global_px) < height_map.shape[1] else None
                 growth = _calc_growth_fields(tree["segmentation_mask"], gsd, tree_h)
                 utm_x, utm_y = transformer_utm.transform(lng, lat)
-                slope_info = ElevationService.get_slope_aspect(lat, lng, utm_x, utm_y); band_val = tile_rgb[int(local_cy), int(local_cx)].tolist(); raw_val = float(rio_ds.read(1, window=((int(global_py),int(global_py)+1), (int(global_px),int(global_px)+1)))[0,0]) if 0 <= int(global_py) < rio_ds.shape[0] and 0 <= int(global_px) < rio_ds.shape[1] else None if 0 <= int(local_cy) < tile_rgb.shape[0] and 0 <= int(local_cx) < tile_rgb.shape[1] else None
+                slope_info = ElevationService.get_slope_aspect(lat, lng, utm_x, utm_y)
+                band_val = tile_rgb[int(local_cy), int(local_cx)].tolist()
+                raw_val = float(band1[int(global_py), int(global_px)]) if 0 <= int(global_py) < band1.shape[0] and 0 <= int(global_px) < band1.shape[1] else None
                 geojson = _make_geojson_from_mask(
                     tree["segmentation_mask"], window_x, window_y,
                     transform, transformer)
@@ -564,8 +568,11 @@ def _run_inference_task(task_id: str, file_path: str):
         # Persist detected trees to database for spatial-diagnose
         _persist_trees_sync(all_detected_trees, batch_id)
 
-        # Publish to GeoScene FeatureServer
-        GeoSceneService.add_features([{"attributes": t, "geometry": {"x": t["utm_x"], "y": t["utm_y"], "spatialReference": {"wkid": 32650}}} for t in all_detected_trees])
+        # Publish to GeoScene FeatureServer（失败降级：权限不足时不影响分割结果返回）
+        try:
+            GeoSceneService.add_features([{"attributes": t, "geometry": {"x": t["utm_x"], "y": t["utm_y"], "spatialReference": {"wkid": 32650}}} for t in all_detected_trees])
+        except Exception as e:
+            print(f"[Warning] Publish to GeoScene FeatureServer failed (non-fatal): {e}")
 
         with _task_lock:
             _task_store[task_id]["status"] = "completed"

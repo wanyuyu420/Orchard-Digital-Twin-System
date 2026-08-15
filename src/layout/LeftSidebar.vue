@@ -126,26 +126,101 @@
             </span>
           </div>
         </div>
+
+        <!-- 上传地块（分析完成后出现，点击跳转加载地2） -->
+        <div class="section" v-if="completedPlotTasks.length > 0">
+          <div class="section-title">上传地块</div>
+          <div
+            v-for="task in completedPlotTasks"
+            :key="task.id"
+            class="layer-item"
+            :class="{ active: orchardStore.activePlotTaskId === task.id }"
+            @click="onPlotLayerClick(task)"
+          >
+            <i class="fa-solid fa-map-location-dot text-cyan"></i>
+            <span class="layer-name">{{ task.fileName }}</span>
+            <span class="layer-status completed">已完成</span>
+            <button
+              class="layer-delete-btn"
+              @click.stop="onDeletePlotTask(task)"
+              title="删除地块"
+            >
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        </div>
       </div>
 
 
 
       <!-- 文件面板 -->
       <div class="tab-panel" v-show="orchardStore.sidebarActiveTab === 'files'">
-        <!-- 上传按钮 -->
+        <!-- 上传 TIF 按钮 -->
         <div class="upload-area">
           <el-upload
             :before-upload="beforeUpload"
             :show-file-list="false"
             :http-request="handleUpload"
-            accept="*"
+            accept=".tif,.tiff"
           >
             <button class="upload-btn">
               <i class="fa-solid fa-cloud-arrow-up"></i>
-              <span>上传文件 (最大1GB)</span>
+              <span>上传 TIF 影像</span>
             </button>
           </el-upload>
-          <div class="upload-hint">支持栅格、矢量、点云等数据格式</div>
+          <div class="upload-hint">建议上传单景果园高分辨率 TIF 影像</div>
+        </div>
+
+        <!-- 地块分析任务卡片 -->
+        <div class="section" v-if="orchardStore.plotTasks.length > 0">
+          <div class="section-title">
+            地块分析任务
+            <span class="count-badge">{{ orchardStore.plotTasks.length }}</span>
+          </div>
+          <div
+            v-for="task in orchardStore.plotTasks"
+            :key="task.id"
+            class="plot-task-item"
+            :class="{ completed: task.status === 'completed' }"
+          >
+            <i
+              class="fa-solid"
+              :class="{
+                'fa-spinner fa-spin': task.status === 'uploading' || task.status === 'processing',
+                'fa-circle-check text-green': task.status === 'completed',
+                'fa-circle-xmark text-red': task.status === 'failed',
+              }"
+            ></i>
+            <div class="plot-task-info">
+              <div class="plot-task-name">{{ task.fileName }}</div>
+              <div class="plot-task-meta">
+                <span v-if="task.status === 'uploading'">上传中 {{ task.uploadProgress }}%</span>
+                <span v-else-if="task.status === 'processing'">AI 正在全图分析中，预计 5-10 秒…</span>
+                <span v-else-if="task.status === 'completed'">提取树冠：{{ task.totalTrees }} 棵</span>
+                <span v-else class="text-red">分析失败</span>
+              </div>
+              <el-progress
+                v-if="task.status === 'uploading'"
+                :percentage="task.uploadProgress"
+                :stroke-width="4"
+                :show-text="false"
+              />
+              <el-progress
+                v-else-if="task.status === 'processing'"
+                :percentage="task.analysisProgress"
+                :stroke-width="4"
+                :show-text="false"
+              />
+            </div>
+            <button
+              v-if="task.status === 'completed' || task.status === 'failed'"
+              class="file-delete"
+              @click.stop="onDeletePlotTask(task)"
+              title="删除任务"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
         </div>
 
         <!-- 文件列表 -->
@@ -208,11 +283,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useOrchardStore } from '@/stores/orchard'
 import { useCesiumStore } from '@/stores/cesium'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { UploadedFile } from '@/types/orchard'
+import type { UploadedFile, UploadPlotTask } from '@/types/orchard'
 
 const orchardStore = useOrchardStore()
 const cesiumStore = useCesiumStore()
@@ -310,16 +385,33 @@ function beforeUpload(file: File) {
     ElMessage.error(`文件 ${file.name} 超过1GB大小限制`)
     return false
   }
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  if (ext !== 'tif' && ext !== 'tiff') {
+    ElMessage.error('仅支持 .tif / .tiff 格式的影像文件')
+    return false
+  }
   return true
 }
 
 async function handleUpload(options: { file: File }) {
   try {
-    await orchardStore.uploadSingleFile(options.file)
-    ElMessage.success(`${options.file.name} 上传成功`)
+    await orchardStore.uploadTifAndInterpret(options.file)
+    ElMessage.success(`${options.file.name} 已上传，AI 正在后台分析`)
   } catch {
     ElMessage.error(`${options.file.name} 上传失败`)
   }
+}
+
+const completedPlotTasks = computed(() =>
+  orchardStore.plotTasks.filter((t) => t.status === 'completed'),
+)
+
+function onPlotLayerClick(task: UploadPlotTask) {
+  orchardStore.loadPlot(task.id)
+}
+
+function onDeletePlotTask(task: UploadPlotTask) {
+  orchardStore.removePlotTask(task.id)
 }
 
 function onDeleteFile(file: UploadedFile) {
@@ -708,6 +800,54 @@ function zoomToGeometry(geo: any) {
 
   &:hover .file-delete {
     opacity: 1;
+  }
+}
+
+.plot-task-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  &.active {
+    background: rgba(100, 100, 100, 0.3);
+    border: 1px solid rgba(150, 150, 150, 0.3);
+  }
+
+  &.completed {
+    border-color: rgba(74, 222, 128, 0.35);
+
+    &:hover {
+      background: rgba(74, 222, 128, 0.08);
+    }
+  }
+
+  .plot-task-info {
+    flex: 1;
+    min-width: 0;
+
+    .plot-task-name {
+      font-size: 13px;
+      color: $text-main;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .plot-task-meta {
+      font-size: 11px;
+      color: $text-dim;
+      margin-top: 2px;
+    }
   }
 }
 

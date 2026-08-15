@@ -1,5 +1,7 @@
 import { apiClient } from './client'
 import { normalizeToClosedRing, growthIndexToHealth } from '@/utils/spatial'
+import { fromArrayBuffer } from 'geotiff'
+import proj4 from 'proj4'
 import type {
   FruitTreePoi,
   TsomQueryParams,
@@ -9,6 +11,7 @@ import type {
   UploadedFile,
   RenderParams,
   GeoServerLayer,
+  InterpretTask,
 } from '@/types/orchard'
 
 /** 根据POI ID获取果树详细信息 */
@@ -154,6 +157,87 @@ export function getChildFiles(parentId: string) {
 /** 获取冠层图表统计数据 */
 export function getChartStatistics() {
   return apiClient.get('/orchard/chart-data')
+}
+
+// ── 上传 TIF 分割（地2 切换）──────────────────────────────
+
+/**
+ * 上传 TIF 并触发后端 YOLO+SAM 后台分割（异步，不阻塞）。
+ * 对应后端 POST /orange/upload-and-interpret，返回任务信息（含 task_id）。
+ */
+export function uploadTifAndInterpret(
+  file: File,
+  onProgress?: (progress: number) => void,
+): Promise<InterpretTask> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiClient
+    .post<InterpretTask>('/orange/upload-and-interpret', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 600000, // 10 分钟超时（大 TIF 上传较慢）
+      onUploadProgress: (event) => {
+        if (event.total && onProgress) {
+          onProgress(Math.round((event.loaded * 100) / event.total))
+        }
+      },
+    })
+    .then((res) => res.data)
+}
+
+/** 轮询后端分割任务状态，对应 GET /orange/upload-and-interpret/{task_id} */
+export function getInterpretTask(taskId: string): Promise<InterpretTask> {
+  return apiClient.get<InterpretTask>(`/orange/upload-and-interpret/${taskId}`).then((res) => res.data)
+}
+
+/**
+ * 从用户上传的 TIF 文件读取 WGS84 边界 [west, south, east, north]。
+ * 只解析文件头（IFD/GeoKeys），不读像素，大文件也很快，不会卡死浏览器。
+ * 投影栅格（如 UTM）会自动转成 WGS84 经纬度；无地理参考或解析失败返回 null。
+ */
+export async function readTifBounds(
+  file: File,
+): Promise<[number, number, number, number] | null> {
+  try {
+    const buf = await file.arrayBuffer()
+    const tiff = await fromArrayBuffer(buf)
+    const image = await tiff.getImage()
+    const bbox = image.getBoundingBox() // [minx, miny, maxx, maxy]，投影栅格为原生坐标
+    const geoKeys: any = image.getGeoKeys?.() ?? {}
+    tiff.close()
+
+    if (!bbox || bbox.some((v) => !isFinite(v))) return null
+
+    let west = bbox[0]
+    let south = bbox[1]
+    let east = bbox[2]
+    let north = bbox[3]
+
+    // 投影坐标系（如 UTM）→ WGS84 经纬度
+    const epsg = geoKeys.ProjectedCSTypeGeoKey || geoKeys.GeographicTypeGeoKey || 0
+    const projStr = epsgToProj4(epsg)
+    if (projStr && epsg !== 4326) {
+      ;[west, south] = proj4(projStr, 'WGS84', [bbox[0], bbox[1]])
+      ;[east, north] = proj4(projStr, 'WGS84', [bbox[2], bbox[3]])
+    }
+
+    const result: [number, number, number, number] = [west, south, east, north]
+    return result.some((v) => !isFinite(v)) ? null : result
+  } catch (e) {
+    console.warn('[readTifBounds] Failed to parse TIF bounds:', e)
+    return null
+  }
+}
+
+function epsgToProj4(epsg: number): string | null {
+  // UTM 北半球
+  if (epsg >= 32601 && epsg <= 32660) {
+    return `+proj=utm +zone=${epsg - 32600} +datum=WGS84 +units=m +no_defs`
+  }
+  // UTM 南半球
+  if (epsg >= 32701 && epsg <= 32760) {
+    return `+proj=utm +zone=${epsg - 32700} +south +datum=WGS84 +units=m +no_defs`
+  }
+  return null
 }
 
 // ── /orange/spatial-diagnose 响应映射 ──────────────────────────────
