@@ -290,8 +290,8 @@ function renderTreeMarkers(viewer: any, trees: FreshTree[]): void {
       position: Cesium.Cartesian3.fromDegrees(tree.lng, tree.lat, height),
       point: {
         pixelSize: 9,
-        color: Cesium.Color.fromCssColorString('#4ade80'),
-        outlineColor: Cesium.Color.WHITE,
+        color: Cesium.Color.fromCssColorString('#4ade80').withAlpha(0.01),
+        outlineColor: Cesium.Color.WHITE.withAlpha(0.01),
         outlineWidth: 1,
         heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
