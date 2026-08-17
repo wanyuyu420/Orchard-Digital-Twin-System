@@ -88,7 +88,7 @@ export async function addGeotiffBasemap(viewer: any): Promise<void> {
       rectangle: rectangle,
     })
 
-    const layer = viewer.imageryLayers.addImageryProvider(provider)
+    viewer.imageryLayers.addImageryProvider(provider)
     console.log('[GeoTIFF] Base map layer added to Cesium')
 
     tiff.close()

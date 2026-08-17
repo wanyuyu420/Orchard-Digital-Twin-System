@@ -67,6 +67,9 @@ export class CircleGraphic extends BaseGraphic {
   /** 面积（平方米） */
   private area: number = 0
 
+  /** 圆形边界点（填充与边框共用同一组点，保证两者完全贴合） */
+  private outlinePositions: Cesium.Cartesian3[] = []
+
   constructor(viewer: Cesium.Viewer, options: CircleGraphicOptions = {}) {
     super(viewer, { ...options, type: 'circle' })
     this.showRadiusLabel = options.showRadiusLabel ?? false  // 默认不显示半径标签
@@ -91,6 +94,9 @@ export class CircleGraphic extends BaseGraphic {
 
     // 计算面积
     this.area = Math.PI * this.radius * this.radius
+
+    // 生成边界点（填充与边框共用，确保两者完全贴合）
+    this.outlinePositions = this.generateOutlinePositions()
 
     // 创建圆形填充实体
     this.createCircleEntity()
@@ -117,6 +123,9 @@ export class CircleGraphic extends BaseGraphic {
     this.radius = radius
     this.area = Math.PI * radius * radius
 
+    // 生成边界点（填充与边框共用，确保两者完全贴合）
+    this.outlinePositions = this.generateOutlinePositions()
+
     // 创建圆形填充实体
     this.createCircleEntity()
 
@@ -142,20 +151,48 @@ export class CircleGraphic extends BaseGraphic {
   }
 
   /**
+   * 生成圆形边界点（64个点，确保圆形足够平滑）
+   * 经度方向按 1/cos(lat) 修正：否则等距圆柱近似会把东西方向压缩成椭圆，
+   * 使边框与填充错位（填充超出）。修正后各边界点与圆心的大地距离均为 radius，
+   * 与半径标签显示的大地测量半径一致。
+   */
+  private generateOutlinePositions(): Cesium.Cartesian3[] {
+    if (!this.centerPosition || this.radius <= 0) return []
+
+    const ellipsoid = this.viewer.scene.globe.ellipsoid
+    const centerCartographic = ellipsoid.cartesianToCartographic(this.centerPosition)
+    const latFactor = Math.max(Math.cos(centerCartographic.latitude), 1e-6)
+    const numPoints = 64
+    const positions: Cesium.Cartesian3[] = []
+
+    for (let i = 0; i <= numPoints; i++) {
+      const angle = (i / numPoints) * 2 * Math.PI
+      const pointCartographic = new Cesium.Cartographic(
+        centerCartographic.longitude +
+          (this.radius / ellipsoid.maximumRadius) * Math.cos(angle) / latFactor,
+        centerCartographic.latitude + (this.radius / ellipsoid.maximumRadius) * Math.sin(angle),
+      )
+      positions.push(ellipsoid.cartographicToCartesian(pointCartographic))
+    }
+
+    return positions
+  }
+
+  /**
    * 创建圆形填充实体
+   * 用多边形填充（与边框共用同一组边界点），保证填充和边框在 DEM 地形上完全贴合，
+   * 避免原先 ellipse（真大地圆）与边框（等距圆柱近似）错位导致的"填充超出"
    */
   private createCircleEntity(): void {
-    if (!this.centerPosition) return
+    if (this.outlinePositions.length === 0) return
 
-    // 创建圆形实体（填充）
     this.circleEntity = this.viewer.entities.add({
       id: this.id,
       name: this.name,
-      position: this.centerPosition,
-      ellipse: {
-        semiMinorAxis: this.radius,
-        semiMajorAxis: this.radius,
-        material: Cesium.Color.TRANSPARENT, // 透明填充
+      polygon: {
+        hierarchy: new Cesium.PolygonHierarchy(this.outlinePositions),
+        material: this.getFillColor(), // 填充使用样式中的填充颜色/透明度
+        classificationType: Cesium.ClassificationType.BOTH, // 贴地形/3D Tile表面（DEM 地形上才可见）
         outline: false,
       },
     })
@@ -165,31 +202,15 @@ export class CircleGraphic extends BaseGraphic {
 
   /**
    * 创建独立边框实体
-   * 使用 Polyline 生成圆形边框
+   * 使用 Polyline 生成圆形边框，与填充共用同一组边界点
    */
   private createOutlineEntity(): void {
-    if (!this.centerPosition) return
-
-    const ellipsoid = this.viewer.scene.globe.ellipsoid
-    const centerCartographic = ellipsoid.cartesianToCartographic(this.centerPosition)
-
-    // 生成圆形边界点（64个点，确保圆形足够平滑）
-    const numPoints = 64
-    const outlinePositions: Cesium.Cartesian3[] = []
-
-    for (let i = 0; i <= numPoints; i++) {
-      const angle = (i / numPoints) * 2 * Math.PI
-      const pointCartographic = new Cesium.Cartographic(
-        centerCartographic.longitude + (this.radius / ellipsoid.maximumRadius) * Math.cos(angle),
-        centerCartographic.latitude + (this.radius / ellipsoid.maximumRadius) * Math.sin(angle),
-      )
-      outlinePositions.push(ellipsoid.cartographicToCartesian(pointCartographic))
-    }
+    if (this.outlinePositions.length === 0) return
 
     // 使用 Entity polyline 创建边框（clampToGround 使边框贴在地形/3D模型表面）
     this.outlineEntity = this.viewer.entities.add({
       polyline: {
-        positions: outlinePositions,
+        positions: this.outlinePositions,
         clampToGround: true,
         width: this.style.strokeWidth || 2,
         material: Cesium.Color.fromCssColorString(this.style.strokeColor || '#000000'),
@@ -197,16 +218,6 @@ export class CircleGraphic extends BaseGraphic {
     })
 
     this.entities.push(this.outlineEntity)
-  }
-
-  /**
-   * 获取填充材质
-   */
-  private getMaterial(): Cesium.MaterialProperty {
-    const color = Cesium.Color.fromCssColorString(this.style.fillColor || '#ffcc33').withAlpha(
-      this.style.opacity ?? 0.5
-    )
-    return new Cesium.ColorMaterialProperty(color)
   }
 
   /**
@@ -507,14 +518,26 @@ export class CircleGraphic extends BaseGraphic {
    * 应用样式到实体
    * 覆盖基类方法以支持高亮效果
    */
+  /**
+   * 计算填充颜色（样式填充色 + 填充透明度）
+   * 供创建实体与 applyStyle 统一使用
+   */
+  private getFillColor(): Cesium.Color {
+    const fillColor = this.style.fillColor || '#000000'
+    const fillOpacity = this.style.fillOpacity ?? 0
+    return Cesium.Color.fromCssColorString(fillColor).withAlpha(fillOpacity)
+  }
+
   protected applyStyle(): void {
-    if (this.circleEntity && this.circleEntity.ellipse) {
-      // 保持透明填充
-      this.circleEntity.ellipse.material = Cesium.Color.TRANSPARENT
+    if (this.circleEntity && this.circleEntity.polygon) {
+      // 使用配置的填充颜色与透明度
+      this.circleEntity.polygon.material = new Cesium.ColorMaterialProperty(this.getFillColor())
     }
     if (this.outlineEntity && this.outlineEntity.polyline) {
       // 使用配置的线条颜色
-      this.outlineEntity.polyline.material = Cesium.Color.fromCssColorString(this.style.strokeColor || '#000000')
+      this.outlineEntity.polyline.material = new Cesium.ColorMaterialProperty(
+        Cesium.Color.fromCssColorString(this.style.strokeColor || '#000000')
+      )
       this.outlineEntity.polyline.width = new Cesium.ConstantProperty(this.style.strokeWidth || 2)
     }
   }
@@ -529,20 +552,18 @@ export class CircleGraphic extends BaseGraphic {
     const centerLon = Cesium.Math.toDegrees(centerCartographic.longitude)
     const centerLat = Cesium.Math.toDegrees(centerCartographic.latitude)
 
-    // 生成圆形的多边形近似（36个点）
+    // 生成圆形的多边形近似（36个点，与 generateOutlinePositions 同样做经度 cos 修正）
     const numPoints = 36
+    const latFactor = Math.max(Math.cos(centerCartographic.latitude), 1e-6)
     const coordinates: number[][] = []
 
     for (let i = 0; i <= numPoints; i++) {
       const angle = (i / numPoints) * 2 * Math.PI
-      const geodesic = new Cesium.EllipsoidGeodesic(
-        centerCartographic,
-        new Cesium.Cartographic(
-          centerCartographic.longitude + (this.radius / ellipsoid.maximumRadius) * Math.cos(angle),
-          centerCartographic.latitude + (this.radius / ellipsoid.maximumRadius) * Math.sin(angle)
-        )
+      const pointCartographic = new Cesium.Cartographic(
+        centerCartographic.longitude +
+          (this.radius / ellipsoid.maximumRadius) * Math.cos(angle) / latFactor,
+        centerCartographic.latitude + (this.radius / ellipsoid.maximumRadius) * Math.sin(angle)
       )
-      const pointCartographic = geodesic.interpolateUsingFraction(1.0)
       coordinates.push([
         Cesium.Math.toDegrees(pointCartographic.longitude),
         Cesium.Math.toDegrees(pointCartographic.latitude),

@@ -6,20 +6,20 @@ import type {
   TsomQueryParams,
   TsomQueryResult,
   OrchardStatistics,
-  RenderParams,
   AnalysisResult,
-  FertilizationPlan,
   UploadedFile,
   GeoServerLayer,
   QueryLevel,
   ModuleMenuItem,
   ChartStatistics,
+  FertilizerPlanOut,
+  AlertTreeItem,
   UploadPlotTask,
 } from '@/types/orchard'
-import { DEFAULT_RENDER_PARAMS } from '@/types/orchard'
 import { useGISStore } from '@/stores/gis'
 import * as orchardApi from '@/api/orchard'
-import { growthIndexToHealth } from '@/utils/spatial'
+import { growthIndexToHealth, normalizeToClosedRing } from '@/utils/spatial'
+import { countTilesetContent, computeAreaFromDem } from '@/utils/mapStats'
 
 export const useOrchardStore = defineStore('orchard', () => {
   // ---- 模块菜单 ----
@@ -58,6 +58,32 @@ export const useOrchardStore = defineStore('orchard', () => {
   const tsomQueryResult = ref<TsomQueryResult | null>(null)
   const orchardStatistics = ref<OrchardStatistics | null>(null)
 
+  // ---- 底图统计（读自 3D Tiles / DEM，绕开 GeoScene 挂起）----
+  const mapStats = ref<{ totalTrees: number; areaMu: number; ready: boolean }>({
+    totalTrees: 0,
+    areaMu: 0,
+    ready: false,
+  })
+
+  /** 从底图刷新统计（trees 瓦片加载成功后调用）。DEM 异步加载，未就绪时最多重试数秒。 */
+  async function refreshMapStats(dataBase: string): Promise<void> {
+    try {
+      const res = await fetch(`${dataBase}/trees/tileset.json`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const tileset = await res.json()
+      const totalTrees = countTilesetContent(tileset)
+      let areaMu = computeAreaFromDem((window as any).DEM)
+      for (let i = 0; i < 12 && areaMu === 0; i++) {
+        await new Promise((r) => setTimeout(r, 500))
+        areaMu = computeAreaFromDem((window as any).DEM)
+      }
+      mapStats.value = { totalTrees, areaMu, ready: true }
+      console.log(`[mapStats] 底图统计: ${totalTrees} 棵树, ${areaMu.toFixed(1)} 亩`)
+    } catch (e) {
+      console.warn('[mapStats] 从底图读取统计失败:', e)
+    }
+  }
+
   // ---- 历史老树（开屏拾取点） ----
   const historicalTreesLoading = ref(false)
   const historicalTreePois = ref<FruitTreePoi[]>([])
@@ -70,11 +96,6 @@ export const useOrchardStore = defineStore('orchard', () => {
     radius?: number
   } | null>(null)
 
-  // ---- 渲染参数 ----
-  const renderParams = ref<RenderParams>({ ...DEFAULT_RENDER_PARAMS })
-  const useDefaultParams = ref(true)
-  const showRenderSettings = ref(false)
-
   // ---- 文件上传 ----
   const uploadedFiles = ref<UploadedFile[]>([])
   const activeFileId = ref<string | null>(null)
@@ -85,12 +106,22 @@ export const useOrchardStore = defineStore('orchard', () => {
   const activeAnalysisId = ref<string | null>(null)
   const showAnalysisWindow = ref(false)
 
-  // ---- 施肥方案 ----
-  const fertilizationPlans = ref<FertilizationPlan[]>([])
-  const activeFertilizationId = ref<string | null>(null)
+  // ---- 变量施肥推荐 ----
   const showFertilizationWindow = ref(false)
-  /** 用户上传后是否自动弹出施肥窗口 */
-  const autoShowFertilization = ref(true)
+  const fertilizerPlan = ref<FertilizerPlanOut | null>(null)
+  const fertilizationLoading = ref(false)
+  const fertilizationError = ref<string | null>(null)
+
+  // ---- 弱树告警 ----
+  const alerts = ref<AlertTreeItem[]>([])
+  const alertsTotal = ref(0)
+  const alertsThreshold = ref(0.15)
+  const alertsLoading = ref(false)
+  const alertsVisible = ref(true)
+  const showAlertsWindow = ref(false)
+  /** 弱树告警查询失败信息（GeoScene 冷缓存超时等原因），空串表示无错误 */
+  const alertsError = ref('')
+
   /** 用户上传后是否自动弹出分析窗口 */
   const autoShowAnalysis = ref(true)
 
@@ -129,10 +160,6 @@ export const useOrchardStore = defineStore('orchard', () => {
 
   const activeAnalysisResult = computed(() =>
     analysisResults.value.find((r) => r.id === activeAnalysisId.value),
-  )
-
-  const activeFertilizationPlan = computed(() =>
-    fertilizationPlans.value.find((p) => p.id === activeFertilizationId.value),
   )
 
   const activeUploadedFile = computed(() =>
@@ -264,22 +291,6 @@ export const useOrchardStore = defineStore('orchard', () => {
     selectedLayerDetail.value = null
   }
 
-  // ---- 渲染参数 ----
-  function updateRenderParams(params: Partial<RenderParams>) {
-    renderParams.value = { ...renderParams.value, ...params }
-  }
-
-  function resetRenderParams() {
-    renderParams.value = { ...DEFAULT_RENDER_PARAMS }
-  }
-
-  function toggleDefaultParams() {
-    useDefaultParams.value = !useDefaultParams.value
-    if (useDefaultParams.value) {
-      resetRenderParams()
-    }
-  }
-
   // ---- 文件操作（TIF 上传 → 后端推理任务，轮询进度） ----
   /** 任务轮询定时器表（本地行 id → intervalId） */
   const pollTimers = new Map<string, number>()
@@ -290,6 +301,14 @@ export const useOrchardStore = defineStore('orchard', () => {
       clearInterval(timer)
       pollTimers.delete(fileId)
     }
+  }
+
+  /** 写入一条分析结果（同文件重复分析时替换旧结果），并设为当前查看项 */
+  function pushAnalysisResult(result: AnalysisResult) {
+    const oldIdx = analysisResults.value.findIndex((r) => r.fileId === result.fileId)
+    if (oldIdx >= 0) analysisResults.value.splice(oldIdx, 1)
+    analysisResults.value.push(result)
+    activeAnalysisId.value = result.id
   }
 
   function startPolling(row: UploadedFile, taskId: string) {
@@ -308,8 +327,98 @@ export const useOrchardStore = defineStore('orchard', () => {
         uploadedFiles.value[idx].uploadProgress = Math.round(res.data.progress * 100)
         uploadedFiles.value[idx].totalTrees = res.data.total_trees
 
-        if (status === 'completed' || status === 'failed') {
+        if (status === 'completed') {
           stopPolling(row.id)
+          // 推理完成 → 把 fresh_trees 打点到地图，上传后立即看到新检测的树
+          const fresh = res.data.fresh_trees ?? []
+          if (fresh.length > 0) {
+            const pois: FruitTreePoi[] = fresh.map((t) => ({
+              id: String(t.id),
+              name: `新树${t.id}`,
+              longitude: t.lng,
+              latitude: t.lat,
+              altitude: undefined,
+              canopyHeight: t.height_m ?? 0,
+              canopyDiameter: t.crown_diameter ?? 0,
+              canopyVolume: t.volume_m3 ?? 0,
+              healthStatus: growthIndexToHealth(t.growth_index),
+              orchardId: '',
+              orchardName: '冠层解析',
+            }))
+            selectedPois.value = pois
+            tsomQueryResult.value = {
+              id: 'upload-' + taskId,
+              queryParams: {
+                rangeType: 'rectangle',
+                coordinates: [],
+              },
+              totalTrees: fresh.length,
+              pois,
+              statistics: {
+                averageNdvi: 0,
+                totalArea: 0,
+                averageCanopyHeight: 0,
+                averageCanopyVolume: 0,
+                healthyCount: 0,
+                warningCount: 0,
+                criticalCount: 0,
+              },
+              executedAt: new Date().toISOString(),
+            }
+            console.log(`[orchardStore] inference done, ${pois.length} new trees on map`)
+          }
+
+          // 生成真实分析结果，供"查看分析"窗口展示
+          let healthyCount = 0
+          let warningCount = 0
+          let criticalCount = 0
+          let heightSum = 0
+          let heightCount = 0
+          let areaSum = 0
+          fresh.forEach((t) => {
+            const h = growthIndexToHealth(t.growth_index)
+            if (h === 'healthy') healthyCount++
+            else if (h === 'warning') warningCount++
+            else criticalCount++
+            if (typeof t.height_m === 'number' && isFinite(t.height_m)) {
+              heightSum += t.height_m
+              heightCount++
+            }
+            if (typeof t.area_m2 === 'number' && isFinite(t.area_m2)) areaSum += t.area_m2
+          })
+          pushAnalysisResult({
+            id: 'analysis-' + taskId,
+            name: `冠层解析 · ${row.name}`,
+            type: 'canopy',
+            fileId: row.id,
+            executedAt: new Date().toISOString(),
+            status: 'completed',
+            data: {
+              totalTrees: fresh.length,
+              healthyCount,
+              warningCount,
+              criticalCount,
+              averageHeight: heightCount ? Number((heightSum / heightCount).toFixed(2)) : 0,
+              totalArea: Number(areaSum.toFixed(2)),
+            },
+          })
+
+          // 上传后自动弹出分析结果窗口（勾选"上传后自动弹出"时）
+          if (autoShowAnalysis.value) {
+            showAnalysisWindow.value = true
+          }
+        } else if (status === 'failed') {
+          stopPolling(row.id)
+          // 失败也生成一条分析结果，窗口展示失败原因
+          pushAnalysisResult({
+            id: 'analysis-' + taskId,
+            name: `冠层解析 · ${row.name}`,
+            type: 'canopy',
+            fileId: row.id,
+            executedAt: new Date().toISOString(),
+            status: 'failed',
+            data: { error: res.data.message || '分析失败' },
+          })
         }
       } catch (err) {
         console.error('[orchardStore] task poll failed:', err)
@@ -377,13 +486,82 @@ export const useOrchardStore = defineStore('orchard', () => {
     }
   }
 
-  // ---- 施肥方案 ----
-  async function fetchFertilizationPlans(orchardId?: string) {
+  // ---- 变量施肥推荐 ----
+  /** 触发浏览器下载一个 Blob 为文件 */
+  function triggerDownload(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  /** 读框选范围 → 闭合经纬度环（无框选时抛错，按钮置灰兜底） */
+  function selectionCoordinates(): number[][] {
+    const range = selectionRange.value
+    if (!range) {
+      throw new Error('请先在地图上框选区域')
+    }
+    return normalizeToClosedRing({
+      type: range.type,
+      coordinates: range.coordinates,
+      radius: range.radius,
+    })
+  }
+
+  /** 生成变量施肥方案（apply=true 时同时把等级写回 GeoScene） */
+  async function generateFertilizationPlan(opts?: { apply?: boolean }) {
+    fertilizationLoading.value = true
+    fertilizationError.value = null
     try {
-      const res = await orchardApi.getFertilizationPlans(orchardId)
-      fertilizationPlans.value = res.data
+      const coordinates = selectionCoordinates()
+      const res = await orchardApi.generateFertilizationPlan({
+        coordinates,
+        apply: opts?.apply ?? false,
+      })
+      fertilizerPlan.value = res.data
+      return res.data
+    } catch (err: any) {
+      fertilizationError.value =
+        err?.response?.data?.detail || err?.message || '生成施肥方案失败'
+      throw err
+    } finally {
+      fertilizationLoading.value = false
+    }
+  }
+
+  /** 导出处方图（CSV 喂无人机/施肥机，GeoJSON 供 Cesium 二次确认） */
+  async function exportFertilizationPlan(format: 'csv' | 'geojson') {
+    const coordinates = selectionCoordinates()
+    const res = await orchardApi.exportFertilizationPlan({ coordinates }, format)
+    triggerDownload(res.data as Blob, `fertilizer_plan.${format}`)
+  }
+
+  // ---- 弱树告警 ----
+  async function fetchTreeAlerts() {
+    alertsLoading.value = true
+    alertsError.value = ''
+    // 立即弹出窗口，让用户看到"巡检中"状态而不是无响应
+    showAlertsWindow.value = true
+    try {
+      const res = await orchardApi.getTreeAlerts()
+      alerts.value = res.data.alerts
+      alertsTotal.value = res.data.total
+      alertsThreshold.value = res.data.growth_threshold
+      alertsVisible.value = true
+      return res.data
     } catch (err) {
-      console.error('Failed to fetch fertilization plans:', err)
+      // GeoScene 冷缓存查询可能 20s 超时（503），给用户明确提示而不是"无弱树告警"
+      alertsError.value = err instanceof Error && err.message
+        ? err.message
+        : '弱树告警查询失败，GIS 服务繁忙或超时，请稍后重试'
+      console.error('[orchardStore] fetchTreeAlerts failed:', err)
+      throw err
+    } finally {
+      alertsLoading.value = false
     }
   }
 
@@ -550,9 +728,9 @@ export const useOrchardStore = defineStore('orchard', () => {
 
   // ---- 初始化 ----
   async function init() {
-    await Promise.all([
-      fetchAnalysisResults(),
-    ])
+    // 注意：不再调用 fetchAnalysisResults() —— 后端无 /analysis/list 端点，
+    // 每次启动打 404，且返回的 analysisResults 无 UI 使用（死代码）。
+    // 若后端补上该端点再恢复调用。
   }
 
   return {
@@ -571,19 +749,23 @@ export const useOrchardStore = defineStore('orchard', () => {
     historicalTreesLoading,
     historicalTreePois,
     historicalTreesVisible,
-    renderParams,
-    useDefaultParams,
-    showRenderSettings,
     uploadedFiles,
     activeFileId,
     showUploadPanel,
     analysisResults,
     activeAnalysisId,
     showAnalysisWindow,
-    fertilizationPlans,
-    activeFertilizationId,
     showFertilizationWindow,
-    autoShowFertilization,
+    fertilizerPlan,
+    fertilizationLoading,
+    fertilizationError,
+    alerts,
+    alertsTotal,
+    alertsThreshold,
+    alertsLoading,
+    alertsVisible,
+    showAlertsWindow,
+    alertsError,
     autoShowAnalysis,
     geoServerLayers,
     activeLayerId,
@@ -600,7 +782,6 @@ export const useOrchardStore = defineStore('orchard', () => {
     activeMenuLabel,
     selectedRangePois,
     activeAnalysisResult,
-    activeFertilizationPlan,
     activeUploadedFile,
     // plot task state
     plotTasks,
@@ -627,14 +808,15 @@ export const useOrchardStore = defineStore('orchard', () => {
     executeFilterQuery,
     setSelectionRange,
     clearSelection,
-    updateRenderParams,
-    resetRenderParams,
-    toggleDefaultParams,
     uploadSingleFile,
     deleteFile,
     fetchAnalysisResults,
-    fetchFertilizationPlans,
+    generateFertilizationPlan,
+    exportFertilizationPlan,
+    fetchTreeAlerts,
     fetchGeoServerLayers,
+    mapStats,
+    refreshMapStats,
     init,
   }
 })

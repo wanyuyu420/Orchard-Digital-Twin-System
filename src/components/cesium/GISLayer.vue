@@ -1015,7 +1015,6 @@ function activateMeasure3DTool(viewer: any) {
  */
 function createGraphicFromFeature(feature: Feature, viewer: any) {
 	const { style, name } = feature
-	const properties = feature.properties || {}
 
 	let positions: any[] = []
 

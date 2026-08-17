@@ -30,7 +30,8 @@ export function cartesianToCoordinate(cartesian: Cesium.Cartesian3): Coordinate 
  * @returns Cesium Cartesian3 坐标
  */
 export function coordinateToCartesian(coord: Coordinate): Cesium.Cartesian3 {
-  return Cesium.Cartesian3.fromDegrees(coord.longitude, coord.latitude, coord.height || 0)
+  const height = 'height' in coord ? coord.height : 0
+  return Cesium.Cartesian3.fromDegrees(coord.longitude, coord.latitude, height)
 }
 
 /**

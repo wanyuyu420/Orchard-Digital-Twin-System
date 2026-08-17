@@ -21,10 +21,10 @@ export interface FruitTreePoi {
 
 /** TSOM查询参数 */
 export interface TsomQueryParams {
-  /** 查询范围类型 */
-  rangeType: 'rectangle' | 'circle' | 'polygon'
+  /** 查询范围类型（精确查询不按空间范围过滤时可省略） */
+  rangeType?: 'rectangle' | 'circle' | 'polygon'
   /** 范围坐标 (GeoJSON Polygon或Circle坐标) */
-  coordinates: number[][][] | number[]
+  coordinates?: number[][][] | number[]
   /** 查询半径 (仅circle类型, 单位: 米) */
   radius?: number
   /** 时间范围开始 */
@@ -76,44 +76,6 @@ export interface FertilizationPlan {
   createdAt: string
   /** 施肥状态 */
   status: 'draft' | 'executing' | 'completed'
-  /** 施肥颜色渲染参数 */
-  renderParams: RenderParams
-}
-
-/** 颜色渲染参数 */
-export interface RenderParams {
-  /** 颜色方案 */
-  colorScheme: 'ndvi' | 'lai' | 'canopyHeight' | 'health' | 'fertilization'
-  /** 最小NDVI阈值 */
-  ndviMin: number
-  /** 最大NDVI阈值 */
-  ndviMax: number
-  /** LAI范围 */
-  laiMin: number
-  laiMax: number
-  /** 冠层高度范围 (m) */
-  canopyHeightMin: number
-  canopyHeightMax: number
-  /** 透明度 */
-  opacity: number
-  /** 是否显示等值线 */
-  showContour: boolean
-  /** 等值线间距 */
-  contourInterval: number
-}
-
-/** 默认渲染参数 */
-export const DEFAULT_RENDER_PARAMS: RenderParams = {
-  colorScheme: 'ndvi',
-  ndviMin: 0.2,
-  ndviMax: 0.9,
-  laiMin: 0.5,
-  laiMax: 6.0,
-  canopyHeightMin: 0.5,
-  canopyHeightMax: 5.0,
-  opacity: 0.8,
-  showContour: false,
-  contourInterval: 0.1,
 }
 
 /** 分析结果 */
@@ -264,3 +226,77 @@ export interface ChartStatistics {
 
 /** 图表视图类型 */
 export type ChartViewType = 'bar' | 'pie' | 'line'
+
+// ── 变量施肥推荐（后端 /orange/fertilizer-plan） ──────────────
+
+/** 各生长指标权重（四项之和必须为 1，与后端 FertilizerWeights 对齐） */
+export interface FertilizerWeights {
+  growth_index: number
+  size: number
+  compactness: number
+  slope: number
+}
+
+/** 变量施肥推荐请求（coordinates 为闭合经纬度环 [[lng,lat],...]） */
+export interface FertilizerPlanRequest {
+  coordinates: number[][]
+  mode?: 'quantile' | 'fixed'
+  weights?: Partial<FertilizerWeights>
+  thresholds?: [number, number]
+  apply?: boolean
+}
+
+/** 施肥等级三档统计 */
+export interface FertilizerStat {
+  light_level_count: number
+  medium_level_count: number
+  heavy_level_count: number
+}
+
+/** 单棵树施肥建议明细 */
+export interface FertilizerPlanItem {
+  id: number
+  lng: number
+  lat: number
+  growth_index: number | null
+  area_m2: number | null
+  compactness: number | null
+  slope_degree: number | null
+  health_score: number
+  size_score: number
+  compact_score: number
+  slope_score: number
+  demand_score: number
+  current_level: number
+  recommended_level: number
+}
+
+/** 变量施肥推荐响应 */
+export interface FertilizerPlanOut {
+  total_trees: number
+  mode: string
+  weights: FertilizerWeights
+  thresholds: number[] | null
+  summary: FertilizerStat
+  plan: FertilizerPlanItem[]
+  applied: boolean
+}
+
+// ── 弱树告警（后端 /orange/alerts） ─────────────────────────
+
+/** 弱树告警明细 */
+export interface AlertTreeItem {
+  id: number
+  lng: number
+  lat: number
+  growth_index: number | null
+  area_m2: number | null
+  fertilizer_level: number
+}
+
+/** 弱树告警响应 */
+export interface AlertsOut {
+  total: number
+  growth_threshold: number
+  alerts: AlertTreeItem[]
+}

@@ -12,10 +12,6 @@
           <span class="stat-value">{{ orchardStore.tsomQueryResult.statistics.averageCanopyVolume.toFixed(2) }}m³</span>
           <span class="stat-label">平均体积</span>
         </div>
-        <div class="canopy-stat">
-          <span class="stat-value">{{ orchardStore.tsomQueryResult.statistics.averageLai.toFixed(2) }}</span>
-          <span class="stat-label">平均LAI</span>
-        </div>
       </div>
       <div class="canopy-health">
         <div class="health-segment healthy" :style="{ width: healthyPercent + '%' }">

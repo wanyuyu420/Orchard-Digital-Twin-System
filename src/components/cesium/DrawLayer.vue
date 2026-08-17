@@ -50,8 +50,6 @@ let handler: any = null
 let isDragging = false
 let dragStartPosition: any = null
 let dragStartCameraPosition: any = null
-let dragStartCameraDirection: any = null
-let dragStartCameraUp: any = null
 
 // Store camera controller config and default interactions to restore after drawing
 let previousCameraControllerState: {
@@ -136,8 +134,8 @@ function setupEventHandlers() {
   }, Cesium.ScreenSpaceEventType.LEFT_DOWN)
 
   // Left drag end
-  handler.setInputAction((movement: any) => {
-    handleLeftDragEnd(movement.position)
+  handler.setInputAction(() => {
+    handleLeftDragEnd()
   }, Cesium.ScreenSpaceEventType.LEFT_UP)
 }
 
@@ -154,16 +152,12 @@ function handleLeftDragStart(position: any) {
   // Store camera state at drag start
   const camera = viewer.scene.camera
   dragStartCameraPosition = Cesium.Cartesian3.clone(camera.position)
-  dragStartCameraDirection = Cesium.Cartesian3.clone(camera.direction)
-  dragStartCameraUp = Cesium.Cartesian3.clone(camera.up)
 }
 
-function handleLeftDragEnd(position: any) {
+function handleLeftDragEnd() {
   isDragging = false
   dragStartPosition = null
   dragStartCameraPosition = null
-  dragStartCameraDirection = null
-  dragStartCameraUp = null
 }
 
 function handleClick(screenPosition: any) {
@@ -264,7 +258,6 @@ function handlePanDrag(currentPosition: any) {
   if (!viewer || !dragStartPosition || !dragStartCameraPosition) return
 
   const camera = viewer.scene.camera
-  const canvas = viewer.scene.canvas
   const ellipsoid = viewer.scene.globe.ellipsoid
 
   // Calculate the movement delta

@@ -34,57 +34,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed } from 'vue'
 import { useOrchardStore } from '@/stores/orchard'
-import { apiClient } from '@/api/client'
 
 const orchardStore = useOrchardStore()
-
-interface DashboardStats {
-  totalTrees: number
-  totalArea: number
-  timestamp: string
-}
-
-const dashboardStats = ref<{ treesLabel: string; areaLabel: string }>({
-  treesLabel: '...',
-  areaLabel: '...亩',
-})
-
-let pollTimer: ReturnType<typeof setInterval> | null = null
 
 function formatNumber(n: number): string {
   return n.toLocaleString('zh-CN', { maximumFractionDigits: 0 })
 }
 
-function formatArea(n: number): string {
-  return n.toFixed(1) + '亩'
-}
-
-async function fetchDashboardStats() {
-  try {
-    const res = await apiClient.get<DashboardStats>('/orchard/dashboard-stats')
-    const data = res.data
-    dashboardStats.value = {
-      treesLabel: formatNumber(Math.round(data.totalTrees)),
-      areaLabel: formatArea(data.totalArea),
-    }
-  } catch (err) {
-    console.error('[OrchardDashboard] Failed to fetch stats:', err)
-  }
-}
-
-onMounted(() => {
-  fetchDashboardStats()
-  pollTimer = setInterval(fetchDashboardStats, 10000)
-})
-
-onUnmounted(() => {
-  if (pollTimer) {
-    clearInterval(pollTimer)
-    pollTimer = null
-  }
-})
+// 底图统计（OrchardTilesetLayer 加载 trees 后填充），数据就绪前显示占位符
+const dashboardStats = computed(() => ({
+  treesLabel: orchardStore.mapStats.ready
+    ? formatNumber(orchardStore.mapStats.totalTrees)
+    : '...',
+  areaLabel: orchardStore.mapStats.ready
+    ? orchardStore.mapStats.areaMu.toFixed(1) + '亩'
+    : '...亩',
+}))
 </script>
 
 <style scoped lang="scss">

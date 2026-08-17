@@ -109,24 +109,6 @@
           </div>
         </div>
 
-        <!-- 施肥方案图层 -->
-        <div class="section" v-if="orchardStore.fertilizationPlans.length > 0">
-          <div class="section-title">施肥方案</div>
-          <div
-            v-for="plan in orchardStore.fertilizationPlans"
-            :key="plan.id"
-            class="layer-item sub-item"
-            :class="{ active: orchardStore.activeFertilizationId === plan.id }"
-            @click="orchardStore.activeFertilizationId = plan.id"
-          >
-            <i class="fa-solid fa-droplet text-cyan"></i>
-            <span class="layer-name">{{ plan.name }}</span>
-            <span class="layer-status" :class="plan.status">
-              {{ fertStatusLabel(plan.status) }}
-            </span>
-          </div>
-        </div>
-
         <!-- 上传地块（分析完成后出现，点击跳转加载地2） -->
         <div class="section" v-if="completedPlotTasks.length > 0">
           <div class="section-title">上传地块</div>
@@ -195,7 +177,7 @@
               <div class="plot-task-name">{{ task.fileName }}</div>
               <div class="plot-task-meta">
                 <span v-if="task.status === 'uploading'">上传中 {{ task.uploadProgress }}%</span>
-                <span v-else-if="task.status === 'processing'">AI 正在全图分析中，预计 5-10 秒…</span>
+                <span v-else-if="task.status === 'processing'">全图分析中，预计 5-10 秒…</span>
                 <span v-else-if="task.status === 'completed'">提取树冠：{{ task.totalTrees }} 棵</span>
                 <span v-else class="text-red">分析失败</span>
               </div>
@@ -342,15 +324,6 @@ function statusLabel(status: string) {
     processing: '分析中',
     completed: '已完成',
     failed: '失败',
-  }
-  return map[status] || status
-}
-
-function fertStatusLabel(status: string) {
-  const map: Record<string, string> = {
-    draft: '草稿',
-    executing: '执行中',
-    completed: '已完成',
   }
   return map[status] || status
 }

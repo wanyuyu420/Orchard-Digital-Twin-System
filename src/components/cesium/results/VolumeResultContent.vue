@@ -42,7 +42,7 @@ interface Props {
   data: any
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 
 const formatVolume = (cubic: number): string => {
   if (!cubic) return '0 m³'

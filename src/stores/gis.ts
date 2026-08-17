@@ -79,7 +79,9 @@ export const useGISStore = defineStore('gis', () => {
   const features = ref<Map<string, Feature>>(new Map())
 
   /** All graphics (featureId -> BaseGraphic) */
-  const graphics = ref<Map<string, BaseGraphic>>(new Map())
+  // 用 shallowRef：ref 会对 Map 值做深层类型解包，把 BaseGraphic 类结构化成普通对象，
+  // 丢失 protected 成员导致类型错误；图形对象本身也不该被深度响应式追踪
+  const graphics = shallowRef<Map<string, BaseGraphic>>(new Map())
 
   /** Feature-Graphic mappings */
   const featureGraphicMaps = ref<Map<string, FeatureGraphicMap>>(new Map())
@@ -189,6 +191,9 @@ export const useGISStore = defineStore('gis', () => {
     },
   }
 
+  /** 工具样式存储版本：v1 曾持久化黑色描边/透明填充旧默认，v2 起丢弃重建 */
+  const TOOL_STYLES_VERSION = 2
+
   /**
    * Load tool styles from localStorage
    */
@@ -197,11 +202,21 @@ export const useGISStore = defineStore('gis', () => {
       const stored = localStorage.getItem('gis-tool-styles')
       if (stored) {
         const parsed = JSON.parse(stored)
-        // Merge with defaults to ensure all tools have styles
-        return {
-          ...DEFAULT_TOOL_STYLES,
-          ...parsed,
+        // 版本不匹配：旧版存储可能残留黑色描边 + fillOpacity 0 的默认样式
+        // （fillOpacity 0 不会触发 ?? 回退、#000000 不会被 || 回退），
+        // 直接丢弃并重建为彩色默认，避免默认填充透明、线条黑色
+        if (parsed.version !== TOOL_STYLES_VERSION) {
+          return { ...DEFAULT_TOOL_STYLES }
         }
+        // 深合并：每个工具的存储值叠加在对应默认值之上，
+        // 缺失的填充/描边字段回退到彩色默认，而不是被旧的部分对象整体覆盖
+        const merged: ToolStyles = { ...DEFAULT_TOOL_STYLES }
+        for (const key of Object.keys(DEFAULT_TOOL_STYLES) as (keyof ToolStyles)[]) {
+          if (parsed[key] && typeof parsed[key] === 'object') {
+            merged[key] = { ...DEFAULT_TOOL_STYLES[key], ...parsed[key] }
+          }
+        }
+        return merged
       }
     } catch (err) {
       console.warn('Failed to load tool styles from localStorage:', err)
@@ -210,11 +225,14 @@ export const useGISStore = defineStore('gis', () => {
   }
 
   /**
-   * Save tool styles to localStorage
+   * Save tool styles to localStorage (带版本号，供 load 时识别旧版损坏数据)
    */
   function saveToolStylesToStorage(styles: ToolStyles): void {
     try {
-      localStorage.setItem('gis-tool-styles', JSON.stringify(styles))
+      localStorage.setItem(
+        'gis-tool-styles',
+        JSON.stringify({ ...styles, version: TOOL_STYLES_VERSION })
+      )
     } catch (err) {
       console.warn('Failed to save tool styles to localStorage:', err)
     }

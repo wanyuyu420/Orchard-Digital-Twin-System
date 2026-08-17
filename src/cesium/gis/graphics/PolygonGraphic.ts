@@ -103,6 +103,17 @@ export class PolygonGraphic extends BaseGraphic {
   }
 
   /**
+   * 将位置投影到椭球面（高度归零）
+   * 填充多边形必须与 clampToGround 边框共享同一经纬度脚印：
+   * 顶点带拾取地形高度做分类贴地时，填充会相对边框收缩、盖不满；
+   * 高度归零后分类多边形恰好覆盖边框（与矩形方案一致，矩形用的就是纯经纬度坐标）
+   */
+  private toSurfacePositions(positions: Cesium.Cartesian3[]): Cesium.Cartesian3[] {
+    const ellipsoid = this.viewer.scene.globe.ellipsoid
+    return positions.map((pos) => ellipsoid.scaleToGeodeticSurface(pos, new Cesium.Cartesian3()))
+  }
+
+  /**
    * 创建多边形填充实体
    */
   private createPolygonEntity(): void {
@@ -112,9 +123,9 @@ export class PolygonGraphic extends BaseGraphic {
       id: this.id,
       name: this.name,
       polygon: {
-        hierarchy: new Cesium.PolygonHierarchy(this.positions),
-        material: Cesium.Color.TRANSPARENT, // 完全透明填充
-        classificationType: Cesium.ClassificationType.BOTH_3D_TILE, // 贴地形/3D Tile表面
+        hierarchy: new Cesium.PolygonHierarchy(this.toSurfacePositions(this.positions)),
+        material: this.getFillColor(), // 填充使用样式中的填充颜色/透明度
+        classificationType: Cesium.ClassificationType.BOTH, // 贴地形/3D Tile表面
         outline: false,
       },
     })
@@ -143,16 +154,6 @@ export class PolygonGraphic extends BaseGraphic {
     })
 
     this.entities.push(this.outlineEntity)
-  }
-
-  /**
-   * 获取填充材质
-   */
-  private getMaterial(): Cesium.MaterialProperty {
-    const color = Cesium.Color.fromCssColorString(this.style.fillColor || '#ffcc33').withAlpha(
-      this.style.opacity ?? 0.5
-    )
-    return new Cesium.ColorMaterialProperty(color)
   }
 
   /**
@@ -488,15 +489,27 @@ export class PolygonGraphic extends BaseGraphic {
    * 应用样式到实体
    * 覆盖基类方法以支持高亮效果
    */
+  /**
+   * 计算填充颜色（样式填充色 + 填充透明度）
+   * 供创建实体与 applyStyle 统一使用
+   */
+  private getFillColor(): Cesium.Color {
+    const fillColor = this.style.fillColor || '#000000'
+    const fillOpacity = this.style.fillOpacity ?? 0
+    return Cesium.Color.fromCssColorString(fillColor).withAlpha(fillOpacity)
+  }
+
   protected applyStyle(): void {
-    // Update polygon fill - 保持透明
+    // Update polygon fill - 使用配置的填充颜色与透明度
     if (this.polygonEntity && this.polygonEntity.polygon) {
-      this.polygonEntity.polygon.material = Cesium.Color.TRANSPARENT
+      this.polygonEntity.polygon.material = new Cesium.ColorMaterialProperty(this.getFillColor())
     }
 
     // Update outline - 使用配置的线条颜色
     if (this.outlineEntity && this.outlineEntity.polyline) {
-      this.outlineEntity.polyline.material = Cesium.Color.fromCssColorString(this.style.strokeColor || '#000000')
+      this.outlineEntity.polyline.material = new Cesium.ColorMaterialProperty(
+        Cesium.Color.fromCssColorString(this.style.strokeColor || '#000000')
+      )
       this.outlineEntity.polyline.width = new Cesium.ConstantProperty(this.style.strokeWidth || 2)
     }
   }

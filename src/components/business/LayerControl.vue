@@ -44,6 +44,9 @@
 							<span>{{ layer.name }}</span>
 						</div>
 						<div class="layer-actions">
+							<button class="layer-action-btn" title="查看详情" @click.stop="onViewLayerDetail(layer)">
+								<i class="fa-solid fa-circle-info"></i>
+							</button>
 							<button class="layer-action-btn" title="编辑图层" @click.stop="openEditDialog(layer)">
 								<i class="fa-solid fa-pen"></i>
 							</button>
@@ -62,7 +65,7 @@
 				<!-- Quick Tool Buttons -->
 				<div class="tool-buttons">
 					<button v-for="tool in drawTools" :key="tool.id" class="tool-btn"
-						:class="{ active: gisStore.toolType === tool.id }" :title="tool.tooltip" @click="toggleDrawTool(tool.id)">
+						:class="{ active: gisStore.toolType === tool.id, 'analysis-btn': tool.analysis }" :title="tool.tooltip" @click="toggleDrawTool(tool.id)">
 						<i :class="tool.icon"></i>
 					</button>
 					<span class="tool-divider"></span>
@@ -462,6 +465,75 @@
 			<el-button type="primary" :loading="layerDialogSaving" @click="onSaveLayer">保存</el-button>
 		</template>
 	</el-dialog>
+
+	<!-- 图层详情弹窗（GET /layers/{id}） -->
+	<el-dialog
+		v-model="layerDetailVisible"
+		title="图层详情"
+		width="480px"
+		:close-on-click-modal="true"
+	>
+		<div v-if="layerStore.layerDetailLoading" class="detail-loading">
+			<i class="fa-solid fa-circle-notch fa-spin"></i>
+			加载中…
+		</div>
+		<template v-else-if="layerStore.layerDetail">
+			<div class="detail-row">
+				<span class="detail-label">图层名称</span>
+				<span class="detail-value">{{ layerStore.layerDetail.name }}</span>
+			</div>
+			<div class="detail-row">
+				<span class="detail-label">图层编码</span>
+				<span class="detail-value code">{{ layerStore.layerDetail.code }}</span>
+			</div>
+			<div class="detail-row">
+				<span class="detail-label">分组</span>
+				<span class="detail-value">{{ layerStore.layerDetail.group_name || '--' }}</span>
+			</div>
+			<div class="detail-row">
+				<span class="detail-label">类型</span>
+				<span class="detail-value">{{ layerStore.layerDetail.layer_type }}</span>
+			</div>
+			<div class="detail-row">
+				<span class="detail-label">服务地址</span>
+				<span class="detail-value url">{{ layerStore.layerDetail.url || '--' }}</span>
+			</div>
+			<div class="detail-row">
+				<span class="detail-label">图标</span>
+				<span class="detail-value code">{{ layerStore.layerDetail.icon || '--' }}</span>
+			</div>
+			<div class="detail-row">
+				<span class="detail-label">排序</span>
+				<span class="detail-value">{{ layerStore.layerDetail.order }}</span>
+			</div>
+			<div class="detail-row">
+				<span class="detail-label">显示</span>
+				<span class="detail-value">
+					<el-tag size="small" :type="layerStore.layerDetail.is_visible ? 'success' : 'info'">
+						{{ layerStore.layerDetail.is_visible ? '可见' : '隐藏' }}
+					</el-tag>
+				</span>
+			</div>
+			<div class="detail-row">
+				<span class="detail-label">启用</span>
+				<span class="detail-value">
+					<el-tag size="small" :type="layerStore.layerDetail.is_enabled ? 'success' : 'info'">
+						{{ layerStore.layerDetail.is_enabled ? '启用' : '停用' }}
+					</el-tag>
+				</span>
+			</div>
+			<div class="detail-row">
+				<span class="detail-label">描述</span>
+				<span class="detail-value">{{ layerStore.layerDetail.description || '--' }}</span>
+			</div>
+			<div class="detail-row">
+				<span class="detail-label">配置</span>
+				<span class="detail-value">
+					<pre class="detail-config">{{ detailConfigText }}</pre>
+				</span>
+			</div>
+		</template>
+	</el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -474,13 +546,6 @@ import { useCesiumStore } from '@/stores/cesium'
 import { useLayerStore, type GISLayer } from '@/stores/layers'
 import { applyDemTerrain } from '@/utils/orchardPreview'
 import type { GISToolType } from '@/types/draw'
-
-interface Layer {
-	id: string
-	name: string
-	icon: string
-	active: boolean
-}
 
 interface StyleConfig {
 	fillColor: string
@@ -699,7 +764,6 @@ function updateFeatureProperty(key: 'name' | 'description', value: string) {
 const activeTab = ref<'resources' | 'features' | 'management' | 'analysis'>('resources')
 const drawStyleCollapsed = ref(false) // Expanded by default
 const selectionStyleCollapsed = ref(false)
-const propertiesPanelCollapsed = ref(false)
 
 // Auto-switch to features tab when a drawing tool is activated from TopRibbon
 watch(
@@ -713,12 +777,16 @@ watch(
 
 // Dynamic layers from store (data-driven)
 const layerStore = useLayerStore()
-const dynamicLayers = computed(() =>
-	layerStore.layers.filter(l => l.layer_type === 'api_point' && l.is_enabled)
-)
 
 // Draw tools configuration with tooltips
-const drawTools: Array<{ id: GISToolType; name: string; icon: string; tooltip: string }> = [
+// analysis 标记的工具为 3D 分析工具（红色高亮），走 gisStore.setTool → GISLayer 的 activateAnalysisTool
+const drawTools: Array<{
+	id: GISToolType
+	name: string
+	icon: string
+	tooltip: string
+	analysis?: boolean
+}> = [
 	{ id: 'draw-point', name: '点', icon: 'fa-solid fa-location-dot', tooltip: '点 - 单击放置点' },
 	{
 		id: 'draw-line',
@@ -744,35 +812,29 @@ const drawTools: Array<{ id: GISToolType; name: string; icon: string; tooltip: s
 		icon: 'fa-solid fa-draw-polygon',
 		tooltip: '多边形 - 连续点击添加节点，双击完成',
 	},
+	// ---- 3D 分析工具（需 DEM 地形） ----
+	{
+		id: 'volume',
+		name: '方量分析',
+		icon: 'fa-solid fa-cubes',
+		tooltip: '方量分析 - 框选区域计算挖填方量（需地形）',
+		analysis: true,
+	},
+	{
+		id: 'profile',
+		name: '剖面分析',
+		icon: 'fa-solid fa-mountain',
+		tooltip: '剖面分析 - 拉一条线查看沿线地形高程剖面',
+		analysis: true,
+	},
+	{
+		id: 'measure3d',
+		name: '3D测量',
+		icon: 'fa-solid fa-ruler-vertical',
+		tooltip: '3D测量 - 测量两点空间距离与坡度（需地形）',
+		analysis: true,
+	},
 ]
-
-// 3D Analysis tools configuration
-const analysisTools: Array<{
-	id: GISToolType
-	name: string
-	icon: string
-	tooltip: string
-	disabled?: boolean
-}> = [
-		{
-			id: 'volume',
-			name: '方量分析',
-			icon: 'fa-solid fa-cubes-stacked',
-			tooltip: '方量分析 - 绘制多边形计算体积',
-		},
-		{
-			id: 'profile',
-			name: '剖面分析',
-			icon: 'fa-solid fa-chart-line',
-			tooltip: '剖面分析 - 绘制线获取地形剖面',
-		},
-		{
-			id: 'measure3d',
-			name: '3D测量',
-			icon: 'fa-solid fa-ruler-combined',
-			tooltip: '3D测量 - Shift:地形 / Ctrl:自定义高度 / Alt:相对高度',
-		},
-	]
 
 // Keyboard shortcuts reference
 const keyboardShortcuts = [
@@ -1197,6 +1259,25 @@ async function onSaveLayer() {
 	}
 }
 
+// === 图层详情 ===
+const layerDetailVisible = ref(false)
+
+/** 详情配置 JSON 预览文本 */
+const detailConfigText = computed(() => {
+  const config = layerStore.layerDetail?.config
+  return config ? JSON.stringify(config, null, 2) : '--'
+})
+
+/** 查看图层详情 → GET /layers/{id} */
+async function onViewLayerDetail(layer: GISLayer) {
+  layerDetailVisible.value = true
+  try {
+    await layerStore.fetchLayerDetail(layer.id)
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '获取图层详情失败')
+  }
+}
+
 async function onDeleteLayer(layer: GISLayer) {
 	try {
 		await ElMessageBox.confirm(
@@ -1218,33 +1299,6 @@ async function onDeleteLayer(layer: GISLayer) {
 		console.error('[LayerControl] Delete layer failed:', e)
 		ElMessage.error(e?.response?.data?.detail || '删除失败，请检查控制台')
 	}
-}
-
-/**
- * Toggle 3D terrain
- */
-async function toggleTerrain() {
-	await cesiumStore.toggleTerrain()
-}
-
-/**
- * Toggle OSGB 3D Tiles visibility
- * The actual loading is handled by OSGBLayer component
- */
-function toggleOSGB() {
-	console.log('[LayerControl] toggleOSGB called, current:', cesiumStore.osgbEnabled)
-	cesiumStore.osgbEnabled = !cesiumStore.osgbEnabled
-	console.log('[LayerControl] toggleOSGB new value:', cesiumStore.osgbEnabled)
-}
-
-/**
- * Toggle BIM 3D Tiles visibility
- * The actual loading is handled by BIMLayer component
- */
-function toggleBIM() {
-	console.log('[LayerControl] toggleBIM called, current:', cesiumStore.bimEnabled)
-	cesiumStore.bimEnabled = !cesiumStore.bimEnabled
-	console.log('[LayerControl] toggleBIM new value:', cesiumStore.bimEnabled)
 }
 
 // === GIS Feature Functions (New) ===
@@ -1313,17 +1367,11 @@ function toggleSnap() {
 
 // Performance thresholds
 const FEATURE_WARNING_THRESHOLD = 100
-const FEATURE_LIMIT = 500
 
 /**
  * Check if feature count is high (performance warning)
  */
 const isHighFeatureCount = computed(() => gisStore.featureCount > FEATURE_WARNING_THRESHOLD)
-
-/**
- * Check if feature count exceeds limit
- */
-const isFeatureCountExceeded = computed(() => gisStore.featureCount > FEATURE_LIMIT)
 
 /**
  * Filter features by search query
@@ -1438,25 +1486,57 @@ function locateFeature(featureId: string) {
 		return
 	}
 
-	// Get center position
+	const viewer = gisStore.viewer
+	if (!viewer || !viewer.camera) return
+	const ellipsoid = viewer.scene.globe.ellipsoid
+
+	// 计算要素外接球：圆形用主实体（64 点多边形填充）取完整边界，
+	// 其余图形用 getPositions() 的顶点（多边形/线为带拾取高度的点，矩形为对角点）
+	let positions: any[] = []
+	if (graphic.type === 'circle') {
+		const mainEntity = graphic.getMainEntity()
+		const hierarchy = mainEntity?.polygon?.hierarchy?.getValue?.(Cesium.JulianDate.now())
+		if (hierarchy?.positions?.length) {
+			positions = hierarchy.positions
+		}
+	} else {
+		positions = graphic.getPositions?.() || []
+	}
+	if (positions.length === 0) return
+
+	const sphere = Cesium.BoundingSphere.fromPoints(positions)
+	const centerCarto = ellipsoid.cartesianToCartographic(sphere.center)
+
+	// 基准高度 = 地形高度（优先 globe.getHeight，其次要素中心高度），
+	// 避免相机瞄准椭球面（低于 DEM ~185m）导致要素显得远
+	let baseHeight = 0
+	try {
+		const terrainHeight = viewer.scene.globe.getHeight(centerCarto)
+		if (typeof terrainHeight === 'number' && isFinite(terrainHeight) && terrainHeight > 0) {
+			baseHeight = terrainHeight
+		}
+	} catch {
+		/* ignore */
+	}
 	const center = graphic.getCenter?.()
-	if (!center) {
-		console.error('Graphic does not have getCenter method:', featureId)
-		return
+	if (center) {
+		const centerHeight = ellipsoid.cartesianToCartographic(center).height
+		if (isFinite(centerHeight)) {
+			baseHeight = Math.max(baseHeight, centerHeight)
+		}
 	}
 
-	// Fly camera to center
-	// Fly camera to center
-	const viewer = gisStore.viewer
-	if (viewer && viewer.camera) {
-		viewer.camera.flyTo({
-			destination: center,
-			duration: 1.5,
-			// Use orientation to look down if possible, but camera.flyTo with point destination moves camera TO point.
-			// Ideally we should use viewer.flyTo(entity) but we don't have easy access to the main entity here.
-			// validation error: offset is not a valid option for camera.flyTo
-		} as any)
-	}
+	// 相机高度 = 地形基准 + 半径 × 缩放因子（1.4 比默认 fit-to-screen 更近，要素占满画面）
+	const radius = Math.max(sphere.radius, 1)
+	viewer.camera.flyTo({
+		destination: Cesium.Cartesian3.fromRadians(
+			centerCarto.longitude,
+			centerCarto.latitude,
+			baseHeight + radius * 1.4
+		),
+		orientation: { heading: 0, pitch: -Cesium.Math.PI_OVER_TWO, roll: 0 },
+		duration: 1.5,
+	})
 }
 
 /**
@@ -1831,6 +1911,7 @@ onMounted(async () => {
 // Tool Buttons
 .tool-buttons {
 	display: flex;
+	flex-wrap: wrap; // 8 个绘制/分析工具 + 吸附 + 帮助，单行放不下时换行
 	gap: 6px;
 	padding: 10px;
 	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -2759,6 +2840,74 @@ onMounted(async () => {
 			max-width: 100%;
 			transition: color 0.2s;
 		}
+	}
+}
+
+// === 图层详情弹窗 ===
+.detail-loading {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 30px 0;
+	justify-content: center;
+	color: $text-sub;
+	font-size: 13px;
+
+	i {
+		color: $neon-cyan;
+	}
+}
+
+.detail-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 8px 0;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+
+	&:last-child {
+		border-bottom: none;
+	}
+
+	.detail-label {
+		flex: 0 0 70px;
+		font-size: 12px;
+		color: $text-sub;
+	}
+
+	.detail-value {
+		flex: 1;
+		font-size: 12px;
+		color: $text-main;
+		word-break: break-all;
+		text-align: right;
+
+		&.code {
+			font-family: $font-code;
+		}
+
+		&.url {
+			font-family: $font-code;
+			color: $neon-cyan;
+		}
+	}
+
+	.detail-config {
+		max-height: 160px;
+		overflow-y: auto;
+		margin: 0;
+		padding: 8px 10px;
+		border-radius: 6px;
+		background: rgba(0, 0, 0, 0.3);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		font-size: 11px;
+		line-height: 1.5;
+		color: $neon-cyan;
+		text-align: left;
+		white-space: pre-wrap;
+		word-break: break-all;
+		@include custom-scrollbar;
 	}
 }
 </style>

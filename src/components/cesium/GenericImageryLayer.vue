@@ -51,7 +51,7 @@ function loadImagery() {
 
 	// Must have either URL or built-in provider
 	const hasUrl = !!props.layer.url
-	const hasBuiltinProvider = ['bing_aerial', 'openstreetmap', 'arcgis'].includes(config.provider)
+	const hasBuiltinProvider = !!config.provider && ['bing_aerial', 'openstreetmap', 'arcgis'].includes(config.provider)
 
 	if (!viewer || (!hasUrl && !hasBuiltinProvider) || imageryLayer.value) return
 
@@ -82,12 +82,18 @@ function loadImagery() {
 		// TMS (DOM) style
 		else if (config.provider === 'tms' || config.urlTemplate) {
 			console.log(`[GenericImageryLayer] Loading ${props.layer.code} from ${props.layer.url}`)
-			const bounds = config.bounds || {}
+			const bounds = config.bounds
 			provider = new Cesium.UrlTemplateImageryProvider({
 				url: config.urlTemplate || props.layer.url,
-				rectangle: bounds.west ? Cesium.Rectangle.fromDegrees(
-					bounds.west, bounds.south, bounds.east, bounds.north
-				) : undefined,
+				rectangle:
+					bounds && bounds.west !== undefined
+						? Cesium.Rectangle.fromDegrees(
+								bounds.west,
+								bounds.south,
+								bounds.east,
+								bounds.north,
+							)
+						: undefined,
 				minimumLevel: config.minimumLevel || 0,
 				maximumLevel: config.maximumLevel || 18,
 				credit: props.layer.name,

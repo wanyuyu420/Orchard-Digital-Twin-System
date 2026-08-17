@@ -31,6 +31,11 @@ export interface LayerUpdateInput {
   description?: string | null
 }
 
+/** 获取单个图层详情（镜像后端 GISLayerOut，含完整 config） */
+export function getLayer(id: number) {
+  return apiClient.get(`/layers/${id}`)
+}
+
 /** 新建图层 */
 export function createLayer(data: LayerCreateInput) {
   return apiClient.post('/layers', data)

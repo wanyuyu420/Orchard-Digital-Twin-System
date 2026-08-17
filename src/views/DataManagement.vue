@@ -168,6 +168,9 @@ function onFileClick(row: UploadedFile) {
 
 function viewAnalysis(row: UploadedFile) {
   orchardStore.activeFileId = row.id
+  // 定位到该文件对应的分析结果，让"查看分析"直接展示详情
+  const result = orchardStore.analysisResults.find((r) => r.fileId === row.id)
+  if (result) orchardStore.activeAnalysisId = result.id
   orchardStore.showAnalysisWindow = true
 }
 

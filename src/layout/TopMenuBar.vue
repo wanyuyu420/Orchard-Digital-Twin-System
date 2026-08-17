@@ -95,11 +95,6 @@
           <i class="fa-solid fa-magnifying-glass"></i>
         </button>
       </el-tooltip>
-      <el-tooltip content="颜色渲染设置" placement="bottom">
-        <button class="action-btn" @click="orchardStore.showRenderSettings = true">
-          <i class="fa-solid fa-palette"></i>
-        </button>
-      </el-tooltip>
       <el-tooltip content="图表统计" placement="bottom">
         <button class="action-btn" @click="orchardStore.showChartDialog = !orchardStore.showChartDialog">
           <i class="fa-solid fa-chart-simple"></i>
@@ -198,7 +193,6 @@ const deleteSelected = () => {
         (g) => g.featureId === featureId
       )
       if (geoIndex !== -1) {
-        const geo = orchardStore.drawnGeometries[geoIndex]
         orchardStore.drawnGeometries.splice(geoIndex, 1)
       }
       // 移除地图图形

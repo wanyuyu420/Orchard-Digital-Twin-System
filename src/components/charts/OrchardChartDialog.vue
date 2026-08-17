@@ -81,14 +81,12 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import * as echarts from 'echarts'
 import type { EChartsOption } from 'echarts'
 import BaseChart from './BaseChart.vue'
 import { useOrchardStore } from '@/stores/orchard'
 import type { ChartMetricData, ChartViewType } from '@/types/orchard'
 import {
-  NEON_CYAN, NEON_BLUE, NEON_PURPLE, NEON_GREEN,
-  NEON_YELLOW, NEON_ORANGE, TEXT_SECONDARY, GRID_LINE,
+  NEON_CYAN, NEON_BLUE, TEXT_SECONDARY, GRID_LINE,
   CHART_COLORS, createGradient,
 } from './theme'
 
@@ -174,7 +172,6 @@ const chartOptions = computed<EChartsOption>(() => {
 
   if (chartType.value === 'pie') {
     const pie = metric.pieData || []
-    const total = pie.reduce((s, d) => s + d.value, 0)
     return {
       tooltip: {
         trigger: 'item',

@@ -5,7 +5,8 @@ import math
 import json as json_mod
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, File, UploadFile, HTTPException, status
+from fastapi import APIRouter, File, UploadFile, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.config import get_settings
@@ -18,6 +19,13 @@ from app.schemas.orange import (
     HistoricalTreesOut,
     growth_index_to_status,
     fertilizer_level_to_kg,
+    FertilizerWeights,
+    FertilizerPlanRequest,
+    FertilizerPlanItem,
+    FertilizerPlanOut,
+    FertilizerExportRequest,
+    AlertTreeItem,
+    AlertsOut,
 )
 from app.services.tif_service import TifService
 from pyproj import Transformer
@@ -30,11 +38,19 @@ import numpy as np
 router = APIRouter(prefix="/orange", tags=["脐橙三维空间大屏诊断API"])
 
 
+def _coord(value) -> float:
+    """GeoScene FeatureServer 坐标可能返回数字或字符串，统一转 float；空/非法返回 0.0。"""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _build_orange_tree(a: dict, g: dict) -> OrangeTreeOut:
     """把 GeoScene FeatureServer 特征映射为 OrangeTreeOut（字段名与 FeatureServer 实际 schema 对齐）。"""
     lng, lat = None, None
     if g and "x" in g:
-        lng, lat = round(g["x"], 6), round(g["y"], 6)
+        lng, lat = round(_coord(g["x"]), 6), round(_coord(g["y"]), 6)
     return OrangeTreeOut(
         id=a.get("id"),
         batch_id=a.get("batch_id") or "",
@@ -607,6 +623,12 @@ def _run_inference_task(task_id: str, file_path: str):
             _task_store[task_id]["total_trees"] = len(all_detected_trees)
             _task_store[task_id]["fresh_trees"] = all_detected_trees
     except Exception as e:
+        # 模型加载在 rio_ds 赋值之前就失败时，rio_ds 尚未定义，必须保护 close
+        try:
+            if "rio_ds" in locals() and rio_ds is not None:
+                rio_ds.close()
+        except Exception:
+            pass
         with _task_lock:
             _task_store[task_id]["status"] = "failed"
             _task_store[task_id]["message"] = str(e)
@@ -662,3 +684,340 @@ async def get_interpret_task(task_id: str):
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+
+# ===== 变量施肥推荐 (数据全部经 GeoScene FeatureServer) =====
+
+
+def _normalize_envelope(coords: list) -> tuple[float, float, float, float]:
+    """多边形坐标取边界框 (xmin, ymin, xmax, ymax)，自动识别经纬度顺序。"""
+    valid = []
+    for pt in coords:
+        if len(pt) < 2:
+            continue
+        # pt[0] ≈ 27 (lat), pt[1] ≈ 116 (lng) → 检测并交换
+        if pt[0] < pt[1]:
+            lng, lat = pt[1], pt[0]
+        else:
+            lng, lat = pt[0], pt[1]
+        valid.append((lng, lat))
+
+    if not valid:
+        return (0.0, 0.0, 0.0, 0.0)
+
+    lngs = [c[0] for c in valid]
+    lats = [c[1] for c in valid]
+    return (min(lngs), min(lats), max(lngs), max(lats))
+
+
+def _minmax_normalize(values: list[float]) -> list[float]:
+    """Min-max归一化到 0~1，消除树高(米)/面积(㎡)/指数(无量纲)之间的量纲差异。区域内无差异时全部取 0.5。"""
+    lo, hi = min(values), max(values)
+    if hi - lo < 1e-9:
+        return [0.5] * len(values)
+    return [(v - lo) / (hi - lo) for v in values]
+
+
+def _map_score_to_level(score: float, thresholds: list[float]) -> int:
+    """需求得分 → 施肥等级 1~3（两档阈值 t1<t2，越高施肥越重，对齐 fertilizer_level 1/2/3 语义）。"""
+    t1, t2 = thresholds
+    if score < t1:
+        return 1   # 轻度
+    if score < t2:
+        return 2   # 中度
+    return 3       # 重度
+
+
+@router.post(
+    "/fertilizer-plan",
+    response_model=FertilizerPlanOut,
+    status_code=status.HTTP_200_OK,
+    summary="变量施肥推荐 — 指标权重评分得出合理施肥等级",
+)
+async def fertilizer_plan(payload: FertilizerPlanRequest):
+    """变量施肥推荐接口。
+
+    **评分模型 (多指标加权评分法):**
+        demand_score = w1×(1-健康度) + w2×面积得分 + w3×(1-紧密度) + w4×坡度得分
+        各指标先在框选区域内 min-max 归一化到 0~1，再加权求和。
+
+    **分级:** quantile（默认，按区域内 33/67 分位分三档，保证档位均衡）
+    或 fixed（固定两档阈值）。
+
+    **写回:** apply=true 时经 GeoScene FeatureServer applyEdits 批量更新
+    fertilizer_level（唯一写路径，不绕开 GeoScene）。
+
+    **查询路径 (唯一):** GeoScene FeatureService REST API → PostGIS
+    当GeoScene不可用时返回 HTTP 503。
+    """
+    xmin, ymin, xmax, ymax = _normalize_envelope(payload.coordinates)
+    weights = payload.weights or FertilizerWeights()
+
+    # 步骤 1: GeoScene 空间查询
+    envelope = {
+        "xmin": xmin, "ymin": ymin, "xmax": xmax, "ymax": ymax,
+        "spatialReference": {"wkid": 4326},
+    }
+    try:
+        features = GeoSceneService.query_features(
+            geometry=envelope,
+            geometry_type="esriGeometryEnvelope",
+            spatial_rel="esriSpatialRelIntersects",
+            where="1=1",
+            out_fields="*",
+            out_sr=4326,
+            limit=500,
+            return_geometry=True,
+        )
+    except GeoSceneError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"GeoScene 空间查询失败，GIS服务不可用: {exc}",
+        )
+
+    if not features:
+        return FertilizerPlanOut(total_trees=0, weights=weights, plan=[], applied=False)
+
+    # 步骤 2: 提取指标，缺值用区域均值填补
+    rows: list[dict] = []
+    for f in features:
+        attrs = f.get("attributes", {})
+        geom = f.get("geometry", {})
+        # 层字段全名: growth_index / fertilizer_level / slope_degree
+        rows.append({
+            "id": int(attrs.get("id", 0) or 0),
+            "lng": round(geom.get("x", 0), 6) if geom else 0.0,
+            "lat": round(geom.get("y", 0), 6) if geom else 0.0,
+            "growth_index": attrs.get("growth_index"),
+            "area_m2": attrs.get("area_m2"),
+            "compactness": attrs.get("compactness"),
+            "slope_degree": attrs.get("slope_degree"),
+            "current_level": int(attrs.get("fertilizer_level", 0) or 0),
+        })
+
+    def _val(rows: list[dict], key: str, fallback: float = 0.0) -> list[float]:
+        """取指标列；缺值用区域内均值填补。"""
+        present = [r[key] for r in rows if r[key] is not None]
+        mean = sum(present) / len(present) if present else fallback
+        return [r[key] if r[key] is not None else mean for r in rows]
+
+    growths = _val(rows, "growth_index")
+    areas = _val(rows, "area_m2")
+    compacts = _val(rows, "compactness")
+    slopes = _val(rows, "slope_degree")
+
+    health_norm = _minmax_normalize(growths)   # 越大越健康
+    size_norm = _minmax_normalize(areas)       # 越大树越大
+    compact_norm = _minmax_normalize(compacts) # 越大越紧密
+    slope_norm = _minmax_normalize(slopes)     # 越大越陡
+
+    # 步骤 3: 加权需求得分，越不健康/树越大/越稀疏/越陡需肥越多
+    scores = [
+        weights.growth_index * (1 - h)
+        + weights.size * s
+        + weights.compactness * (1 - c)
+        + weights.slope * sl
+        for h, s, c, sl in zip(health_norm, size_norm, compact_norm, slope_norm)
+    ]
+
+    # 步骤 4: 得分映射等级，quantile 按分位，fixed 按固定阈值
+    if payload.mode == "quantile":
+        sorted_scores = sorted(scores)
+        n = len(sorted_scores)
+        thresholds = [
+            sorted_scores[min(n - 1, n // 3)],
+            sorted_scores[min(n - 1, 2 * n // 3)],
+        ]
+    else:
+        thresholds = list(payload.thresholds)
+
+    levels = [_map_score_to_level(s, thresholds) for s in scores]
+
+    # 步骤 5: apply=true 时经 applyEdits 写回（唯一写路径）
+    applied = False
+    if payload.apply:
+        updates = [
+            {"attributes": {"id": r["id"], "fertilizer_level": lvl}}
+            for r, lvl in zip(rows, levels)
+            if lvl != r["current_level"]
+        ]
+        if updates:
+            result = GeoSceneService.update_features(updates=updates)
+            update_results = result.get("updateResults", [])
+            ok = all(u.get("success") for u in update_results)
+            if not ok:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="GeoScene applyEdits 批量写回施肥等级失败",
+                )
+        applied = True
+
+    # 步骤 6: 三档统计 + 每棵树明细（对齐 FertilizerStat 的 light/medium/heavy）
+    stat = FertilizerStat(
+        light_level_count=levels.count(1),
+        medium_level_count=levels.count(2),
+        heavy_level_count=levels.count(3),
+    )
+
+    plan_items = []
+    for r, h, s, c, sl, score, lvl in zip(
+        rows, health_norm, size_norm, compact_norm, slope_norm, scores, levels
+    ):
+        plan_items.append(FertilizerPlanItem(
+            id=r["id"],
+            lng=r["lng"],
+            lat=r["lat"],
+            growth_index=r["growth_index"],
+            area_m2=r["area_m2"],
+            compactness=r["compactness"],
+            slope_degree=r["slope_degree"],
+            health_score=round(h, 4),
+            size_score=round(s, 4),
+            compact_score=round(c, 4),
+            slope_score=round(sl, 4),
+            demand_score=round(score, 4),
+            current_level=r["current_level"],
+            recommended_level=lvl,
+        ))
+
+    return FertilizerPlanOut(
+        total_trees=len(plan_items),
+        mode=payload.mode,
+        weights=weights,
+        thresholds=[round(t, 4) for t in thresholds],
+        summary=stat,
+        plan=plan_items,
+        applied=applied,
+    )
+
+
+# ===== 处方图导出 (GeoJSON/CSV) =====
+
+
+def _plan_to_csv(plan: FertilizerPlanOut) -> str:
+    """推荐方案 → CSV 处方表（无人机/施肥机标准输入格式）。"""
+    header = "id,lng,lat,growth_index,area_m2,demand_score,current_level,recommended_level"
+    lines = [header]
+    for item in plan.plan:
+        lines.append(
+            ",".join(
+                str(v)
+                for v in (
+                    item.id,
+                    item.lng,
+                    item.lat,
+                    item.growth_index if item.growth_index is not None else "",
+                    item.area_m2 if item.area_m2 is not None else "",
+                    round(item.demand_score, 4),
+                    item.current_level,
+                    item.recommended_level,
+                )
+            )
+        )
+    return "﻿" + "\n".join(lines) + "\n"  # BOM 防Excel中文乱码
+
+
+def _plan_to_geojson(plan: FertilizerPlanOut) -> dict:
+    """推荐方案 → GeoJSON 要素集，前端可叠加到Cesium地图二次确认。"""
+    features = [
+        {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [item.lng, item.lat]},
+            "properties": {
+                "id": item.id,
+                "demand_score": round(item.demand_score, 4),
+                "current_level": item.current_level,
+                "recommended_level": item.recommended_level,
+            },
+        }
+        for item in plan.plan
+    ]
+    return {"type": "FeatureCollection", "features": features}
+
+
+@router.post(
+    "/fertilizer-plan/export",
+    status_code=status.HTTP_200_OK,
+    summary="变量施肥处方图导出 — GeoJSON/CSV 机具作业文件",
+)
+async def fertilizer_plan_export(payload: FertilizerExportRequest):
+    """复用施肥推荐全流程（评分→分级），另以文件形式输出处方图。
+
+    **查询路径 (唯一):** GeoScene FeatureService REST API → PostGIS
+    与 /fertilizer-plan 完全一致，GeoScene不可用时返回 HTTP 503。
+    """
+    plan = await fertilizer_plan(payload)
+    if payload.format == "csv":
+        return StreamingResponse(
+            iter([_plan_to_csv(plan)]),
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": 'attachment; filename="fertilizer_plan.csv"'
+            },
+        )
+    return _plan_to_geojson(plan)
+
+
+# ===== 弱树告警 =====
+
+
+def _build_alerts_where(growth_threshold: float) -> str:
+    """构造弱树告警查询条件（低于阈值或指标缺失都算弱树）。层字段全名 growth_index。"""
+    return f"growth_index < {growth_threshold} OR growth_index IS NULL"
+
+
+@router.get(
+    "/alerts",
+    status_code=status.HTTP_200_OK,
+    response_model=AlertsOut,
+    summary="弱树巡检告警 — 生长指数低于阈值的橙树",
+)
+async def tree_alerts(
+    growth_threshold: float = Query(
+        0.15, description="生长指数阈值，低于此值判定为弱树"
+    ),
+    limit: int = Query(200, ge=1, le=1000, description="最多返回的告警树数量"),
+):
+    """巡检弱树清单（只读，不写库）。
+
+    **查询路径 (唯一):** GeoScene FeatureService REST API → PostGIS
+    当GeoScene不可用时返回 HTTP 503。
+    """
+    try:
+        features = GeoSceneService.query_features(
+            where=_build_alerts_where(growth_threshold),
+            out_fields="*",
+            out_sr=4326,
+            limit=limit,
+            return_geometry=True,
+            # GeoScene 冷缓存查询可达 30s+，前端最多等 30s。这里收紧到 20s：
+            # 热缓存 14s 内能返回，冷缓存 20s 后明确 503，避免前端长时间挂"巡检中"
+            timeout=20,
+        )
+    except GeoSceneError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"GeoScene 告警查询失败，GIS服务不可用: {exc}",
+        )
+
+    alerts = []
+    for f in features:
+        attrs = f.get("attributes", {})
+        geom = f.get("geometry", {}) or {}
+        lng, lat = _coord(geom.get("x")), _coord(geom.get("y"))
+        # 无几何/坐标缺失的 feature 不产出告警：避免 (0,0) 脏红点和前端 toFixed(null) 崩溃
+        if not lng or not lat:
+            continue
+        alerts.append(
+            AlertTreeItem(
+                id=int(attrs.get("id", 0) or 0),
+                lng=round(lng, 6),
+                lat=round(lat, 6),
+                growth_index=attrs.get("growth_index"),
+                area_m2=attrs.get("area_m2"),
+                fertilizer_level=int(attrs.get("fertilizer_level", 0) or 0),
+            )
+        )
+    return AlertsOut(
+        total=len(alerts), growth_threshold=growth_threshold, alerts=alerts
+    )

@@ -15,8 +15,7 @@ import * as Cesium from 'cesium'
 import { BaseTool, type BaseToolOptions } from '../core/BaseTool'
 import type { Coordinate } from '@/types/geometry'
 import type { Feature } from '@/types/feature'
-import { TOOL_COLORS, POINT_STYLES, LINE_STYLES } from '../utils/toolStyles'
-import { generateId } from '../utils/geo'
+import { POINT_STYLES, LINE_STYLES } from '../utils/toolStyles'
 
 /**
  * 绘制几何类型
@@ -81,14 +80,14 @@ export class DrawTool extends BaseTool {
   /** 样式配置 */
   private style: Required<NonNullable<DrawToolOptions['style']>>
 
-  /** 默认样式 - 无填充，黑色边框 */
+  /** 默认样式 - 蓝色填充（30%透明度）、青色边框（与 gisStore.drawStyle / DEFAULT_TOOL_STYLES 一致） */
   private static readonly DEFAULT_STYLE = {
-    fillColor: '#000000',
-    fillOpacity: 0, // 完全透明填充
-    strokeColor: '#000000', // 黑色边框
+    fillColor: '#3B82F6',
+    fillOpacity: 0.3, // 30% 透明度填充
+    strokeColor: '#22D3EE', // 青色边框
     strokeWidth: LINE_STYLES.result.width,
     pointSize: POINT_STYLES.marker.pixelSize,
-    pointColor: '#000000', // 黑色点
+    pointColor: '#22D3EE', // 青色点
     lineType: 'solid' as LineType,
     iconType: 'dot' as string,
   }
@@ -132,6 +131,14 @@ export class DrawTool extends BaseTool {
   }
 
   /**
+   * 计算填充颜色（样式填充色 + 填充透明度）
+   * 预览填充与 PolygonGraphic/RectangleGraphic/CircleGraphic 完成后的填充保持一致
+   */
+  private getFillColor(): Cesium.Color {
+    return Cesium.Color.fromCssColorString(this.style.fillColor).withAlpha(this.style.fillOpacity)
+  }
+
+  /**
    * Safe access to coordinate height
    */
   private getHeight(coord: Coordinate): number {
@@ -164,7 +171,7 @@ export class DrawTool extends BaseTool {
     // 双击 - 完成多边形/线绘制
     if (this.geometryType === 'polygon' || this.geometryType === 'line') {
       this.handler.setInputAction(
-        (click: any) => this.handleDoubleClick(click.position),
+        () => this.handleDoubleClick(),
         Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK
       )
     }
@@ -193,7 +200,7 @@ export class DrawTool extends BaseTool {
     // 根据几何类型处理点击
     switch (this.geometryType) {
       case 'point':
-        this.handlePointClick(coord, cartesian)
+        this.handlePointClick(coord)
         break
       case 'line':
       case 'polygon':
@@ -218,7 +225,7 @@ export class DrawTool extends BaseTool {
   /**
    * 处理双击 - 完成多边形/线绘制
    */
-  private handleDoubleClick(screenPosition: Cesium.Cartesian2): void {
+  private handleDoubleClick(): void {
     if (this.geometryType === 'polygon' && this.vertices.length >= 3) {
       this.completePolygonDrawing()
     } else if (this.geometryType === 'line' && this.vertices.length >= 2) {
@@ -245,7 +252,7 @@ export class DrawTool extends BaseTool {
   /**
    * 点绘制处理
    */
-  private handlePointClick(coord: Coordinate, cartesian: Cesium.Cartesian3): void {
+  private handlePointClick(coord: Coordinate): void {
     // 点绘制只需一次点击即完成
     const feature: Feature = {
       id: this.generateId(),
@@ -481,11 +488,18 @@ export class DrawTool extends BaseTool {
       Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, this.getHeight(v))
     )
 
+    // 填充多边形投影到椭球面（高度归零），与完成后的 PolygonGraphic 一致：
+    // 顶点带拾取高度做分类会收缩、盖不满边框；高度归零后填充恰好盖住 clampToGround 边框
+    const surfacePos = (p: Cesium.Cartesian3): Cesium.Cartesian3 =>
+      this.viewer.scene.globe.ellipsoid.scaleToGeodeticSurface(p, new Cesium.Cartesian3())
+
     // 显示已确定的边框线段（连接已确定的顶点）
+    // clampToGround 与 PolygonGraphic 完成后的边框一致（吸附 DEM 地形）
     if (this.vertices.length >= 2) {
       const confirmedOutline = this.viewer.entities.add({
         polyline: {
           positions: staticPositions,
+          clampToGround: true,
           width: this.style.strokeWidth,
           material: Cesium.Color.fromCssColorString(this.style.strokeColor),
         },
@@ -506,6 +520,7 @@ export class DrawTool extends BaseTool {
         positions: new Cesium.CallbackProperty(() => {
           return this.drawCursorPosition ? [lastCartesian, this.drawCursorPosition] : []
         }, false) as any,
+        clampToGround: true,
         width: this.style.strokeWidth,
         material: Cesium.Color.fromCssColorString(this.style.strokeColor),
       },
@@ -517,10 +532,16 @@ export class DrawTool extends BaseTool {
       const previewPolygon = this.viewer.entities.add({
         polygon: {
           hierarchy: new Cesium.CallbackProperty(() => {
-            if (!this.drawCursorPosition) return new Cesium.PolygonHierarchy(staticPositions)
-            return new Cesium.PolygonHierarchy([...staticPositions, this.drawCursorPosition])
+            if (!this.drawCursorPosition) {
+              return new Cesium.PolygonHierarchy(staticPositions.map(surfacePos))
+            }
+            return new Cesium.PolygonHierarchy([
+              ...staticPositions.map(surfacePos),
+              surfacePos(this.drawCursorPosition),
+            ])
           }, false),
-          material: Cesium.Color.TRANSPARENT, // 完全透明填充
+          material: this.getFillColor(), // 填充使用样式中的填充颜色/透明度
+          classificationType: Cesium.ClassificationType.BOTH, // 贴地形/3D Tile表面，与完成后的 PolygonGraphic 一致
           outline: false,
         },
       })
@@ -575,6 +596,7 @@ export class DrawTool extends BaseTool {
           positions: new Cesium.CallbackProperty(() => {
             return this.drawCursorPosition ? [this.drawCursorPosition, firstCartesian] : []
           }, false),
+          clampToGround: true,
           width: this.style.strokeWidth,
           material: new Cesium.PolylineDashMaterialProperty({
             color: Cesium.Color.fromCssColorString(this.style.strokeColor),
@@ -673,48 +695,34 @@ export class DrawTool extends BaseTool {
     const centerCartographic = ellipsoid.cartesianToCartographic(centerCartesian)
 
     // 使用 CallbackProperty 动态计算半径 (大地测量距离)
+    // 填充用多边形、与边框共用同一组边界点，保证在 DEM 地形上完全贴合（避免填充超出）
     const previewCircle = this.viewer.entities.add({
-      position: centerCartesian,
-      ellipse: {
-        semiMajorAxis: new Cesium.CallbackProperty(() => {
-          return this.drawCursorPosition
-            ? this.calculateGeodesicDistance(centerCartesian, this.drawCursorPosition)
-            : 0
+      polygon: {
+        hierarchy: new Cesium.CallbackProperty(() => {
+          if (!this.drawCursorPosition) return new Cesium.PolygonHierarchy([])
+          const radius = this.calculateGeodesicDistance(centerCartesian, this.drawCursorPosition)
+          return new Cesium.PolygonHierarchy(
+            this.generateCircleOutlinePositions(centerCartographic, radius, ellipsoid)
+          )
         }, false),
-        semiMinorAxis: new Cesium.CallbackProperty(() => {
-          return this.drawCursorPosition
-            ? this.calculateGeodesicDistance(centerCartesian, this.drawCursorPosition)
-            : 0
-        }, false),
-        material: Cesium.Color.TRANSPARENT, // 完全透明填充
+        material: this.getFillColor(), // 填充使用样式中的填充颜色/透明度
+        classificationType: Cesium.ClassificationType.BOTH, // 贴地形/3D Tile表面，与完成后的 CircleGraphic 一致
         outline: false,
       },
     })
     this.previewEntities.push(previewCircle)
 
-    // 使用独立 Polyline 显示虚线边框
+    // 使用独立 Polyline 显示虚线边框（与填充共用同一组边界点）
+    // clampToGround 必须与 CircleGraphic 完成后的边框一致（吸附 DEM 地形），
+    // 否则预览虚线停在椭球面高度 0，在 ~185m DEM 上会沉入地底，与最终圆错位 ~185m
     const outlineLine = this.viewer.entities.add({
       polyline: {
         positions: new Cesium.CallbackProperty(() => {
           if (!this.drawCursorPosition) return []
           const radius = this.calculateGeodesicDistance(centerCartesian, this.drawCursorPosition)
-          // 生成圆形边界点（64个点）
-          const numPoints = 64
-          const outlinePositions: Cesium.Cartesian3[] = []
-          for (let i = 0; i <= numPoints; i++) {
-            const angle = (i / numPoints) * 2 * Math.PI
-            const geodesic = new Cesium.EllipsoidGeodesic(
-              centerCartographic,
-              new Cesium.Cartographic(
-                centerCartographic.longitude + (radius / ellipsoid.maximumRadius) * Math.cos(angle),
-                centerCartographic.latitude + (radius / ellipsoid.maximumRadius) * Math.sin(angle)
-              )
-            )
-            const pointCartographic = geodesic.interpolateUsingFraction(1.0)
-            outlinePositions.push(ellipsoid.cartographicToCartesian(pointCartographic))
-          }
-          return outlinePositions
+          return this.generateCircleOutlinePositions(centerCartographic, radius, ellipsoid)
         }, false) as any,
+        clampToGround: true,
         width: this.style.strokeWidth,
         material: new Cesium.PolylineDashMaterialProperty({
           color: Cesium.Color.fromCssColorString(this.style.strokeColor),
@@ -777,13 +785,38 @@ export class DrawTool extends BaseTool {
   }
 
   /**
+   * 生成圆形边界点（与 CircleGraphic.generateOutlinePositions 完全一致）
+   * 经度方向按 1/cos(lat) 修正，使各边界点与圆心的大地距离均为 radius，
+   * 预览填充、预览边框与完成后的图形用同一套点，保证三者完全贴合
+   */
+  private generateCircleOutlinePositions(
+    centerCartographic: Cesium.Cartographic,
+    radius: number,
+    ellipsoid: Cesium.Ellipsoid
+  ): Cesium.Cartesian3[] {
+    const latFactor = Math.max(Math.cos(centerCartographic.latitude), 1e-6)
+    const numPoints = 64
+    const positions: Cesium.Cartesian3[] = []
+
+    for (let i = 0; i <= numPoints; i++) {
+      const angle = (i / numPoints) * 2 * Math.PI
+      const pointCartographic = new Cesium.Cartographic(
+        centerCartographic.longitude + (radius / ellipsoid.maximumRadius) * Math.cos(angle) / latFactor,
+        centerCartographic.latitude + (radius / ellipsoid.maximumRadius) * Math.sin(angle),
+      )
+      positions.push(ellipsoid.cartographicToCartesian(pointCartographic))
+    }
+
+    return positions
+  }
+
+  /**
    * 更新矩形预览 (使用 CallbackProperty 优化性能)
    */
   private updateRectanglePreview(): void {
     if (this.vertices.length === 0 || !this.drawCursorPosition) return
 
     const corner1 = this.vertices[0]
-    const corner1Height = this.getHeight(corner1)
     const corner1Carto = Cesium.Cartographic.fromDegrees(corner1.longitude, corner1.latitude)
 
     // 使用 CallbackProperty 动态计算矩形边界
@@ -800,13 +833,16 @@ export class DrawTool extends BaseTool {
 
           return Cesium.Rectangle.fromRadians(west, south, east, north)
         }, false),
-        material: Cesium.Color.TRANSPARENT, // 完全透明填充
+        material: this.getFillColor(), // 填充使用样式中的填充颜色/透明度
+        classificationType: Cesium.ClassificationType.BOTH, // 贴地形/3D Tile表面，与完成后的 RectangleGraphic 一致
         outline: false,
       },
     })
     this.previewEntities.push(previewRectangle)
 
-    // 使用独立 Polyline 显示虚线边框（使用拾取的实际高度）
+    // 使用独立 Polyline 显示虚线边框
+    // 与 RectangleGraphic 完成后的边框保持一致：纯经纬度 + clampToGround 贴地。
+    // 之前用拾取高度会在 DEM 地形上悬空/错位，与完成后的矩形不重合
     const outlineLine = this.viewer.entities.add({
       polyline: {
         positions: new Cesium.CallbackProperty(() => {
@@ -823,15 +859,14 @@ export class DrawTool extends BaseTool {
           const southDeg = Cesium.Math.toDegrees(south)
           const northDeg = Cesium.Math.toDegrees(north)
 
-          // 使用拾取高度让矩形边框贴合3D模型表面
-          const useHeight = corner1Height
-          const nw = Cesium.Cartesian3.fromDegrees(westDeg, northDeg, useHeight)
-          const ne = Cesium.Cartesian3.fromDegrees(eastDeg, northDeg, useHeight)
-          const se = Cesium.Cartesian3.fromDegrees(eastDeg, southDeg, useHeight)
-          const sw = Cesium.Cartesian3.fromDegrees(westDeg, southDeg, useHeight)
+          const nw = Cesium.Cartesian3.fromDegrees(westDeg, northDeg, 0)
+          const ne = Cesium.Cartesian3.fromDegrees(eastDeg, northDeg, 0)
+          const se = Cesium.Cartesian3.fromDegrees(eastDeg, southDeg, 0)
+          const sw = Cesium.Cartesian3.fromDegrees(westDeg, southDeg, 0)
 
           return [nw, ne, se, sw, nw]
         }, false) as any,
+        clampToGround: true,
         width: this.style.strokeWidth,
         material: new Cesium.PolylineDashMaterialProperty({
           color: Cesium.Color.fromCssColorString(this.style.strokeColor),

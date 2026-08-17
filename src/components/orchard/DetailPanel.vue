@@ -126,11 +126,6 @@ const healthLabel = computed(() => {
   }
 })
 
-function formatDate(dateStr: string) {
-  if (!dateStr) return '--'
-  return new Date(dateStr).toLocaleString('zh-CN')
-}
-
 function locateOnMap() {
   if (!detailPoi.value) return
   const viewer = cesiumStore.viewer

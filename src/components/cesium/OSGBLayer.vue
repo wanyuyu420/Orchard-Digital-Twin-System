@@ -233,7 +233,7 @@ onMounted(() => {
 	// 监听地形变化
 	watch(
 		() => cesiumStore.terrainEnabled,
-		async (enabled) => {
+		async () => {
 			await applyGrounding()
 		}
 	)

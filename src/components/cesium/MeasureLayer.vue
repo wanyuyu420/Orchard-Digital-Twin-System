@@ -37,7 +37,7 @@ watch(
     }
 
     if (newToolType && isMeasureTool(newToolType)) {
-      activateTool(newToolType as MeasureToolType)
+      activateTool(newToolType as string)
     }
   }
 )

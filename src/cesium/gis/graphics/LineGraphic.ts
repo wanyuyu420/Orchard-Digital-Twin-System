@@ -53,14 +53,14 @@ export class LineGraphic extends BaseGraphic {
   /** 当前总长度（米）*/
   private totalLength: number = 0
 
-  /** 默认样式 */
+  /** 默认样式（青色，与 gisStore.drawStyle / DEFAULT_TOOL_STYLES 一致，避免黑色回退） */
   private static readonly DEFAULT_STYLE: Required<GraphicStyle> = {
-    fillColor: '#000000',
+    fillColor: '#22D3EE',
     fillOpacity: 0,
-    strokeColor: '#000000', // 黑色边框
+    strokeColor: '#22D3EE', // 青色边框
     strokeWidth: 3,
     pointSize: 8,
-    pointColor: '#000000', // 黑色点
+    pointColor: '#22D3EE', // 青色点
     opacity: 1.0,
   }
 
@@ -436,7 +436,7 @@ export class LineGraphic extends BaseGraphic {
   protected applyStyle(): void {
     if (this.lineEntity && this.lineEntity.polyline) {
       // 保持黑色边框
-      this.lineEntity.polyline.material = Cesium.Color.BLACK
+      this.lineEntity.polyline.material = new Cesium.ColorMaterialProperty(Cesium.Color.BLACK)
       this.lineEntity.polyline.width = new Cesium.ConstantProperty(this.style.strokeWidth || 2)
     }
   }

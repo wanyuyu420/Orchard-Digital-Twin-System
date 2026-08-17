@@ -51,6 +51,7 @@ import { ref, computed, watch } from 'vue'
 import { useOrchardStore } from '@/stores/orchard'
 import { useGISStore } from '@/stores/gis'
 import { ElMessage } from 'element-plus'
+import type { DrawToolType } from '@/types/draw'
 
 const orchardStore = useOrchardStore()
 const gisStore = useGISStore()
@@ -81,8 +82,8 @@ function setTool(tool: 'rectangle' | 'circle' | 'polygon') {
   }
   activeTool.value = tool
 
-  // 激活Cesium绘制工具 (draw/volume/profile/measure3d)
-  gisStore.activateTool('draw')
+  // 设置工具类型，GISLayer 监听 toolType 变化后实例化 DrawTool
+  gisStore.setTool(`draw-${tool}` as DrawToolType)
 
   // 监听绘制完成事件
   setupDrawListener(tool)

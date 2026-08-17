@@ -27,10 +27,12 @@
  */
 import { ref, watch, onUnmounted } from 'vue'
 import { useCesiumStore } from '@/stores/cesium'
+import { useOrchardStore } from '@/stores/orchard'
 
 declare const Cesium: any
 
 const cesiumStore = useCesiumStore()
+const orchardStore = useOrchardStore()
 
 const DATA_BASE = 'http://100.69.181.81:8766'
 
@@ -252,6 +254,9 @@ async function loadTrees() {
     treesTileset = treeTiles
     ;(window as any).__orchardTreesTileset = treeTiles
     console.log('[OrchardTilesetLayer] trees tileset loaded (253 trees)')
+
+    // 驾驶舱统计：从底图读果树总数 + 种植面积（不依赖 GeoScene）
+    orchardStore.refreshMapStats(DATA_BASE)
 
     // Fly to the orchard once the tree layer is in
     viewer.flyTo(treeTiles, { duration: 2 }).then(() => {

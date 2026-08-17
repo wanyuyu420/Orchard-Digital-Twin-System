@@ -276,3 +276,30 @@ class GeoSceneService:
             raise
         except Exception as e:
             raise GeoSceneError(f'GeoScene FeatureServer delete failed: {e}')
+
+    @classmethod
+    def update_features(cls, updates: list[dict]) -> dict:
+        """Batch-update features via applyEdits (the only write-back path, e.g. fertilizer levels).
+
+        Returns the raw applyEdits result dict so callers can inspect ``updateResults``.
+        """
+        settings = get_settings()
+        token = cls._get_token()
+
+        try:
+            resp = httpx.post(
+                f'{settings.geoscene_feature_server_url}/0/applyEdits',
+                params={'f': 'json', 'token': token},
+                json={'updates': updates},
+                verify=False,
+                timeout=120,
+            )
+            resp.raise_for_status()
+            result = resp.json()
+            if 'error' in result:
+                raise GeoSceneError(f"applyEdits updates failed: {result['error']}")
+            return result
+        except GeoSceneError:
+            raise
+        except Exception as e:
+            raise GeoSceneError(f'GeoScene FeatureServer applyEdits failed: {e}')

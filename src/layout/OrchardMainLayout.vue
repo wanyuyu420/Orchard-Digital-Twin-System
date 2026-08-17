@@ -15,6 +15,9 @@
     <!-- 历史老树拾取点图层 -->
     <HistoricalTreeLayer />
 
+    <!-- 弱树告警红点图层 -->
+    <AlertsLayer />
+
     <!-- 图层管理面板（顶栏按钮开关） -->
     <div v-if="layerStore.showManager" class="layer-manager">
       <LayerControl />
@@ -34,14 +37,14 @@
     <QueryResultPanel />
     <DetailPanel />
 
-    <!-- 颜色渲染设置 -->
-    <ColorRenderSettings />
-
     <!-- 分析结果窗口 -->
     <AnalysisResultWindow />
 
     <!-- 施肥方案窗口 -->
     <FertilizationWindow />
+
+    <!-- 弱树告警窗口 -->
+    <AlertsWindow />
 
     <!-- 图层详细信息面板 -->
     <LayerDetailPanel />
@@ -60,14 +63,15 @@ import LeftSidebar from '@/layout/LeftSidebar.vue'
 import GISLayer from '@/components/cesium/GISLayer.vue'
 import DynamicLayerRenderer from '@/components/cesium/DynamicLayerRenderer.vue'
 import HistoricalTreeLayer from '@/components/cesium/HistoricalTreeLayer.vue'
+import AlertsLayer from '@/components/cesium/AlertsLayer.vue'
 import LayerControl from '@/components/business/LayerControl.vue'
 import { useLayerStore } from '@/stores/layers'
 import QueryPanel from '@/components/orchard/QueryPanel.vue'
 import QueryResultPanel from '@/components/orchard/QueryResultPanel.vue'
 import DetailPanel from '@/components/orchard/DetailPanel.vue'
-import ColorRenderSettings from '@/components/orchard/ColorRenderSettings.vue'
 import AnalysisResultWindow from '@/components/orchard/AnalysisResultWindow.vue'
 import FertilizationWindow from '@/components/orchard/FertilizationWindow.vue'
+import AlertsWindow from '@/components/orchard/AlertsWindow.vue'
 import LayerDetailPanel from '@/components/orchard/LayerDetailPanel.vue'
 import OrchardChartDialog from '@/components/charts/OrchardChartDialog.vue'
 

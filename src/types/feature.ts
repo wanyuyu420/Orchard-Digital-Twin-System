@@ -1,9 +1,6 @@
 // GIS 要素类型定义
 
 import type { Coordinate } from './geometry'
-// Imported for potential future use
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import type { Coordinate3D, Coordinate2D } from './geometry'
 import type { FeatureStyle, FeatureType, LineType } from './draw'
 import type { BaseGraphic } from '@/cesium/gis/core/BaseGraphic'
 

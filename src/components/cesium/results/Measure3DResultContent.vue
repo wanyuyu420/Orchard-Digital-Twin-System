@@ -55,7 +55,7 @@ interface Props {
   data: any
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 
 const formatDistance = (meters: number): string => {
   if (!meters) return '0 m'

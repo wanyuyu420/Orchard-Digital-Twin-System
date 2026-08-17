@@ -28,39 +28,96 @@
           <p class="empty-hint">上传数据文件后，系统将自动进行分析</p>
         </div>
 
-        <!-- 分析结果列表 -->
-        <div v-else class="analysis-list">
-          <div
-            v-for="result in orchardStore.analysisResults"
-            :key="result.id"
-            class="analysis-card"
-            :class="{ active: orchardStore.activeAnalysisId === result.id }"
-            @click="orchardStore.activeAnalysisId = result.id"
-          >
-            <div class="card-header">
-              <div class="card-type" :class="result.type">
-                <i class="fa-solid" :class="typeIcon(result.type)"></i>
-                {{ typeLabel(result.type) }}
+        <template v-else>
+          <!-- 分析结果列表 -->
+          <div class="analysis-list">
+            <div
+              v-for="result in orchardStore.analysisResults"
+              :key="result.id"
+              class="analysis-card"
+              :class="{ active: orchardStore.activeAnalysisId === result.id }"
+              @click="orchardStore.activeAnalysisId = result.id"
+            >
+              <div class="card-header">
+                <div class="card-type" :class="result.type">
+                  <i class="fa-solid" :class="typeIcon(result.type)"></i>
+                  {{ typeLabel(result.type) }}
+                </div>
+                <span class="card-status" :class="result.status">
+                  {{ statusLabel(result.status) }}
+                </span>
               </div>
-              <span class="card-status" :class="result.status">
-                {{ statusLabel(result.status) }}
-              </span>
-            </div>
-            <div class="card-title">{{ result.name }}</div>
-            <div class="card-meta">
-              执行时间: {{ formatDate(result.executedAt) }}
+              <div class="card-title">{{ result.name }}</div>
+              <div class="card-meta">
+                执行时间: {{ formatDate(result.executedAt) }}
+              </div>
             </div>
           </div>
-        </div>
+
+          <!-- 选中分析结果的详情 -->
+          <div v-if="activeResult" class="detail-panel">
+            <div class="detail-title">
+              <span class="detail-name">{{ activeResult.name }}</span>
+              <span class="detail-status" :class="activeResult.status">
+                {{ statusLabel(activeResult.status) }}
+              </span>
+            </div>
+            <div class="detail-meta">执行时间: {{ formatDate(activeResult.executedAt) }}</div>
+
+            <template v-if="activeResult.status === 'completed' && activeResult.data">
+              <div class="stat-grid">
+                <div class="stat-item">
+                  <div class="stat-value">{{ activeResult.data.totalTrees ?? 0 }}</div>
+                  <div class="stat-label">检测树数</div>
+                </div>
+                <div class="stat-item healthy">
+                  <div class="stat-value">{{ activeResult.data.healthyCount ?? 0 }}</div>
+                  <div class="stat-label">健康</div>
+                </div>
+                <div class="stat-item warning">
+                  <div class="stat-value">{{ activeResult.data.warningCount ?? 0 }}</div>
+                  <div class="stat-label">预警</div>
+                </div>
+                <div class="stat-item critical">
+                  <div class="stat-value">{{ activeResult.data.criticalCount ?? 0 }}</div>
+                  <div class="stat-label">严重</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">
+                    {{ activeResult.data.averageHeight ?? 0 }}<span class="unit">m</span>
+                  </div>
+                  <div class="stat-label">平均树高</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ formatArea(activeResult.data.totalArea) }}</div>
+                  <div class="stat-label">冠层面积</div>
+                </div>
+              </div>
+              <div class="detail-hint">
+                检测到的 {{ activeResult.data.totalTrees ?? 0 }} 棵树已打点到地图上
+              </div>
+            </template>
+
+            <template v-else-if="activeResult.status === 'failed'">
+              <div class="error-box">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                {{ activeResult.data?.error || '分析失败，请重试' }}
+              </div>
+            </template>
+          </div>
+        </template>
       </div>
     </div>
   </transition>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useOrchardStore } from '@/stores/orchard'
 
 const orchardStore = useOrchardStore()
+
+const activeResult = computed(() => orchardStore.activeAnalysisResult)
 
 function typeIcon(type: string): string {
   switch (type) {
@@ -97,6 +154,13 @@ function statusLabel(status: string): string {
 function formatDate(dateStr: string): string {
   if (!dateStr) return '--'
   return new Date(dateStr).toLocaleString('zh-CN')
+}
+
+function formatArea(area: number | null | undefined): string {
+  if (area == null || !isFinite(area)) return '0 m²'
+  if (area >= 1_000_000) return (area / 1_000_000).toFixed(2) + ' km²'
+  if (area >= 10_000) return (area / 10_000).toFixed(2) + ' 公顷'
+  return area.toFixed(0) + ' m²'
 }
 </script>
 
@@ -257,5 +321,100 @@ function formatDate(dateStr: string): string {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* ---- 分析详情 ---- */
+.detail-panel {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(251, 146, 60, 0.25);
+  background: rgba(251, 146, 60, 0.05);
+}
+
+.detail-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+
+  .detail-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: $text-main;
+  }
+}
+
+.detail-status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 8px;
+
+  &.completed { color: $success-green; background: rgba(34, 197, 94, 0.1); }
+  &.failed { color: $alert-red; background: rgba(239, 68, 68, 0.1); }
+  &.processing { color: $warn-yellow; background: rgba(234, 179, 8, 0.1); }
+  &.pending { color: $text-dim; background: rgba(100, 116, 139, 0.1); }
+}
+
+.detail-meta {
+  font-size: 11px;
+  color: $text-dim;
+  margin-bottom: 12px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 8px 4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid $border-subtle;
+
+  .stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: $text-main;
+
+    .unit {
+      font-size: 11px;
+      font-weight: 400;
+      color: $text-sub;
+      margin-left: 2px;
+    }
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: $text-dim;
+    margin-top: 2px;
+  }
+
+  &.healthy .stat-value { color: $success-green; }
+  &.warning .stat-value { color: $warn-yellow; }
+  &.critical .stat-value { color: $alert-red; }
+}
+
+.detail-hint {
+  margin-top: 10px;
+  font-size: 11px;
+  color: $text-sub;
+}
+
+.error-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: $alert-red;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 </style>

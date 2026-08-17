@@ -6,10 +6,11 @@ import type {
   FruitTreePoi,
   TsomQueryParams,
   TsomQueryResult,
-  FertilizationPlan,
   AnalysisResult,
-  RenderParams,
   GeoServerLayer,
+  FertilizerPlanRequest,
+  FertilizerPlanOut,
+  AlertsOut,
   InterpretTask,
 } from '@/types/orchard'
 
@@ -26,10 +27,11 @@ export function getFruitTreeById(id: string) {
  * rangeType/radius/日期/健康过滤等字段后端不接收，一律不发送。
  */
 export async function queryTsom(params: TsomQueryParams): Promise<{ data: TsomQueryResult }> {
+  // 空间查询必须带范围，调用方 setSelectionRange 始终提供 rangeType/coordinates
   const payload = {
     coordinates: normalizeToClosedRing({
-      type: params.rangeType,
-      coordinates: params.coordinates,
+      type: params.rangeType!,
+      coordinates: params.coordinates!,
       radius: params.radius,
     }),
   }
@@ -103,26 +105,28 @@ export function getAnalysisResults(params?: { type?: string; status?: string }) 
   return apiClient.get<AnalysisResult[]>('/analysis/list', { params })
 }
 
-/** 获取施肥方案 */
-export function getFertilizationPlan(planId: string) {
-  return apiClient.get<FertilizationPlan>(`/fertilization/${planId}`)
-}
-
-/** 获取施肥方案列表 */
-export function getFertilizationPlans(orchardId?: string) {
-  return apiClient.get<FertilizationPlan[]>('/fertilization/list', {
-    params: orchardId ? { orchard_id: orchardId } : {},
+/** 变量施肥推荐 - 按框选区域计算每棵树推荐施肥等级 */
+export function generateFertilizationPlan(payload: FertilizerPlanRequest) {
+  return apiClient.post<FertilizerPlanOut>('/orange/fertilizer-plan', payload, {
+    timeout: 60000, // GeoScene 空间查询较慢
   })
 }
 
-/** 保存/更新颜色渲染参数 */
-export function saveRenderParams(params: RenderParams) {
-  return apiClient.post('/render/params', params)
+/**
+ * 处方图导出 - GeoJSON/CSV 机具作业文件
+ * csv 返回文件流（blob），geojson 返回 JSON 再转 blob 下载
+ */
+export function exportFertilizationPlan(payload: FertilizerPlanRequest, format: 'csv' | 'geojson') {
+  return apiClient.post('/orange/fertilizer-plan/export', { ...payload, format }, {
+    responseType: 'blob',
+    timeout: 60000,
+  })
 }
 
-/** 获取当前渲染参数 */
-export function getRenderParams() {
-  return apiClient.get<RenderParams>('/render/params')
+/** 弱树告警 - 生长指数低于阈值的橙树 */
+export function getTreeAlerts(params?: { growth_threshold?: number; limit?: number }) {
+  // GeoScene 冷缓存首查可达 6s+，全局 5s 超时不够，单独放宽到 30s
+  return apiClient.get<AlertsOut>('/orange/alerts', { params, timeout: 30000 })
 }
 
 /** 获取GeoServer图层配置 */
@@ -130,33 +134,31 @@ export function getGeoserverLayers() {
   return apiClient.get<GeoServerLayer[]>('/geoserver/layers')
 }
 
-/** TIF 上传响应（POST /orange/upload-tif） */
-export interface TifUploadResponse {
-  success: boolean
-  message: string
-  file_path: string
-  spatial_info: {
-    crs: string
-    transform: number[]
-  }
-  task_id: string
-}
-
-/** 推理任务状态（GET /orange/upload-and-interpret/{task_id}） */
+/** 推理任务状态（POST /orange/upload-and-interpret 与 GET 轮询共用） */
 export interface TaskStatus {
   task_id: string
   status: 'pending' | 'processing' | 'completed' | 'failed'
   message: string
   total_trees: number
-  fresh_trees: any[]
+  fresh_trees: Array<{
+    id: number
+    lng: number
+    lat: number
+    growth_index?: number | null
+    area_m2?: number | null
+    height_m?: number | null
+    crown_diameter?: number | null
+    volume_m3?: number | null
+    fertilizer_kg?: number | null
+  }>
   progress: number // 0.0 ~ 1.0
 }
 
-/** 上传 TIF - 触发 YOLO+SAM 推理任务，返回 task_id */
-export function uploadFile(file: File): Promise<{ data: TifUploadResponse }> {
+/** 上传 TIF - 触发 YOLO+SAM 推理任务（upload-and-interpret），返回 task_id 供轮询 */
+export function uploadFile(file: File): Promise<{ data: TaskStatus }> {
   const formData = new FormData()
   formData.append('file', file)
-  return apiClient.post('/orange/upload-tif', formData, {
+  return apiClient.post('/orange/upload-and-interpret', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 600000, // 10分钟超时（上传+首响应可能较慢）
   })

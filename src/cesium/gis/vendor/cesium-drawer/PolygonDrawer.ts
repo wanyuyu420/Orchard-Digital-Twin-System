@@ -98,6 +98,7 @@ export default class PolygonDrawer {
     }
     this._labels = new LabelCollection()
     viewer.scene.primitives.add(this._labels)
+    // position 由后续 updateLabel 设置，初始 add 时留空（兼容 Cesium 运行期默认值）
     this._labels.add({
       text: 'start',
       font: `bold 1rem Arial`,
@@ -109,7 +110,7 @@ export default class PolygonDrawer {
       pixelOffset: new Cesium.Cartesian2(4, 30),
       scale: 1,
       scaleByDistance: new Cesium.NearFarScalar(1, 0.85, 8.0e6, 0.75),
-    })
+    } as any)
     this._subscriber = new Subscriber(this._viewer)
   }
 
@@ -188,7 +189,7 @@ export default class PolygonDrawer {
   /**
    * 点Entity的左键点击事件
    */
-  private onMouseClickPoint = (movement: EventArgs, entity: Entity) => {
+  private onMouseClickPoint = (_movement: EventArgs, entity: Entity) => {
     if (this._status === 'EDITING' && this._activePoint) {
       return
     }

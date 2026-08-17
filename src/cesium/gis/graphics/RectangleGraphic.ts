@@ -136,7 +136,8 @@ export class RectangleGraphic extends BaseGraphic {
       name: this.name,
       rectangle: {
         coordinates: this.rectangleBounds,
-        material: Cesium.Color.TRANSPARENT, // 完全透明填充
+        material: this.getFillColor(), // 填充使用样式中的填充颜色/透明度
+        classificationType: Cesium.ClassificationType.BOTH, // 贴地形/3D Tile表面（DEM 地形上才可见）
         outline: false,
       },
     })
@@ -176,16 +177,6 @@ export class RectangleGraphic extends BaseGraphic {
     })
 
     this.entities.push(this.outlineEntity)
-  }
-
-  /**
-   * 获取填充材质
-   */
-  private getMaterial(): Cesium.MaterialProperty {
-    const color = Cesium.Color.fromCssColorString(this.style.fillColor || '#ffcc33').withAlpha(
-      this.style.opacity ?? 0.5
-    )
-    return new Cesium.ColorMaterialProperty(color)
   }
 
   /**
@@ -493,15 +484,27 @@ export class RectangleGraphic extends BaseGraphic {
    * 应用样式到实体
    * 覆盖基类方法以支持高亮效果
    */
+  /**
+   * 计算填充颜色（样式填充色 + 填充透明度）
+   * 供创建实体与 applyStyle 统一使用
+   */
+  private getFillColor(): Cesium.Color {
+    const fillColor = this.style.fillColor || '#000000'
+    const fillOpacity = this.style.fillOpacity ?? 0
+    return Cesium.Color.fromCssColorString(fillColor).withAlpha(fillOpacity)
+  }
+
   protected applyStyle(): void {
-    // Update rectangle fill - 保持透明
+    // Update rectangle fill - 使用配置的填充颜色与透明度
     if (this.rectangleEntity && this.rectangleEntity.rectangle) {
-      this.rectangleEntity.rectangle.material = Cesium.Color.TRANSPARENT
+      this.rectangleEntity.rectangle.material = new Cesium.ColorMaterialProperty(this.getFillColor())
     }
 
     // Update outline - 使用配置的线条颜色
     if (this.outlineEntity && this.outlineEntity.polyline) {
-      this.outlineEntity.polyline.material = Cesium.Color.fromCssColorString(this.style.strokeColor || '#000000')
+      this.outlineEntity.polyline.material = new Cesium.ColorMaterialProperty(
+        Cesium.Color.fromCssColorString(this.style.strokeColor || '#000000')
+      )
       this.outlineEntity.polyline.width = new Cesium.ConstantProperty(this.style.strokeWidth || 2)
     }
   }

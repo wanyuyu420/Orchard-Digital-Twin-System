@@ -61,6 +61,9 @@ import { LineGraphic } from '@/cesium/gis/graphics/LineGraphic'
 import { CircleGraphic } from '@/cesium/gis/graphics/CircleGraphic'
 import { RectangleGraphic } from '@/cesium/gis/graphics/RectangleGraphic'
 import { PolygonGraphic } from '@/cesium/gis/graphics/PolygonGraphic'
+import type { Feature } from '@/types/feature'
+import type { FeatureStyle } from '@/types/draw'
+import type { Coordinate } from '@/types/geometry'
 
 const cesiumStore = useCesiumStore()
 const gisStore = useGISStore()
@@ -68,6 +71,27 @@ const gisStore = useGISStore()
 const lastAction = ref<string>('等待操作...')
 const showList = ref(false)
 const graphics = ref<any[]>([])
+
+/** 测试用样式：统一填充/描边配置 */
+function testStyle(stroke: string, fill = stroke): FeatureStyle {
+  return {
+    fillColor: fill,
+    strokeColor: stroke,
+    strokeWidth: 2,
+    pointSize: 10,
+    opacity: 1,
+    lineType: 'solid',
+  }
+}
+
+/** Cartesian3 → 经纬度坐标 */
+function toCoord(position: Cesium.Cartesian3): Coordinate {
+  const carto = Cesium.Cartographic.fromCartesian(position)
+  return {
+    longitude: Cesium.Math.toDegrees(carto.longitude),
+    latitude: Cesium.Math.toDegrees(carto.latitude),
+  }
+}
 
 const viewer = computed(() => cesiumStore.viewer)
 const viewerStatus = computed(() => (viewer.value ? '已加载' : '未加载'))
@@ -95,11 +119,15 @@ function testDrawPoint() {
     // 注册到 GISStore
     const feature = {
       id: point.id,
-      type: 'point' as const,
+      type: 'point',
       name: point.name,
+      position: toCoord(position),
+      style: testStyle('#22D3EE'),
       properties: {},
+      visible: true,
       createdAt: new Date(),
-    }
+      updatedAt: new Date(),
+    } satisfies Feature
     gisStore.addFeature(feature, point)
 
     lastAction.value = `✅ 创建点: ${point.id}`
@@ -120,8 +148,8 @@ function testDrawLine() {
     const line = new LineGraphic(viewer.value as Cesium.Viewer, {
       name: '测试线',
       style: {
-        lineColor: '#FCD34D',
-        lineWidth: 3,
+        strokeColor: '#FCD34D',
+        strokeWidth: 3,
       },
     })
 
@@ -136,11 +164,17 @@ function testDrawLine() {
     // 注册到 GISStore
     const feature = {
       id: line.id,
-      type: 'line' as const,
+      type: 'line',
       name: line.name,
+      vertices: positions.map(toCoord),
+      length: 0,
+      lineType: 'solid',
+      style: testStyle('#FCD34D'),
       properties: {},
+      visible: true,
       createdAt: new Date(),
-    }
+      updatedAt: new Date(),
+    } satisfies Feature
     gisStore.addFeature(feature, line)
 
     lastAction.value = `✅ 创建线: ${line.id} (${positions.length} 点)`
@@ -162,8 +196,8 @@ function testDrawCircle() {
       name: '测试圆',
       style: {
         fillColor: '#F472B6',
-        lineColor: '#EC4899',
-        lineWidth: 2,
+        strokeColor: '#EC4899',
+        strokeWidth: 2,
       },
     })
 
@@ -175,11 +209,17 @@ function testDrawCircle() {
     // 注册到 GISStore
     const feature = {
       id: circle.id,
-      type: 'circle' as const,
+      type: 'circle',
       name: circle.name,
+      center: toCoord(center),
+      radius: 0,
+      area: 0,
+      style: testStyle('#EC4899', '#F472B6'),
       properties: {},
+      visible: true,
       createdAt: new Date(),
-    }
+      updatedAt: new Date(),
+    } satisfies Feature
     gisStore.addFeature(feature, circle)
 
     lastAction.value = `✅ 创建圆: ${circle.id}`
@@ -201,8 +241,8 @@ function testDrawRectangle() {
       name: '测试矩形',
       style: {
         fillColor: '#A78BFA',
-        lineColor: '#8B5CF6',
-        lineWidth: 2,
+        strokeColor: '#8B5CF6',
+        strokeWidth: 2,
       },
     })
 
@@ -214,11 +254,19 @@ function testDrawRectangle() {
     // 注册到 GISStore
     const feature = {
       id: rectangle.id,
-      type: 'rectangle' as const,
+      type: 'rectangle',
       name: rectangle.name,
+      southwest: toCoord(corner1),
+      northeast: toCoord(corner2),
+      width: 0,
+      height: 0,
+      area: 0,
+      style: testStyle('#8B5CF6', '#A78BFA'),
       properties: {},
+      visible: true,
       createdAt: new Date(),
-    }
+      updatedAt: new Date(),
+    } satisfies Feature
     gisStore.addFeature(feature, rectangle)
 
     lastAction.value = `✅ 创建矩形: ${rectangle.id}`
@@ -240,8 +288,8 @@ function testDrawPolygon() {
       name: '测试多边形',
       style: {
         fillColor: '#34D399',
-        lineColor: '#10B981',
-        lineWidth: 2,
+        strokeColor: '#10B981',
+        strokeWidth: 2,
       },
     })
 
@@ -258,11 +306,16 @@ function testDrawPolygon() {
     // 注册到 GISStore
     const feature = {
       id: polygon.id,
-      type: 'polygon' as const,
+      type: 'polygon',
       name: polygon.name,
+      vertices: positions.map(toCoord),
+      area: 0,
+      style: testStyle('#10B981', '#34D399'),
       properties: {},
+      visible: true,
       createdAt: new Date(),
-    }
+      updatedAt: new Date(),
+    } satisfies Feature
     gisStore.addFeature(feature, polygon)
 
     lastAction.value = `✅ 创建多边形: ${polygon.id} (${positions.length} 点)`

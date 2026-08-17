@@ -116,3 +116,106 @@ class HistoricalTreesOut(BaseModel):
     """历史老树全量查询响应"""
     total: int
     trees: List[OrangeTreeOut]
+
+
+# ── 变量施肥推荐 ──────────────────────────────────────────
+
+
+class FertilizerWeights(BaseModel):
+    """
+    变量施肥各生长指标权重（配方秤砣）。
+    四项权重之和必须为1，直接决定需肥得分的倾向性。
+    """
+    growth_index: float = Field(0.40, ge=0, le=1, description="生长指数权重（越不健康越需施肥）")
+    size: float = Field(0.25, ge=0, le=1, description="树冠面积权重（树越大需肥越多）")
+    compactness: float = Field(0.20, ge=0, le=1, description="树冠紧密度权重（越稀疏越需施肥）")
+    slope: float = Field(0.15, ge=0, le=1, description="坡度权重（越陡养分越易流失）")
+
+    @model_validator(mode="after")
+    def _check_sum(self) -> Self:
+        total = self.growth_index + self.size + self.compactness + self.slope
+        if abs(total - 1.0) > 1e-6:
+            raise ValueError(f"权重之和必须为1，当前为{total}")
+        return self
+
+
+class FertilizerPlanRequest(SpatialQuerySchema):
+    """变量施肥推荐请求参数（输入安检门）——框选区域 + 可选权重/分级配置。"""
+    weights: Optional[FertilizerWeights] = Field(None, description="各指标权重，缺省用默认配方")
+    mode: str = Field("quantile", description="quantile=按区域内分位分级; fixed=固定阈值分级")
+    thresholds: List[float] = Field(
+        default_factory=lambda: [0.33, 0.67],
+        min_length=2,
+        max_length=2,
+        description="fixed模式的两档阈值，需满足 0<t1<t2<1",
+    )
+    apply: bool = Field(False, description="是否将推荐等级写回GeoScene（经FeatureServer applyEdits）")
+
+    @model_validator(mode="after")
+    def _check_thresholds(self) -> Self:
+        t1, t2 = self.thresholds
+        if not (0 < t1 < t2 < 1):
+            raise ValueError("阈值必须满足 0 < t1 < t2 < 1")
+        if self.mode not in ("quantile", "fixed"):
+            raise ValueError("mode 只能为 quantile 或 fixed")
+        return self
+
+
+class FertilizerPlanItem(BaseModel):
+    """单棵树施肥建议明细——供前端Cesium按等级着色渲染。"""
+    id: int
+    lng: float
+    lat: float
+    growth_index: Optional[float] = None
+    area_m2: Optional[float] = None
+    compactness: Optional[float] = None
+    slope_degree: Optional[float] = None
+    health_score: float = Field(0.0, description="生长健康归一化得分 0~1（越大越健康）")
+    size_score: float = Field(0.0, description="树冠面积归一化得分 0~1（越大树越大）")
+    compact_score: float = Field(0.0, description="树冠紧密度归一化得分 0~1")
+    slope_score: float = Field(0.0, description="坡度归一化得分 0~1（越大越陡）")
+    demand_score: float = Field(0.0, description="综合需肥得分 0~1（越大越需施肥）")
+    current_level: int = Field(0, description="当前施肥等级 (0:未计算, 1:轻度, 2:中度, 3:重度)")
+    recommended_level: int = Field(0, description="推荐施肥等级 (1:轻度, 2:中度, 3:重度)")
+
+
+class FertilizerPlanOut(BaseModel):
+    """变量施肥推荐输出（输出安检门）——权重配方 + 每棵树明细 + 三档统计。"""
+    total_trees: int = 0
+    mode: str = "quantile"
+    weights: FertilizerWeights
+    thresholds: Optional[List[float]] = Field(None, description="实际采用的分级阈值")
+    summary: FertilizerStat = Field(default_factory=FertilizerStat)
+    plan: List[FertilizerPlanItem] = Field(default_factory=list)
+    applied: bool = False
+
+
+# ── 处方图导出 + 弱树告警 ─────────────────────────────────
+
+
+class FertilizerExportRequest(FertilizerPlanRequest):
+    """变量施肥处方图导出请求——继承施肥推荐请求，另指定导出文件格式。"""
+    format: str = Field("geojson", description="导出格式: geojson=GeoJSON要素集; csv=CSV表格")
+
+    @model_validator(mode="after")
+    def _check_format(self) -> Self:
+        if self.format not in ("geojson", "csv"):
+            raise ValueError("format 只能为 geojson 或 csv")
+        return self
+
+
+class AlertTreeItem(BaseModel):
+    """弱树告警明细——供前端Cesium红点高亮。"""
+    id: int
+    lng: float
+    lat: float
+    growth_index: Optional[float] = Field(None, description="当前生长指数（缺失则更需关注）")
+    area_m2: Optional[float] = Field(None, description="树冠面积 (m²)")
+    fertilizer_level: int = Field(0, description="当前施肥等级 (0:未计算, 1:轻度, 2:中度, 3:重度)")
+
+
+class AlertsOut(BaseModel):
+    """弱树巡检告警输出（输出安检门）。"""
+    total: int = Field(0, description="命中的弱树数量")
+    growth_threshold: float = Field(..., description="本次告警的生长指数阈值")
+    alerts: List[AlertTreeItem] = Field(default_factory=list, description="弱树明细")

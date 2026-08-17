@@ -66,6 +66,27 @@ export interface LayerConfig {
   ellipsoidOffset?: number
   terrainOffset?: number
   provider?: string
+  // 影像图层配置（GenericImageryLayer 使用）
+  urlTemplate?: string
+  bounds?: {
+    west: number
+    south: number
+    east: number
+    north: number
+  }
+  minimumLevel?: number
+  maximumLevel?: number
+  /** WMS 图层名 */
+  layers?: string
+  /** WMS 额外请求参数 */
+  parameters?: Record<string, string>
+  /** 图层透明度 (0-1) */
+  alpha?: number
+  /** 颜色透明化（去除白底） */
+  colorToAlpha?: string
+  colorToAlphaThreshold?: number
+  /** 自动飞行高度 */
+  flyToHeight?: number
   // Point cloud specific configuration
   pointCloud?: {
     pointSize?: number
@@ -100,6 +121,9 @@ export const useLayerStore = defineStore('layers', () => {
   const lastError = ref<string | null>(null)
   /** 图层管理面板显隐 */
   const showManager = ref(false)
+  /** 查看详情的单个图层（GET /layers/{id}） */
+  const layerDetail = ref<GISLayer | null>(null)
+  const layerDetailLoading = ref(false)
 
   // Getters
   const activeLayers = computed(() => 
@@ -172,6 +196,23 @@ export const useLayerStore = defineStore('layers', () => {
     showManager.value = !showManager.value
   }
 
+  // ---- 图层详情 ----
+  async function fetchLayerDetail(id: number) {
+    layerDetailLoading.value = true
+    lastError.value = null
+    try {
+      const res = await layersApi.getLayer(id)
+      layerDetail.value = res.data as GISLayer
+      return res.data
+    } catch (e) {
+      console.error('[LayerStore] Failed to fetch layer detail:', e)
+      lastError.value = '获取图层详情失败'
+      throw e
+    } finally {
+      layerDetailLoading.value = false
+    }
+  }
+
   // ---- CRUD（调后端 /layers） ----
   async function createLayer(data: LayerCreateInput) {
     const res = await layersApi.createLayer(data)
@@ -206,12 +247,15 @@ export const useLayerStore = defineStore('layers', () => {
     isLoading,
     lastError,
     showManager,
+    layerDetail,
+    layerDetailLoading,
     // Getters
     activeLayers,
     layersByGroup,
     getLayerByCode,
     // Actions
     fetchLayers,
+    fetchLayerDetail,
     toggleLayer,
     setLayerActive,
     isLayerActive,
