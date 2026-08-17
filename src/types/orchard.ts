@@ -194,6 +194,9 @@ export interface FreshTree {
   growth_index?: number | null
   compactness?: number | null
   shape_length?: number | null
+  slope_degree?: number | null
+  aspect?: number | null
+  elevation_m?: number | null
   fertilizer_level?: number
   fertilizer_kg?: number
   growth_status?: string

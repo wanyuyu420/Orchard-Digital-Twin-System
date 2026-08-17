@@ -104,6 +104,8 @@ function setupClickHandler(): void {
       let picked: any = null
       for (const p of picks) {
         if (p instanceof Cesium.Cesium3DTileFeature) {
+          // 只拾取地1 自己的 tileset，跳过地2 的（避免与 UploadPlotLayer 弹窗打架）
+          if (p.tileset !== treesTileset && p.tileset !== orchardTileset) continue
           const ids = p.getPropertyIds ? p.getPropertyIds() : p.getPropertyNames()
           if (ids.indexOf('树木编号') >= 0) {
             picked = p
@@ -114,6 +116,7 @@ function setupClickHandler(): void {
       if (!picked) {
         for (const p of picks) {
           if (p instanceof Cesium.Cesium3DTileFeature) {
+            if (p.tileset !== treesTileset && p.tileset !== orchardTileset) continue
             picked = p
             break
           }
@@ -135,7 +138,7 @@ function setupClickHandler(): void {
         idVal +
         '</span><span class="oc-close">×</span></div>'
       for (let i = 0; i < names.length; i++) {
-        if (names[i] === 'featureId' || names[i] === 'nodeId' || names[i] === 'isLeaf') continue
+        if (names[i] === 'featureId' || names[i] === 'nodeId' || names[i] === 'isLeaf' || names[i] === '冠层高度') continue
         let v: any = picked.getProperty(names[i])
         if (v === null || v === undefined) v = '—'
         if (typeof v === 'number') v = +v.toFixed(3)
@@ -200,6 +203,36 @@ watch(
   },
   { immediate: true }
 )
+
+// 监听"回到地1"信号，清空旧瓦片并重新加载（切地2 后回来）
+watch(
+  () => cesiumStore.plot1ReloadSignal,
+  () => {
+    if (!cesiumStore.viewer || cesiumStore.plot1ReloadSignal === 0) return
+    reloadTrees()
+  }
+)
+
+function reloadTrees(): void {
+  viewer = cesiumStore.viewer
+  if (!viewer) return
+  if (treesTileset) {
+    try {
+      viewer.scene.primitives.remove(treesTileset)
+      treesTileset.destroy?.()
+    } catch (e) { /* ignore */ }
+    treesTileset = null
+  }
+  if (orchardTileset) {
+    try {
+      viewer.scene.primitives.remove(orchardTileset)
+      orchardTileset.destroy?.()
+    } catch (e) { /* ignore */ }
+    orchardTileset = null
+  }
+  isLoading.value = false
+  loadTrees()
+}
 
 async function loadTrees() {
   viewer = cesiumStore.viewer

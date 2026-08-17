@@ -116,7 +116,7 @@ async def spatial_diagnose(
             geometry_type="esriGeometryPolygon",
             spatial_rel="esriSpatialRelContains",
             out_sr=4326,
-            limit=500,
+            limit=2000,
             return_geometry=True,
         )
     except GeoSceneError as e:
@@ -465,129 +465,152 @@ def _make_geojson_from_mask(
     return {"type": "Polygon", "coordinates": [coords]}
 
 
+def _detect_trees(file_path: str, batch_id: str, progress_cb=None) -> list[dict]:
+    """核心推理：YOLO 检测 + SAM 分割 + 计算生长字段，返回检测到的树列表（不含入库发布）。
+
+    上传推理和一次性入库脚本共用此函数，保证字段计算完全一致。
+    progress_cb(tile_count, total_tiles) 为可选的进度回调（上传任务用，入库脚本不传）。
+    """
+    yolo_model = YoloService.get_instance()
+    sam_predictor = SamInferenceService.get_instance()
+
+    import rasterio as _rio
+    with _rio.open(file_path) as _src:
+        tif_crs = str(_src.crs)
+        gsd = float(_src.res[0])  # meters per pixel
+
+    transformer = Transformer.from_crs(tif_crs, "EPSG:4326", always_xy=True)
+    transformer_utm = Transformer.from_crs("EPSG:4326", "EPSG:32650", always_xy=True)
+
+    # Step 0: Predict full canopy height map from RGB
+    try:
+        from app.services.height_service import HeightService
+        from app.services.elevation_service import ElevationService
+        height_map = HeightService.predict_height_map(file_path)
+    except Exception as e:
+        print(f"[Warning] Height prediction failed: {e}, skipping height fields")
+        height_map = None
+
+    all_detected_trees = []
+    tile_count = 0
+    rio_ds = rasterio.open(file_path)
+    # 预读整张单波段进内存，循环里每棵树直接内存索引，避免逐像素磁盘 I/O
+    band1 = rio_ds.read(1)
+
+    tiles = list(TifService.slice_tif_generator(file_path, overlap=112))
+    total_tiles = len(tiles)
+
+    for tile_info in tiles:
+        tile_rgb = tile_info["tile_data"]
+        valid_mask = tile_info["valid_mask"]
+        window_x = tile_info["window_x"]
+        window_y = tile_info["window_y"]
+        transform = tile_info["transform"]
+
+        # Smart skip: blank or low-contrast tiles
+        if tile_rgb.max() < 10 or tile_rgb.std() < 5:
+            tile_count += 1
+            if progress_cb:
+                progress_cb(tile_count, total_tiles)
+            continue
+
+        # Step 1: YOLO detects tree canopy boxes
+        boxes = YoloService.detect_boxes(tile_rgb, yolo_model, conf=0.135)
+        if len(boxes) == 0:
+            tile_count += 1
+            if progress_cb:
+                progress_cb(tile_count, total_tiles)
+            continue
+
+        # Step 2: SAM refines each box with Box Prompt
+        local_trees = SamInferenceService.infer_tile_with_boxes(
+            tile_rgb, valid_mask, boxes, sam_predictor)
+
+        # Step 3: Coordinate conversion + post-processing growth fields
+        for tree in local_trees:
+            local_cx, local_cy = tree["local_centroid"]
+            global_px = window_x + local_cx
+            global_py = window_y + local_cy
+            geo_x, geo_y = rasterio.transform.xy(
+                transform, global_py, global_px, offset="center")
+            lng, lat = transformer.transform(geo_x, geo_y)
+            utm_x, utm_y = transformer_utm.transform(lng, lat)
+            bbox = tree.get("bbox", (0, 0, 0, 0))
+            if height_map is not None:
+                # 树高：height_map 是 DSM-DEM（dem2.tif 坐标），用 utm 坐标转像素，
+                # 取树冠中心附近窗口的 90 分位数（接近树冠顶、抗噪声）。
+                # 注意：RGB 影像与 DSM-DEM 尺寸/像元不同，不能直接用 global_px/global_py 索引。
+                HM_ORIGIN_X = 399004.9068
+                HM_ORIGIN_Y = 2903721.04768
+                HM_RES = 0.12836
+                hm_px = int((utm_x - HM_ORIGIN_X) / HM_RES)
+                hm_py = int((HM_ORIGIN_Y - utm_y) / HM_RES)
+                H, W = height_map.shape
+                if 0 <= hm_py < H and 0 <= hm_px < W:
+                    win = height_map[max(0, hm_py - 7):min(H, hm_py + 8), max(0, hm_px - 7):min(W, hm_px + 8)]
+                    win = win[win > 0]
+                    tree_h = float(np.percentile(win, 90)) if win.size > 0 else None
+                else:
+                    tree_h = None
+            else:
+                tree_h = None
+            growth = _calc_growth_fields(tree["segmentation_mask"], gsd, tree_h)
+            slope_info = ElevationService.get_slope_aspect(lat, lng, utm_x, utm_y)
+            band_val = tile_rgb[int(local_cy), int(local_cx)].tolist()
+            raw_val = float(band1[int(global_py), int(global_px)]) if 0 <= int(global_py) < band1.shape[0] and 0 <= int(global_px) < band1.shape[1] else None
+            geojson = _make_geojson_from_mask(
+                tree["segmentation_mask"], window_x, window_y,
+                transform, transformer)
+            tree_uuid = f"tree_{uuid.uuid4().hex[:8]}"
+            all_detected_trees.append({
+                "id": tree_uuid,
+                "batch_id": batch_id,
+                "lng": round(lng, 8),
+                "lat": round(lat, 8),
+                "utm_x": round(utm_x, 4),
+                "utm_y": round(utm_y, 4),
+                "iou_score": round(tree.get("iou_score", 0), 4),
+                "bbox_local": [round(float(v), 2) for v in bbox],
+                "shape_area": growth.get("area_m2", 0),
+                "band_value": band_val, "value": raw_val, **slope_info,
+                **growth,
+                "growth_status": growth_index_to_status(growth.get("growth_index")),
+                "fertilizer_kg": fertilizer_level_to_kg(growth.get("fertilizer_level", 0)),
+                "geometry": geojson,
+            })
+
+        tile_count += 1
+        if progress_cb:
+            progress_cb(tile_count, total_tiles)
+
+    rio_ds.close()
+    return all_detected_trees
+
+
 def _run_inference_task(task_id: str, file_path: str):
     with _task_lock:
         _task_store[task_id]["status"] = "processing"
 
+    batch_id = os.path.splitext(os.path.basename(file_path))[0]
+
+    def _progress_cb(tile_count, total_tiles):
+        _update_progress(task_id, tile_count, total_tiles)
+
     try:
-        yolo_model = YoloService.get_instance()
-        sam_predictor = SamInferenceService.get_instance()
-
-        import rasterio as _rio
-        with _rio.open(file_path) as _src:
-            tif_crs = str(_src.crs)
-            gsd = float(_src.res[0])  # meters per pixel
-
-        transformer = Transformer.from_crs(tif_crs, "EPSG:4326", always_xy=True)
-        transformer_utm = Transformer.from_crs("EPSG:4326", "EPSG:32650", always_xy=True)
-
-        batch_id = os.path.splitext(os.path.basename(file_path))[0]
-
-        # Step 0: Predict full canopy height map from RGB
-        _update_progress(task_id, 0, 1, "Predicting canopy height...")
-        try:
-            from app.services.height_service import HeightService
-            from app.services.elevation_service import ElevationService
-            height_map = HeightService.predict_height_map(file_path)
-        except Exception as e:
-            print(f"[Warning] Height prediction failed: {e}, skipping height fields")
-            height_map = None
-
-        all_detected_trees = []
-        tile_count = 0
-        rio_ds = rasterio.open(file_path)
-        # 预读整张单波段进内存，循环里每棵树直接内存索引，避免逐像素磁盘 I/O
-        band1 = rio_ds.read(1)
-
-        tiles = list(TifService.slice_tif_generator(file_path, overlap=112))
-        total_tiles = len(tiles)
-
-        for tile_info in tiles:
-            tile_rgb = tile_info["tile_data"]
-            valid_mask = tile_info["valid_mask"]
-            window_x = tile_info["window_x"]
-            window_y = tile_info["window_y"]
-            transform = tile_info["transform"]
-
-            # Smart skip: blank or low-contrast tiles
-            if tile_rgb.max() < 10 or tile_rgb.std() < 5:
-                tile_count += 1
-                _update_progress(task_id, tile_count, total_tiles)
-                continue
-
-            # Step 1: YOLO detects tree canopy boxes
-            boxes = YoloService.detect_boxes(tile_rgb, yolo_model, conf=0.135)
-            if len(boxes) == 0:
-                tile_count += 1
-                _update_progress(task_id, tile_count, total_tiles)
-                continue
-
-            # Step 2: SAM refines each box with Box Prompt
-            local_trees = SamInferenceService.infer_tile_with_boxes(
-                tile_rgb, valid_mask, boxes, sam_predictor)
-
-            # Step 3: Coordinate conversion + post-processing growth fields
-            for tree in local_trees:
-                local_cx, local_cy = tree["local_centroid"]
-                global_px = window_x + local_cx
-                global_py = window_y + local_cy
-                geo_x, geo_y = rasterio.transform.xy(
-                    transform, global_py, global_px, offset="center")
-                lng, lat = transformer.transform(geo_x, geo_y)
-                bbox = tree.get("bbox", (0, 0, 0, 0))
-                tree_h = float(np.median(height_map[max(0,int(global_py)-2):min(height_map.shape[0],int(global_py)+3), max(0,int(global_px)-2):min(height_map.shape[1],int(global_px)+3)][height_map[max(0,int(global_py)-2):min(height_map.shape[0],int(global_py)+3), max(0,int(global_px)-2):min(height_map.shape[1],int(global_px)+3)] > 0])) if height_map is not None and 0 <= int(global_py) < height_map.shape[0] and 0 <= int(global_px) < height_map.shape[1] else None
-                growth = _calc_growth_fields(tree["segmentation_mask"], gsd, tree_h)
-                utm_x, utm_y = transformer_utm.transform(lng, lat)
-                slope_info = ElevationService.get_slope_aspect(lat, lng, utm_x, utm_y)
-                band_val = tile_rgb[int(local_cy), int(local_cx)].tolist()
-                raw_val = float(band1[int(global_py), int(global_px)]) if 0 <= int(global_py) < band1.shape[0] and 0 <= int(global_px) < band1.shape[1] else None
-                geojson = _make_geojson_from_mask(
-                    tree["segmentation_mask"], window_x, window_y,
-                    transform, transformer)
-                tree_uuid = f"tree_{uuid.uuid4().hex[:8]}"
-                all_detected_trees.append({
-                    "id": tree_uuid,
-                    "batch_id": batch_id,
-                    "lng": round(lng, 8),
-                    "lat": round(lat, 8),
-                    "utm_x": round(utm_x, 4),
-                    "utm_y": round(utm_y, 4),
-                    "iou_score": round(tree.get("iou_score", 0), 4),
-                    "bbox_local": [round(float(v), 2) for v in bbox],
-                    "shape_area": growth.get("area_m2", 0),
-                    "band_value": band_val, "value": raw_val, **slope_info,
-                    **growth,
-                    "growth_status": growth_index_to_status(growth.get("growth_index")),
-                    "fertilizer_kg": fertilizer_level_to_kg(growth.get("fertilizer_level", 0)),
-                    "geometry": geojson,
-                })
-
-            tile_count += 1
-            _update_progress(task_id, tile_count, total_tiles)
+        all_detected_trees = _detect_trees(file_path, batch_id, _progress_cb)
 
         # Persist detected trees to database for spatial-diagnose
         _persist_trees_sync(all_detected_trees, batch_id)
-
-        # Publish to GeoScene FeatureServer（失败降级：权限不足时不影响分割结果返回）
-        try:
-            GeoSceneService.add_features([{"attributes": t, "geometry": {"x": t["utm_x"], "y": t["utm_y"], "spatialReference": {"wkid": 32650}}} for t in all_detected_trees])
-        except Exception as e:
-            print(f"[Warning] Publish to GeoScene FeatureServer failed (non-fatal): {e}")
 
         with _task_lock:
             _task_store[task_id]["status"] = "completed"
             _task_store[task_id]["total_trees"] = len(all_detected_trees)
             _task_store[task_id]["fresh_trees"] = all_detected_trees
-
-        rio_ds.close()
-        if os.path.exists(file_path):
-            os.remove(file_path)
-
     except Exception as e:
         with _task_lock:
             _task_store[task_id]["status"] = "failed"
             _task_store[task_id]["message"] = str(e)
-        rio_ds.close()
+    finally:
         if os.path.exists(file_path):
             os.remove(file_path)
 

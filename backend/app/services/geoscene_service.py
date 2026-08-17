@@ -203,7 +203,7 @@ class GeoSceneService:
             resp = httpx.post(
                 f'{settings.geoscene_feature_server_url}/0/applyEdits',
                 params={'f': 'json', 'token': token},
-                json={'adds': features},
+                data={'adds': json.dumps(features)},
                 verify=False,
                 timeout=120,
             )
@@ -220,3 +220,59 @@ class GeoSceneService:
             raise
         except Exception as e:
             raise GeoSceneError(f'GeoScene FeatureServer applyEdits failed: {e}')
+
+    @classmethod
+    def delete_features_by_batch(cls, batch_id: str) -> int:
+        """删除指定 batch_id 的所有要素（重复上传时先清旧数据，避免 GeoScene 累积）。"""
+        settings = get_settings()
+        token = cls._get_token()
+
+        # 1) 查询旧 batch 的 objectId
+        try:
+            features = cls.query_features(
+                where=f"batch_id='{batch_id}'",
+                return_geometry=False,
+                limit=2000,
+                timeout=60,
+            )
+        except GeoSceneError:
+            return 0
+
+        if not features:
+            return 0
+
+        object_ids = [
+            f["attributes"].get(k)
+            for f in features
+            for k in ("objectid", "OBJECTID", "objectId", "FID", "fid")
+            if f["attributes"].get(k) is not None
+        ]
+        object_ids = list(dict.fromkeys(object_ids))  # 去重保序
+        if not object_ids:
+            return 0
+
+        # 2) applyEdits deletes（分批，避免一次删除太多超时）
+        total_success = 0
+        try:
+            for i in range(0, len(object_ids), 200):
+                chunk = object_ids[i:i + 200]
+                resp = httpx.post(
+                    f'{settings.geoscene_feature_server_url}/0/applyEdits',
+                    params={'f': 'json', 'token': token},
+                    data={'deletes': json.dumps(chunk)},
+                    verify=False,
+                    timeout=120,
+                )
+                resp.raise_for_status()
+                result = resp.json()
+                if result.get('deleteResults'):
+                    total_success += sum(1 for r in result['deleteResults'] if r.get('success'))
+                else:
+                    err = result.get('error', resp.text)
+                    raise GeoSceneError(f'deleteFeatures failed: {err}')
+            print(f'[GeoScene] Deleted {total_success} old trees of batch {batch_id}')
+            return total_success
+        except GeoSceneError:
+            raise
+        except Exception as e:
+            raise GeoSceneError(f'GeoScene FeatureServer delete failed: {e}')

@@ -221,6 +221,9 @@ const toggleLayerManager = () => {
 
 const resetView = () => {
   try {
+    // 回到地1：清地2 + 触发地1 重新加载 + 相机飞回
+    orchardStore.activePlotTaskId = null
+    cesiumStore.reloadPlot1()
     cesiumStore.zoomToHome()
     ElMessage.success('已回到初始视角')
   } catch (e) {

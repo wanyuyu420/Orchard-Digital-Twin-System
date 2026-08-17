@@ -52,16 +52,27 @@ const FIELD_UNIT: Record<string, string> = {
   冠幅直径: ' m',
   冠幅面积: ' m²',
   冠层体积: ' m³',
+  周长: ' m',
+  坡度: '°',
+  坡向: '°',
   长势指数: '',
+  紧凑度: '',
   施肥量: ' kg',
 }
 
-// 监听激活的"已完成"地块任务 → 触发加载
+// 监听激活的"已完成"地块任务 → 触发加载；任务清空（回到地1）→ dispose 地2
+let loadedPlot = false
+
 watch(
   () => orchardStore.activePlotTask,
   (task) => {
     if (task && task.status === 'completed') {
+      loadedPlot = true
       loadPlot(task)
+    } else if (task === null && loadedPlot) {
+      const viewer = cesiumStore.viewer
+      if (viewer) disposeCurrentScene(viewer)
+      loadedPlot = false
     }
   },
   { immediate: true },
@@ -167,14 +178,16 @@ async function setupPlotDemTerrain(viewer: any): Promise<void> {
     const res = await fetch(UPLOAD_PLOT_DEM)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const code = await res.text()
-    new Function(code)()
-    if (!(window as any).DEM) throw new Error('dem.js 未定义 window.DEM')
+    // dem2.js 内容是 window.DEM=...，替换成 window.DEM2，避免覆盖地1 的 window.DEM
+    const code2 = code.replace(/window\.DEM\s*=/g, 'window.DEM2 =')
+    new Function(code2)()
+    if (!(window as any).DEM2) throw new Error('dem2.js 未定义 window.DEM2')
   } catch (e) {
-    console.warn('[UploadPlotLayer] 加载地2 dem.js 失败，保持平椭球地形:', e)
+    console.warn('[UploadPlotLayer] 加载地2 dem2.js 失败，保持平椭球地形:', e)
     return
   }
 
-  const D = (window as any).DEM
+  const D = (window as any).DEM2
   const demHeight = (lonDeg: number, latDeg: number): number => {
     if (!D || lonDeg < D.minLon || lonDeg > D.maxLon || latDeg < D.minLat || latDeg > D.maxLat) {
       return D ? D.zMin - 2 : 0
@@ -307,43 +320,72 @@ function setupClickHandler(viewer: any, trees: FreshTree[]): void {
   destroyClickHandler()
   clickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas)
   clickHandler.setInputAction((movement: any) => {
+    // 1) 先试拾取树冠点（透明点）
     const picked = viewer.scene.pick(movement.position)
-    if (!picked?.id?.id) {
+    if (picked?.id?.id && String(picked.id.id).startsWith('_upload_plot_tree_')) {
+      const index = parseInt(String(picked.id.id).replace('_upload_plot_tree_', ''), 10)
+      const tree = trees[index]
+      if (tree) {
+        showTreeCard(viewer, tree, index, movement.position)
+        return
+      }
+    }
+
+    // 2) 否则 drillPick 拾取地2 树模型，按经纬度匹配最近的 GeoAI 树
+    const picks = viewer.scene.drillPick(movement.position, 10, 5, 5)
+    const feature = picks.find(
+      (p: any) => p instanceof Cesium.Cesium3DTileFeature && p.tileset === plotTreesTileset,
+    )
+    if (!feature) {
       closePropCard()
       return
     }
-    const entityId: string = picked.id.id
-    if (!String(entityId).startsWith('_upload_plot_tree_')) {
+    const cartesian = viewer.scene.pickPosition(movement.position)
+    if (!cartesian) {
       closePropCard()
       return
     }
-    const index = parseInt(String(entityId).replace('_upload_plot_tree_', ''), 10)
-    const tree = trees[index]
-    if (!tree) {
+    const carto = Cesium.Cartographic.fromCartesian(cartesian)
+    const lng = Cesium.Math.toDegrees(carto.longitude)
+    const lat = Cesium.Math.toDegrees(carto.latitude)
+    let bestIndex = -1
+    let bestDist = Infinity
+    trees.forEach((tree, i) => {
+      const d = (tree.lng - lng) ** 2 + (tree.lat - lat) ** 2
+      if (d < bestDist) {
+        bestDist = d
+        bestIndex = i
+      }
+    })
+    if (bestIndex >= 0) {
+      showTreeCard(viewer, trees[bestIndex], bestIndex, movement.position)
+    } else {
       closePropCard()
-      return
     }
-    showTreeCard(viewer, tree, movement.position)
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK)
 
   viewer.scene.postRender.addEventListener(updatePropCardPos)
 }
 
-function showTreeCard(viewer: any, tree: FreshTree, screenPos: any): void {
+function showTreeCard(viewer: any, tree: FreshTree, index: number, screenPos: any): void {
   const rows: [string, any][] = [
-    ['树木编号', tree.id],
     ['树高', tree.height_m],
     ['冠幅直径', tree.crown_diameter],
     ['冠幅面积', tree.area_m2],
     ['冠层体积', tree.volume_m3],
+    ['周长', tree.shape_length],
+    ['坡度', tree.slope_degree],
+    ['坡向', tree.aspect],
     ['长势指数', tree.growth_index],
+    ['紧凑度', tree.compactness],
     ['长势', tree.growth_status],
+    ['施肥等级', ['', '轻度', '中度', '重度'][tree.fertilizer_level ?? 0] || '—'],
     ['施肥量', tree.fertilizer_kg],
   ]
 
   let html =
     '<div class="oc-inner"><div class="oc-title"><span>树冠参数 #' +
-    tree.id +
+    (index + 1) +
     '</span><span class="oc-close">×</span></div>'
   rows.forEach(([label, val], i) => {
     let v: any = val

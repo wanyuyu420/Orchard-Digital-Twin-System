@@ -45,12 +45,19 @@ export const useCesiumStore = defineStore('cesium', () => {
     roll: number
   } | null>(null)
 
+  // 回到地1 的触发信号（计数器，每次回到主视角 +1，OrchardTilesetLayer / CesiumViewer 监听重新加载）
+  const plot1ReloadSignal = ref(0)
+
   function setViewer(v: any) {
     viewer.value = v
   }
 
   function setHomeView(view: typeof homeView.value) {
     homeView.value = view
+  }
+
+  function reloadPlot1() {
+    plot1ReloadSignal.value++
   }
 
   function toggle2D3D(mode2D: boolean) {
@@ -234,8 +241,10 @@ export const useCesiumStore = defineStore('cesium', () => {
     bimLoading,
     savedCameraState,
     homeView,
+    plot1ReloadSignal,
     setViewer,
     setHomeView,
+    reloadPlot1,
     toggle2D3D,
     flyTo,
     flyToDefault,

@@ -4,7 +4,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed } from 'vue'
+import { onMounted, onUnmounted, computed, watch } from 'vue'
 import { useCesiumStore } from '@/stores/cesium'
 import { useAppStore } from '@/stores/app'
 import { GController } from '@/utils/ctrlCesium/Controller'
@@ -49,6 +49,19 @@ onMounted(async () => {
 
 	// 对齐果园预览:高德卫星 + DOM 无人机影像 + DEM 地形(async, non-blocking)
 	setupOrchardPreviewBasemap(viewer)
+
+	// 监听"回到地1"信号，重新加载 DOM + DEM（切地2 后回来）
+	watch(
+		() => cesiumStore.plot1ReloadSignal,
+		() => {
+			if (cesiumStore.viewer && cesiumStore.plot1ReloadSignal > 0) {
+				// 用 setTimeout(0) 确保在 UploadPlotLayer 的 dispose（移除底图）之后执行
+				setTimeout(() => {
+					setupOrchardPreviewBasemap(cesiumStore.viewer)
+				}, 0)
+			}
+		}
+	)
 })
 
 onUnmounted(() => {
