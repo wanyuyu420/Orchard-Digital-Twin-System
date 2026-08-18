@@ -28,3 +28,21 @@ export function computeAreaFromDem(dem: any): number {
   const heightM = (dem.maxLat - dem.minLat) * 111320
   return (widthM * heightM) / 666.6667
 }
+
+/**
+ * 从 WGS84 包络矩形 [west, south, east, north] 计算面积（亩）。
+ * 用于上传地块（地2）的 domRect：几何近似（与 computeAreaFromDem 同公式），
+ * 单景 TIF 范围较小，误差可忽略。
+ */
+export function computeAreaFromRect(
+  rect: [number, number, number, number] | null | undefined,
+): number {
+  if (!rect || rect.length !== 4) return 0
+  const [west, south, east, north] = rect
+  if (!isFinite(west) || !isFinite(south) || !isFinite(east) || !isFinite(north)) return 0
+  if (east <= west || north <= south) return 0
+  const avgLat = ((south + north) / 2) * (Math.PI / 180)
+  const widthM = (east - west) * 111320 * Math.cos(avgLat)
+  const heightM = (north - south) * 111320
+  return (widthM * heightM) / 666.6667
+}

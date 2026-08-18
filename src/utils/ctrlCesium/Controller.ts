@@ -95,6 +95,13 @@ class Controller {
 
     const viewer = new Cesium.Viewer(mapID, vConfig)
 
+    // 按需渲染：只有相机变化 / 瓦片就绪 / 显式 requestRender() 时才出帧，
+    // 空闲不再 60fps 全速渲染（shouldAnimate 让时钟每帧跳动，若不设
+    // maximumRenderTimeChange 为极大值，requestRenderMode 会被时间驱动渲染顶掉）。
+    // 项目内 PolygonDrawer 已显式调用 scene.requestRender()，即按需渲染为预期模式。
+    viewer.scene.requestRenderMode = true
+    viewer.scene.maximumRenderTimeChange = Number.MAX_VALUE
+
     // WebGL 上下文丢失防护(见 installContextLossGuard 注释)
     this.installContextLossGuard(viewer)
 

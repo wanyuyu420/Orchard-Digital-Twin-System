@@ -21,8 +21,21 @@ export const DOM_RECT = {
 
 const DOM_BASE = 'http://100.69.181.81:8766'
 
-/** 高德卫星影像:园外大范围底图 */
+/** 查找 URL 含 needle 的影像图层（幂等去重用） */
+function findImageryByUrl(viewer: any, needle: string): any[] {
+  const layers = viewer.imageryLayers
+  const found: any[] = []
+  for (let i = 0; i < layers.length; i++) {
+    const l = layers.get(i)
+    const url = l?._imageryProvider?.url || l?.imageryProvider?.url || ''
+    if (typeof url === 'string' && url.includes(needle)) found.push(l)
+  }
+  return found
+}
+
+/** 高德卫星影像:园外大范围底图（幂等，重复调用只保留一层） */
 function addGaodeImagery(viewer: any): void {
+  findImageryByUrl(viewer, 'autonavi').forEach((l) => viewer.imageryLayers.remove(l))
   viewer.imageryLayers.addImageryProvider(
     new Cesium.UrlTemplateImageryProvider({
       url: 'https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
@@ -33,9 +46,14 @@ function addGaodeImagery(viewer: any): void {
   )
 }
 
-/** DOM 无人机 1.4cm 正射影像:果园范围内,优先于高德底图 */
-function addDomImagery(viewer: any): void {
-  viewer.imageryLayers.addImageryProvider(
+/**
+ * DOM 无人机 1.4cm 正射影像:果园范围内,优先于高德底图。
+ * 幂等（重复调用先移除旧的），并把图层引用挂到 window.__dom1Layer，
+ * 供"显示原地块"开关（plot1Visible）控制显隐。
+ */
+function addDomImagery(viewer: any): any {
+  findImageryByUrl(viewer, '/dom/').forEach((l) => viewer.imageryLayers.remove(l))
+  const layer = viewer.imageryLayers.addImageryProvider(
     new Cesium.UrlTemplateImageryProvider({
       url: `${DOM_BASE}/dom/{z}/{x}/{y}.png`,
       tilingScheme: new Cesium.WebMercatorTilingScheme(),
@@ -50,6 +68,9 @@ function addDomImagery(viewer: any): void {
       credit: 'DOM 无人机影像',
     })
   )
+  layer.show = true
+  ;(window as any).__dom1Layer = layer
+  return layer
 }
 
 /** 双线性插值高程(与 viewer.html demHeight 一致) */
@@ -85,6 +106,8 @@ class DemTerrainProvider {
   private _w = 65
   private _h = 65
   private _levelZeroGeometricError: number
+  /** heightmap 瓦片缓存：地形 Provider 互换时 Cesium 会整盘重建可见瓦片，按瓦片坐标缓存可复用插值结果 */
+  private _tileCache = new Map<string, any>()
 
   constructor() {
     this._levelZeroGeometricError =
@@ -100,6 +123,9 @@ class DemTerrainProvider {
   }
 
   requestTileGeometry(x: number, y: number, level: number): any {
+    const key = `${level}/${x}/${y}`
+    const hit = this._tileCache.get(key)
+    if (hit) return hit
     const rect = this._tilingScheme.tileXYToRectangle(x, y, level)
     const w = this._w
     const h = this._h
@@ -111,7 +137,11 @@ class DemTerrainProvider {
         buf[j * w + i] = demHeight(lon, lat)
       }
     }
-    return new Cesium.HeightmapTerrainData({ buffer: buf, width: w, height: h })
+    const data = new Cesium.HeightmapTerrainData({ buffer: buf, width: w, height: h })
+    // 有界缓存，超限整体清空（实际可见瓦片仅几十~几百，2000 足够；每次互换都重写同一批 key）
+    if (this._tileCache.size >= 2000) this._tileCache.clear()
+    this._tileCache.set(key, data)
+    return data
   }
 
   getLevelMaximumGeometricError(level: number): number {
@@ -156,7 +186,10 @@ export async function applyDemTerrain(viewer: any): Promise<boolean> {
   if (!(await ensureDemData())) return false
   try {
     if (!cachedDemProvider) cachedDemProvider = new DemTerrainProvider()
-    viewer.scene.terrainProvider = cachedDemProvider
+    // 已是 DEM1 地形时不再赋值，避免 Cesium 整盘重建地形瓦片
+    if (viewer.scene.terrainProvider !== cachedDemProvider) {
+      viewer.scene.terrainProvider = cachedDemProvider
+    }
     console.log('[DEM] 已启用 DEM 起伏地形(树根贴地)')
     return true
   } catch (e) {

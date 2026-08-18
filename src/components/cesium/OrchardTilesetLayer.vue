@@ -213,6 +213,14 @@ watch(
   }
 )
 
+// 监听"显示原地块"开关（plot1Visible）：隐藏地1 时关掉树瓦片，显示时恢复（地2 叠加不受影响）
+watch(
+  () => orchardStore.plot1Visible,
+  (v) => {
+    if (treesTileset) treesTileset.show = !!v
+  }
+)
+
 function reloadTrees(): void {
   viewer = cesiumStore.viewer
   if (!viewer) return
@@ -243,11 +251,14 @@ async function loadTrees() {
     })
     viewer.scene.primitives.add(treeTiles)
     treesTileset = treeTiles
+    treeTiles.show = orchardStore.plot1Visible
     ;(window as any).__orchardTreesTileset = treeTiles
     console.log('[OrchardTilesetLayer] trees tileset loaded (253 trees)')
 
+    // 记录地1 数据源，供"显示原地块"开关恢复统计时复用
+    orchardStore.plot1DataBase = DATA_BASE
     // 驾驶舱统计：从底图读果树总数 + 种植面积（不依赖 GeoScene）
-    orchardStore.refreshMapStats(DATA_BASE)
+    orchardStore.refreshMapStats()
 
     // Fly to the orchard once the tree layer is in
     viewer.flyTo(treeTiles, { duration: 2 }).then(() => {
