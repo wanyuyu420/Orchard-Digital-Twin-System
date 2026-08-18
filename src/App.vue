@@ -9,9 +9,6 @@
     <!-- 上传地块（地2）三维场景：点击侧边栏"已完成"任务卡片后加载 -->
     <UploadPlotLayer />
 
-    <!-- Orchard 3D Tiles 底部控制条(树透明度/显隐/果园精模懒加载) -->
-    <OrchardControlBar />
-
     <!-- Measure Layer (Persistent across pages) -->
     <MeasureLayer />
 
@@ -27,7 +24,6 @@
 import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
 import OrchardTilesetLayer from '@/components/cesium/OrchardTilesetLayer.vue'
 import UploadPlotLayer from '@/components/cesium/UploadPlotLayer.vue'
-import OrchardControlBar from '@/components/orchard/OrchardControlBar.vue'
 import MeasureLayer from '@/components/cesium/MeasureLayer.vue'
 import DrawLayer from '@/components/cesium/DrawLayer.vue'
 import OrchardMainLayout from '@/layout/OrchardMainLayout.vue'

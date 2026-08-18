@@ -84,7 +84,7 @@ async function executeQuery() {
       params.endDate = dateRange.value[1].toISOString()
     }
 
-    // 菜单精细查询永远查全部树，不按空间范围过滤
+    // 菜单精细查询查底图范围内的树（bbox 限制到底图 DOM 范围，见 api/orchard.ts）
     await orchardStore.executeFilterQuery(params)
     // 查询成功后关闭查询面板，避免与结果面板重叠
     orchardStore.showQueryPanel = false
@@ -98,9 +98,7 @@ async function executeQuery() {
 
 <style scoped lang="scss">
 .query-panel {
-  position: absolute;
-  right: 24px;
-  top: 80px;
+  position: relative;
   width: 420px;
   max-height: calc(100vh - 120px);
   z-index: $z-layer-6;

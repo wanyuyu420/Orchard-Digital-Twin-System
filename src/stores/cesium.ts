@@ -16,11 +16,6 @@ export const useCesiumStore = defineStore('cesium', () => {
   // OSGB 3D Tiles state
   const osgbEnabled = ref(false)
   const osgbLoading = ref(false)
-  // Orchard 2.0 果园3D Tiles 视图状态(移植自 viewer.html 底部控制条)
-  const orchardTreeOpacity = ref(1) // 0-1，树透明度
-  const orchardTreesVisible = ref(true) // 树显隐
-  const orchardModelsLoaded = ref(false) // 果园精模是否已加载(懒加载标记)
-  const orchardModelsVisible = ref(false) // 果园精模显隐
   // BIM 3D Tiles state
   const bimEnabled = ref(false)
   const bimLoading = ref(false)
@@ -233,10 +228,6 @@ export const useCesiumStore = defineStore('cesium', () => {
     terrainLoading,
     osgbEnabled,
     osgbLoading,
-    orchardTreeOpacity,
-    orchardTreesVisible,
-    orchardModelsLoaded,
-    orchardModelsVisible,
     bimEnabled,
     bimLoading,
     savedCameraState,

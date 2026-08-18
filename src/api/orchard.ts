@@ -1,5 +1,6 @@
 import { apiClient } from './client'
 import { normalizeToClosedRing, growthIndexToHealth } from '@/utils/spatial'
+import { DOM_RECT } from '@/utils/orchardPreview'
 import { fromArrayBuffer } from 'geotiff'
 import proj4 from 'proj4'
 import type {
@@ -52,10 +53,12 @@ export async function queryTsom(params: TsomQueryParams): Promise<{ data: TsomQu
  * 复用 mapDiagnoseToTsomResult 映射。GeoScene 全量扫描较慢，覆盖默认 5s 超时。
  */
 export async function queryTreesByFilter(params: TsomQueryParams): Promise<{ data: TsomQueryResult }> {
+  // 只查底图（DOM 影像）范围内的树，排除底图外的树
   const payload = {
     healthStatuses: params.healthStatuses,
     startDate: params.startDate,
     endDate: params.endDate,
+    bbox: [DOM_RECT.west, DOM_RECT.south, DOM_RECT.east, DOM_RECT.north],
   }
   const res = await apiClient.post<DiagnoseResult>(
     '/orange/trees/filter',
@@ -71,6 +74,14 @@ export async function queryTreesByFilter(params: TsomQueryParams): Promise<{ dat
  * 走后端 /orange/historical-trees：GeoScene FeatureServer 中 batch_id='historical_zone'
  * 的全量坐标 + 长势/施肥属性，用于在地图上铺设可拾取点。
  */
+/** 底图范围内可查询的果树总数（GeoScene returnCountOnly，果园态势驾驶舱用） */
+export function getTreeCountByBbox(bbox: [number, number, number, number]) {
+  return apiClient.get<{ count: number }>('/orange/trees/count', {
+    params: { bbox: bbox.join(',') },
+    timeout: 30000,
+  })
+}
+
 export async function getHistoricalTrees(): Promise<{ data: HistoricalTreesResponse }> {
   // GeoScene 全量查询较慢，覆盖默认 5s 超时
   const res = await apiClient.get<HistoricalTreesResponse>(

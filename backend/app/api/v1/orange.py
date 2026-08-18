@@ -85,10 +85,12 @@ def _health_label(index: float | None) -> str:
 
 
 class FilterQuerySchema(BaseModel):
-    """精确查询（全量果树，不按空间范围过滤）请求参数。"""
+    """精确查询（按健康状态过滤；可附加 bbox 限制到底图范围）请求参数。"""
     healthStatuses: Optional[List[str]] = None
     startDate: Optional[str] = None
     endDate: Optional[str] = None
+    # 可选：底图范围 [west, south, east, north]（WGS84），只查该包络内的树
+    bbox: Optional[List[float]] = None
 
 
 
@@ -161,20 +163,32 @@ async def spatial_diagnose(
     "/trees/filter",
     response_model=DiagnoseResultSchema,
     status_code=status.HTTP_200_OK,
-    summary="精确查询 — 全量果树按条件过滤（不限制空间范围）",
+    summary="精确查询 — 果树按健康状态过滤（可限制在底图范围内）",
 )
 async def filter_trees(payload: FilterQuerySchema):
     """
-    菜单"精细查询"：全量扫描 FeatureServer 中所有果树，按健康状态过滤。
-    品种/时间字段在 FeatureServer 中不存在，过滤不生效（返回全量）。
+    菜单"精细查询"：扫描 FeatureServer 中果树，按健康状态过滤。
+    前端可传 bbox（底图 DOM 范围）只查包络内的树；不传则全量。
+    品种/时间字段在 FeatureServer 中不存在，过滤不生效。
     """
     try:
-        features = GeoSceneService.query_features(
-            where="1=1",
-            limit=1000,
-            return_geometry=True,
-            timeout=90,
-        )
+        query_kwargs: dict = {
+            "where": "1=1",
+            "limit": 1000,
+            "return_geometry": True,
+            "timeout": 90,
+        }
+        # 附加底图范围限制：前端传 [west, south, east, north]（WGS84 包络），
+        # 只查 DOM 影像覆盖区域内的树，排除底图外的树。
+        if payload.bbox and len(payload.bbox) == 4:
+            west, south, east, north = payload.bbox
+            query_kwargs["geometry"] = {
+                "xmin": west, "ymin": south, "xmax": east, "ymax": north,
+                "spatialReference": {"wkid": 4326},
+            }
+            query_kwargs["geometry_type"] = "esriGeometryEnvelope"
+            query_kwargs["spatial_rel"] = "esriSpatialRelIntersects"
+        features = GeoSceneService.query_features(**query_kwargs)
     except GeoSceneError as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -206,6 +220,51 @@ async def filter_trees(payload: FilterQuerySchema):
         ),
         trees=trees,
     )
+
+
+@router.get(
+    "/trees/count",
+    status_code=status.HTTP_200_OK,
+    summary="底图范围内可查询的果树总数（FeatureServer returnCountOnly，轻量）",
+)
+async def count_trees(
+    bbox: str = Query(..., description="底图范围 [west,south,east,north]，逗号分隔 WGS84"),
+):
+    """果园态势果树总数：统计底图（DOM 影像）范围内可查询的树。"""
+    try:
+        parts = [float(x.strip()) for x in bbox.split(',')]
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="bbox 需为 4 个数字 [west,south,east,north]",
+        )
+    if len(parts) != 4:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="bbox 需为 4 个数字 [west,south,east,north]",
+        )
+
+    west, south, east, north = parts
+    geometry = {
+        "xmin": west, "ymin": south, "xmax": east, "ymax": north,
+        "spatialReference": {"wkid": 4326},
+    }
+    try:
+        count = GeoSceneService.count_features(
+            geometry=geometry,
+            geometry_type="esriGeometryEnvelope",
+            spatial_rel="esriSpatialRelIntersects",
+            where="1=1",
+            timeout=30,
+        )
+    except GeoSceneError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"GeoScene Server count failed: {e}",
+        )
+
+    return {"count": count}
+
 
 @router.get(
     "/historical-trees",

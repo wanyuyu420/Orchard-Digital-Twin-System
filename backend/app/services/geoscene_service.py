@@ -149,6 +149,51 @@ class GeoSceneService:
             raise GeoSceneError(f'GeoScene FeatureServer query failed: {e}')
 
     @classmethod
+    def count_features(
+        cls,
+        *,
+        geometry: dict | None = None,
+        geometry_type: str | None = None,
+        spatial_rel: str = 'esriSpatialRelIntersects',
+        where: str = '1=1',
+        timeout: int = 30,
+    ) -> int:
+        """只统计命中 FeatureServer 的特征数（returnCountOnly，不下载几何，轻量）。"""
+        settings = get_settings()
+        token = cls._get_token()
+
+        params: dict[str, Any] = {
+            'f': 'json',
+            'token': token,
+            'where': where,
+            'returnCountOnly': 'true',
+            'returnGeometry': 'false',
+        }
+
+        if geometry is not None:
+            params['geometry'] = json.dumps(geometry)
+            params['geometryType'] = geometry_type
+            params['spatialRel'] = spatial_rel
+            params['inSR'] = 4326
+
+        try:
+            resp = httpx.get(
+                f'{settings.geoscene_feature_server_url}/0/query',
+                params=params,
+                verify=False,
+                timeout=timeout,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if 'error' in data:
+                raise GeoSceneError(f"Count failed: {data['error']}")
+            return int(data.get('count', 0))
+        except GeoSceneError:
+            raise
+        except Exception as e:
+            raise GeoSceneError(f'GeoScene FeatureServer count failed: {e}')
+
+    @classmethod
     def query_stats(
         cls,
         *,

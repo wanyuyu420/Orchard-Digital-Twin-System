@@ -15,15 +15,14 @@
  *
  * Data source: 本机部署的果园 tiles(http://100.69.181.81:8765, CORS-enabled,
  * 内容与原 果园2.0 一致:dem.js/tileset.json md5 相同,树模型 batch table 字段一致)。
- * Both tilesets carry ECEF world transforms, so they land at the correct geographic
+ * The tileset carries an ECEF world transform, so it lands at the correct geographic
  * position (116.4973°E, 27.1322°N) automatically — no BIMAlignment placement needed.
  *
  *  - trees/tileset.json   253 per-tree detailed b3dm
- *  - orchard/tileset.json 246 orchard refined-model b3dm
  *
  * Also ports the 果园2.0 preview's click-to-inspect: drillPick the clicked
- * feature (tree first, then orchard model) and show a property card floating
- * above the crown, updated every frame to follow the camera.
+ * tree feature and show a property card floating above the crown, updated
+ * every frame to follow the camera.
  */
 import { ref, watch, onUnmounted } from 'vue'
 import { useCesiumStore } from '@/stores/cesium'
@@ -39,7 +38,6 @@ const DATA_BASE = 'http://100.69.181.81:8766'
 const isLoading = ref(false)
 let viewer: any = null
 let treesTileset: any = null
-let orchardTileset: any = null
 
 // ==================== 点击属性浮窗(移植自果园2.0 viewer.html) ====================
 const FIELD_UNIT: Record<string, string> = {
@@ -107,7 +105,7 @@ function setupClickHandler(): void {
       for (const p of picks) {
         if (p instanceof Cesium.Cesium3DTileFeature) {
           // 只拾取地1 自己的 tileset，跳过地2 的（避免与 UploadPlotLayer 弹窗打架）
-          if (p.tileset !== treesTileset && p.tileset !== orchardTileset) continue
+          if (p.tileset !== treesTileset) continue
           const ids = p.getPropertyIds ? p.getPropertyIds() : p.getPropertyNames()
           if (ids.indexOf('树木编号') >= 0) {
             picked = p
@@ -118,7 +116,7 @@ function setupClickHandler(): void {
       if (!picked) {
         for (const p of picks) {
           if (p instanceof Cesium.Cesium3DTileFeature) {
-            if (p.tileset !== treesTileset && p.tileset !== orchardTileset) continue
+            if (p.tileset !== treesTileset) continue
             picked = p
             break
           }
@@ -195,7 +193,7 @@ function setupClickHandler(): void {
 }
 
 // ==================== 瓦片加载 ====================
-// 树(trees)启动即加载;果园精模(orchard)懒加载,点击控制条才真正加载(1.8GB 数据)
+// 树(trees)启动即加载
 watch(
   () => cesiumStore.viewer,
   (v) => {
@@ -224,13 +222,6 @@ function reloadTrees(): void {
       treesTileset.destroy?.()
     } catch (e) { /* ignore */ }
     treesTileset = null
-  }
-  if (orchardTileset) {
-    try {
-      viewer.scene.primitives.remove(orchardTileset)
-      orchardTileset.destroy?.()
-    } catch (e) { /* ignore */ }
-    orchardTileset = null
   }
   isLoading.value = false
   loadTrees()
@@ -286,61 +277,6 @@ async function loadTrees() {
   }
 }
 
-/** 果园精模懒加载(独立于树)。仅当用户点"显示果园精模"才调用。 */
-async function loadOrchard() {
-  if (orchardTileset || !viewer) return
-
-  try {
-    const orchardTiles = await Cesium.Cesium3DTileset.fromUrl(`${DATA_BASE}/orchard/tileset.json`, {
-      maximumScreenSpaceError: 4,
-      cacheBytes: 4 * 1024 * 1024 * 1024,
-      maximumCacheOverflowBytes: 1024 * 1024 * 1024,
-    })
-    viewer.scene.primitives.add(orchardTiles)
-    orchardTileset = orchardTiles
-    ;(window as any).__orchardOrchardTileset = orchardTiles
-    orchardTiles.show = cesiumStore.orchardModelsVisible
-    cesiumStore.orchardModelsLoaded = true
-    console.log('[OrchardTilesetLayer] orchard tileset loaded (246 models)')
-  } catch (e) {
-    // 加载失败:回退显隐状态,让控制条按钮回到"显示果园精模"而非卡在"加载中…"
-    cesiumStore.orchardModelsVisible = false
-    console.error('[OrchardTilesetLayer] Failed to load orchard tileset:', e)
-  }
-}
-
-// ==================== 响应控制条状态(移植自 viewer.html 工具栏) ====================
-// 树透明度:通过 style color alpha 控制(与 viewer.html: color('white', alpha) 一致)
-watch(
-  () => cesiumStore.orchardTreeOpacity,
-  (a) => {
-    if (treesTileset) {
-      treesTileset.style = new Cesium.Cesium3DTileStyle({ color: `color('white', ${a})` })
-    }
-  }
-)
-
-// 树显隐
-watch(
-  () => cesiumStore.orchardTreesVisible,
-  (v) => {
-    if (treesTileset) treesTileset.show = v
-  }
-)
-
-// 果园精模显隐:首次显示触发懒加载
-watch(
-  () => cesiumStore.orchardModelsVisible,
-  (v) => {
-    if (v) {
-      if (!orchardTileset) loadOrchard()
-      else orchardTileset.show = true
-    } else if (orchardTileset) {
-      orchardTileset.show = false
-    }
-  }
-)
-
 onUnmounted(() => {
   if (viewer) {
     viewer.scene.postRender.removeEventListener(updatePropCardPos)
@@ -353,20 +289,16 @@ onUnmounted(() => {
     }
     clickHandler = null
   }
-  for (const t of [treesTileset, orchardTileset]) {
-    if (t && viewer) {
-      try {
-        viewer.scene.primitives.remove(t)
-        t.destroy()
-      } catch (e) {
-        /* ignore */
-      }
+  if (treesTileset && viewer) {
+    try {
+      viewer.scene.primitives.remove(treesTileset)
+      treesTileset.destroy()
+    } catch (e) {
+      /* ignore */
     }
   }
   treesTileset = null
-  orchardTileset = null
   delete (window as any).__orchardTreesTileset
-  delete (window as any).__orchardOrchardTileset
 })
 </script>
 

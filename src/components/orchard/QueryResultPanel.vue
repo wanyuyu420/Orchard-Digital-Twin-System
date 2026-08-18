@@ -74,9 +74,7 @@ function onPoiClick(poi: FruitTreePoi) {
 
 <style scoped lang="scss">
 .result-panel {
-  position: absolute;
-  right: 24px;
-  top: 80px;
+  position: relative;
   width: 460px;
   max-height: calc(100vh - 120px);
   z-index: $z-layer-6;

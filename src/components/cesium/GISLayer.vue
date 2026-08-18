@@ -753,10 +753,17 @@ function isAnalysisTool(toolType: string | null): boolean {
  */
 function featureToSidebarCoords(
 	feature: Feature,
-	type: 'rectangle' | 'circle' | 'polygon'
+	type: 'point' | 'line' | 'rectangle' | 'circle' | 'polygon'
 ): number[][] {
 	const f = feature as any
 	switch (type) {
+		case 'point': {
+			const p = f.position
+			return p ? [[p.longitude, p.latitude]] : []
+		}
+		case 'line': {
+			return (f.vertices || []).map((v: any) => [v.longitude, v.latitude])
+		}
 		case 'rectangle': {
 			const sw = f.southwest
 			const ne = f.northeast
@@ -823,8 +830,14 @@ function activateTool(toolType: DrawToolType) {
 				gisStore.addFeature(feature, graphic)
 
 				// Bridge to orchardStore for left sidebar layer display
-				const geomType = normalizedType.replace('draw-', '') as 'rectangle' | 'circle' | 'polygon'
-				if (['rectangle', 'circle', 'polygon'].includes(geomType)) {
+				// 点/线/圆/矩形/多边形均作为独立图层显示在左侧图层列表
+				const geomType = normalizedType.replace('draw-', '') as
+					| 'point'
+					| 'line'
+					| 'rectangle'
+					| 'circle'
+					| 'polygon'
+				if (['point', 'line', 'rectangle', 'circle', 'polygon'].includes(geomType)) {
 					const nextNum = orchardStore.drawnGeometries.length + 1
 					const layerName = `#${nextNum}`
 
@@ -838,15 +851,19 @@ function activateTool(toolType: DrawToolType) {
 						featureId: feature.id,
 					})
 
-					// 将绘制图形坐标同步到 selectionRange，供查询面板使用
-					orchardStore
-						.setSelectionRange({
-							type: geomType,
-							coordinates: coords,
-							// featureToSidebarCoords 把圆压成单中心点，这里透传半径供后端多边形构造
-							radius: geomType === 'circle' ? (feature as any).radius : undefined,
-						})
-						.catch(() => ElMessage.error('查询失败，请重试'))
+					// 仅面状选择范围（矩形/圆形/多边形）同步到 selectionRange 供查询面板使用，
+					// 点/线不参与 TSOM 空间查询
+					if (['rectangle', 'circle', 'polygon'].includes(geomType)) {
+						const shapeType = geomType as 'rectangle' | 'circle' | 'polygon'
+						orchardStore
+							.setSelectionRange({
+								type: shapeType,
+								coordinates: coords,
+								// featureToSidebarCoords 把圆压成单中心点，这里透传半径供后端多边形构造
+								radius: shapeType === 'circle' ? (feature as any).radius : undefined,
+							})
+							.catch(() => ElMessage.error('查询失败，请重试'))
+					}
 				}
 
 				// For MVP: Keep tool active for easier use (user can click away to deactivate)

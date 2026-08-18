@@ -12,7 +12,7 @@
 declare const Cesium: any
 
 // DOM 无人机影像覆盖范围(与 geotiffBasemap.ts / view.ts 一致,果园真实范围)
-const DOM_RECT = {
+export const DOM_RECT = {
   west: 116.4964871416,
   south: 27.1313509689,
   east: 116.4985926154,

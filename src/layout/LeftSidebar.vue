@@ -400,6 +400,8 @@ function onDeleteFile(file: UploadedFile) {
 
 function drawIcon(type: string): string {
   switch (type) {
+    case 'point': return 'fa-solid fa-location-dot'
+    case 'line': return 'fa-solid fa-minus'
     case 'rectangle': return 'fa-regular fa-square'
     case 'circle': return 'fa-regular fa-circle'
     case 'polygon': return 'fa-solid fa-draw-polygon'

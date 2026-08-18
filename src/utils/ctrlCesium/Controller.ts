@@ -232,7 +232,8 @@ class Controller {
     try {
       const options: any = {
         // Default view reset rectangle (China region)
-        defaultResetView: new Cesium.Rectangle.fromDegrees(80, 22, 130, 50),
+        // Cesium ≥1.87 中 Rectangle.fromDegrees 是静态工厂方法(非构造函数),不能加 new
+        defaultResetView: Cesium.Rectangle.fromDegrees(80, 22, 130, 50),
         enableCompass: true,
         enableZoomControls: true,
         enableDistanceLegend: true,

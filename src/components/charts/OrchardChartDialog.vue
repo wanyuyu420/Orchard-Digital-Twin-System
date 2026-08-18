@@ -97,11 +97,18 @@ const selectedMetric = ref<string>('canopyVolume')
 const isFirstLoading = ref(true)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
-const chartTabs = [
-  { key: 'bar' as ChartViewType, label: '柱状图', icon: 'fa-solid fa-chart-column' },
-  { key: 'pie' as ChartViewType, label: '饼状图', icon: 'fa-solid fa-chart-pie' },
-  { key: 'line' as ChartViewType, label: '折线图', icon: 'fa-solid fa-chart-line' },
-]
+// 折线图需要时间序列历史数据,底图单时点快照没有 → 无 trend 时隐藏该标签
+const chartTabs = computed<{ key: ChartViewType; label: string; icon: string }[]>(() => {
+  const hasTrend = orchardStore.chartData?.metrics?.some((m) => m.trend && m.trend.length)
+  const tabs = [
+    { key: 'bar' as ChartViewType, label: '柱状图', icon: 'fa-solid fa-chart-column' },
+    { key: 'pie' as ChartViewType, label: '饼状图', icon: 'fa-solid fa-chart-pie' },
+  ]
+  if (hasTrend) {
+    tabs.push({ key: 'line' as ChartViewType, label: '折线图', icon: 'fa-solid fa-chart-line' })
+  }
+  return tabs
+})
 
 const availableMetrics = computed<{ key: string; label: string }[]>(() => {
   if (!orchardStore.chartData?.metrics) return []
@@ -319,9 +326,7 @@ watch(
 
 <style scoped lang="scss">
 .chart-dialog {
-  position: absolute;
-  right: 24px;
-  top: 80px;
+  position: relative;
   width: 480px;
   max-height: calc(100vh - 120px);
   z-index: $z-layer-7;

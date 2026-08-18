@@ -20,6 +20,8 @@ import { useGISStore } from '@/stores/gis'
 import * as orchardApi from '@/api/orchard'
 import { growthIndexToHealth, normalizeToClosedRing } from '@/utils/spatial'
 import { countTilesetContent, computeAreaFromDem } from '@/utils/mapStats'
+import { DOM_RECT } from '@/utils/orchardPreview'
+import { buildChartFromLoadedTileset } from '@/utils/chartFromBasemap'
 
 export const useOrchardStore = defineStore('orchard', () => {
   // ---- 模块菜单 ----
@@ -67,21 +69,39 @@ export const useOrchardStore = defineStore('orchard', () => {
 
   /** 从底图刷新统计（trees 瓦片加载成功后调用）。DEM 异步加载，未就绪时最多重试数秒。 */
   async function refreshMapStats(dataBase: string): Promise<void> {
+    // 优先：底图范围内可查询的果树总数（后端 FeatureServer returnCountOnly，与精确查询口径一致）
+    let totalTrees = 0
     try {
-      const res = await fetch(`${dataBase}/trees/tileset.json`)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const tileset = await res.json()
-      const totalTrees = countTilesetContent(tileset)
-      let areaMu = computeAreaFromDem((window as any).DEM)
-      for (let i = 0; i < 12 && areaMu === 0; i++) {
-        await new Promise((r) => setTimeout(r, 500))
-        areaMu = computeAreaFromDem((window as any).DEM)
-      }
-      mapStats.value = { totalTrees, areaMu, ready: true }
-      console.log(`[mapStats] 底图统计: ${totalTrees} 棵树, ${areaMu.toFixed(1)} 亩`)
+      const res = await orchardApi.getTreeCountByBbox([
+        DOM_RECT.west,
+        DOM_RECT.south,
+        DOM_RECT.east,
+        DOM_RECT.north,
+      ])
+      totalTrees = res.data.count
     } catch (e) {
-      console.warn('[mapStats] 从底图读取统计失败:', e)
+      console.warn('[mapStats] 底图范围内计数失败,回退瓦片统计:', e)
     }
+
+    // 回退：后端不可用时从底图瓦片数树模型
+    if (!totalTrees) {
+      try {
+        const res = await fetch(`${dataBase}/trees/tileset.json`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const tileset = await res.json()
+        totalTrees = countTilesetContent(tileset)
+      } catch (e) {
+        console.warn('[mapStats] 从底图读取统计失败:', e)
+      }
+    }
+
+    let areaMu = computeAreaFromDem((window as any).DEM)
+    for (let i = 0; i < 12 && areaMu === 0; i++) {
+      await new Promise((r) => setTimeout(r, 500))
+      areaMu = computeAreaFromDem((window as any).DEM)
+    }
+    mapStats.value = { totalTrees, areaMu, ready: true }
+    console.log(`[mapStats] 底图统计: ${totalTrees} 棵树, ${areaMu.toFixed(1)} 亩`)
   }
 
   // ---- 历史老树（开屏拾取点） ----
@@ -141,7 +161,7 @@ export const useOrchardStore = defineStore('orchard', () => {
   interface DrawnGeometry {
     id: string
     name: string
-    type: 'rectangle' | 'circle' | 'polygon'
+    type: 'point' | 'line' | 'rectangle' | 'circle' | 'polygon'
     coordinates: any
     /** Cesium 地图上的 feature ID，删除图层时同步移除地图图形 */
     featureId?: string
@@ -688,8 +708,27 @@ export const useOrchardStore = defineStore('orchard', () => {
     chartLoading.value = true
     chartError.value = null
     try {
-      const res = await orchardApi.getChartStatistics()
-      chartData.value = res.data as ChartStatistics
+      // 优先从底图读取(遍历已加载的 trees 瓦片,读每棵树 batch table 属性统计)
+      let data: ChartStatistics | null = null
+      try {
+        data = buildChartFromLoadedTileset()
+        if (data) {
+          console.log(
+            `[orchardStore] 图表数据来自底图: ${data.metrics.length} 个指标, 时间 ${data.timestamp}`,
+          )
+        } else {
+          console.warn('[orchardStore] 底图瓦片未就绪,回退后端接口')
+        }
+      } catch (e) {
+        console.warn('[orchardStore] 底图读图失败,回退后端接口:', e)
+      }
+
+      // 底图不可用才走后端接口
+      if (!data) {
+        const res = await orchardApi.getChartStatistics()
+        data = res.data as ChartStatistics
+      }
+      chartData.value = data
     } catch (err: any) {
       chartError.value = err?.message || '获取图表数据失败'
       console.error('[orchardStore] fetchChartData failed:', err)
