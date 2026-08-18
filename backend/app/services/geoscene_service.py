@@ -200,11 +200,13 @@ class GeoSceneService:
         geometry: dict,
         geometry_type: str = 'esriGeometryPolygon',
         spatial_rel: str = 'esriSpatialRelContains',
+        where: str = '1=1',
     ) -> dict:
         features = cls.query_features(
             geometry=geometry,
             geometry_type=geometry_type,
             spatial_rel=spatial_rel,
+            where=where,
             out_fields='*',
             limit=1000,
             return_geometry=False,

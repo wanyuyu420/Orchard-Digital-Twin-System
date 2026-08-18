@@ -30,6 +30,7 @@
     "geotiff": "^3.0.5",
     "leaflet": "^1.9.4",
     "lodash-es": "^4.17.21",
+    "openai": "^7.5.0",
     "pinia": "^2.1.7",
     "proj4": "^2.20.8",
     "vite-plugin-external": "^6.2.2",

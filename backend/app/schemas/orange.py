@@ -24,6 +24,7 @@ class SpatialQuerySchema(BaseModel):
         ],
         description="首尾相连的闭合经纬度多边形顶点数组，格式为 [[Lng, Lat], ...]"
     )
+    batch_id: Optional[str] = Field(None, description="可选批次标签过滤（如 historical_zone / orange_tree），不传则查全量")
 
     @model_validator(mode="after")
     def _check_closed(self) -> Self:
