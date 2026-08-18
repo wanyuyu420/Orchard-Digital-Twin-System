@@ -271,10 +271,13 @@ export const useOrchardStore = defineStore('orchard', () => {
   function setSelectionRange(range: NonNullable<typeof selectionRange.value>) {
     selectionRange.value = range
     // 选定范围后默认触发TSOM查询
+    // 地2（上传地块）激活时传 batch_id='orange_tree'，地1 不传（查 historical_zone 为主）
+    const batchId = activePlotTaskId.value ? 'orange_tree' : undefined
     const params: TsomQueryParams = {
       rangeType: range.type,
       coordinates: range.coordinates,
       radius: range.radius,
+      batchId,
     }
     return executeTsomQuery(params)
   }

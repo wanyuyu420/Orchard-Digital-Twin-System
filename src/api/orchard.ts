@@ -29,13 +29,15 @@ export function getFruitTreeById(id: string) {
  */
 export async function queryTsom(params: TsomQueryParams): Promise<{ data: TsomQueryResult }> {
   // 空间查询必须带范围，调用方 setSelectionRange 始终提供 rangeType/coordinates
-  const payload = {
+  const payload: any = {
     coordinates: normalizeToClosedRing({
       type: params.rangeType!,
       coordinates: params.coordinates!,
       radius: params.radius,
     }),
   }
+  // 按批次过滤（地1='historical_zone'，地2='orange_tree'），不传则查全量
+  if (params.batchId) payload.batch_id = params.batchId
   // GeoScene FeatureServer 空间查询较慢，覆盖默认 5s 超时
   const res = await apiClient.post<DiagnoseResult>(
     '/orange/spatial-diagnose',

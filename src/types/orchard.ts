@@ -33,6 +33,8 @@ export interface TsomQueryParams {
   endDate?: string
   /** 健康状态筛选 */
   healthStatuses?: string[]
+  /** 批次过滤：地1='historical_zone'，地2='orange_tree'，不传则查全量 */
+  batchId?: string
 }
 
 /** TSOM查询结果 */

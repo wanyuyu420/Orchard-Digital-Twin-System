@@ -127,12 +127,16 @@ async def spatial_diagnose(
 
     geometry = {"rings": [ring], "spatialReference": {"wkid": 4326}}
 
+    # 按批次过滤，不传则查全量（后向兼容地1 旧前端）
+    where = f"batch_id='{payload.batch_id}'" if payload.batch_id else "1=1"
+
     try:
-        stats = GeoSceneService.query_stats(geometry=geometry)
+        stats = GeoSceneService.query_stats(geometry=geometry, where=where)
         features = GeoSceneService.query_features(
             geometry=geometry,
             geometry_type="esriGeometryPolygon",
             spatial_rel="esriSpatialRelContains",
+            where=where,
             out_sr=4326,
             limit=2000,
             return_geometry=True,
