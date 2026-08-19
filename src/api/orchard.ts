@@ -38,11 +38,13 @@ export async function queryTsom(params: TsomQueryParams): Promise<{ data: TsomQu
   }
   // 按批次过滤（地1='historical_zone'，地2='orange_tree'），不传则查全量
   if (params.batchId) payload.batch_id = params.batchId
-  // GeoScene FeatureServer 空间查询较慢，覆盖默认 5s 超时
+  // GeoScene FeatureServer 空间查询较慢，覆盖默认 5s 超时。
+  // 后端 spatial-diagnose 串行跑两次空间查询（query_stats + query_features），
+  // 冷缓存/慢查询时单次可达 12s+，30s 不够 → 放宽到 90s
   const res = await apiClient.post<DiagnoseResult>(
     '/orange/spatial-diagnose',
     payload,
-    { timeout: 30000 },
+    { timeout: 90000 },
   )
   return { data: mapDiagnoseToTsomResult(params, res.data) }
 }
@@ -80,7 +82,8 @@ export async function queryTreesByFilter(params: TsomQueryParams): Promise<{ dat
 export function getTreeCountByBbox(bbox: [number, number, number, number]) {
   return apiClient.get<{ count: number }>('/orange/trees/count', {
     params: { bbox: bbox.join(',') },
-    timeout: 30000,
+    // GeoScene 冷缓存 count 单次可达 12s+，30s 不够 → 放宽到 60s
+    timeout: 60000,
   })
 }
 

@@ -7,16 +7,14 @@
 import { onMounted, onUnmounted, computed, watch } from 'vue'
 import { useCesiumStore } from '@/stores/cesium'
 import { useAppStore } from '@/stores/app'
-import { useOrchardStore } from '@/stores/orchard'
 import { GController } from '@/utils/ctrlCesium/Controller'
 import { getBaseMapConfig, getBaseMapImageryList } from '@/mock/baseMapData'
-import { setupOrchardPreviewBasemap, applyDemTerrain } from '@/utils/orchardPreview'
+import { setupOrchardPreviewBasemap } from '@/utils/orchardPreview'
 
 declare const Cesium: any
 
 const cesiumStore = useCesiumStore()
 const appStore = useAppStore()
-const orchardStore = useOrchardStore()
 
 const viewMode = computed(() => appStore.viewMode)
 
@@ -65,19 +63,6 @@ onMounted(async () => {
 		}
 	)
 
-	// 监听"显示原地块"开关（plot1Visible）：
-	//  on → 恢复地1 DOM 影像显隐 + 恢复地1 DEM 地形（地2 叠加仍在，只是地形切回地1 基准）
-	//  off → 由 UploadPlotLayer 切到地2 的 DEM 地形，这里只隐藏 DOM1
-	watch(
-		() => orchardStore.plot1Visible,
-		(v) => {
-			const dom1 = (window as any).__dom1Layer
-			if (dom1) dom1.show = !!v
-			if (v && cesiumStore.viewer) {
-				applyDemTerrain(cesiumStore.viewer)
-			}
-		}
-	)
 })
 
 onUnmounted(() => {

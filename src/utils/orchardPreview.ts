@@ -48,8 +48,7 @@ function addGaodeImagery(viewer: any): void {
 
 /**
  * DOM 无人机 1.4cm 正射影像:果园范围内,优先于高德底图。
- * 幂等（重复调用先移除旧的），并把图层引用挂到 window.__dom1Layer，
- * 供"显示原地块"开关（plot1Visible）控制显隐。
+ * 幂等（重复调用先移除旧的），并把图层引用挂到 window.__dom1Layer。
  */
 function addDomImagery(viewer: any): any {
   findImageryByUrl(viewer, '/dom/').forEach((l) => viewer.imageryLayers.remove(l))
@@ -73,12 +72,8 @@ function addDomImagery(viewer: any): any {
   return layer
 }
 
-/** 双线性插值高程(与 viewer.html demHeight 一致) */
-function demHeight(lonDeg: number, latDeg: number): number {
-  const D = (window as any).DEM
-  if (!D || lonDeg < D.minLon || lonDeg > D.maxLon || latDeg < D.minLat || latDeg > D.maxLat) {
-    return D ? D.zMin - 2 : 0 // 范围外略低,避免边缘翘起穿模
-  }
+/** 对单个 DEM 数据集(D 含 minLon/maxLon/minLat/maxLat/nx/ny/data)做双线性插值(与 viewer.html demHeight 一致) */
+function interpolateDem(D: any, lonDeg: number, latDeg: number): number {
   const fx = ((lonDeg - D.minLon) / (D.maxLon - D.minLon)) * (D.nx - 1)
   const fy = ((latDeg - D.minLat) / (D.maxLat - D.minLat)) * (D.ny - 1)
   const x0 = Math.floor(fx)
@@ -94,6 +89,28 @@ function demHeight(lonDeg: number, latDeg: number): number {
   const z01 = d[y1 * nx + x0]
   const z11 = d[y1 * nx + x1]
   return (z00 * (1 - tx) + z10 * tx) * (1 - ty) + (z01 * (1 - tx) + z11 * tx) * ty
+}
+
+/**
+ * 双线性插值高程：地2 区域优先 DEM2(上传地块高程)，其余走地1 DEM1。
+ * 地1 与地2 恒共存后 Cesium 只有一个 terrainProvider，合并地形按经纬度分派两个 DEM。
+ */
+function demHeight(lonDeg: number, latDeg: number): number {
+  const D2 = (window as any).DEM2
+  if (
+    D2 &&
+    lonDeg >= D2.minLon &&
+    lonDeg <= D2.maxLon &&
+    latDeg >= D2.minLat &&
+    latDeg <= D2.maxLat
+  ) {
+    return interpolateDem(D2, lonDeg, latDeg)
+  }
+  const D = (window as any).DEM
+  if (!D || lonDeg < D.minLon || lonDeg > D.maxLon || latDeg < D.minLat || latDeg > D.maxLat) {
+    return D ? D.zMin - 2 : 0 // 范围外略低,避免边缘翘起穿模
+  }
+  return interpolateDem(D, lonDeg, latDeg)
 }
 
 /** 自定义 TerrainProvider(移植自 viewer.html) */
@@ -194,6 +211,45 @@ export async function applyDemTerrain(viewer: any): Promise<boolean> {
     return true
   } catch (e) {
     console.warn('[DEM] 设置地形失败:', e)
+    return false
+  }
+}
+
+/**
+ * 加载地2 dem2.js 到 window.DEM2，并把地形重建为「地1 区域 DEM1 + 地2 区域 DEM2」的合并地形。
+ *
+ * 地1 与地2 恒共存后 Cesium 只有一个 terrainProvider，不能再"切换"地形。demHeight 已按
+ * 经纬度分派（地2 范围读 window.DEM2，其余走 window.DEM），因此加载 DEM2 后只需重建一个
+ * provider 实例，两区域即各有正确地表起伏（地2 3D Tiles 只有树模型、无地表 mesh，地表全靠
+ * 此 DEM 提供，若缺失则地2 区域会平铺成地1 的外围高度）。
+ *
+ * @returns 合并地形是否成功启用
+ */
+export async function applyPlotDem2Terrain(viewer: any): Promise<boolean> {
+  if (!viewer) return false
+  if (!(window as any).DEM2) {
+    try {
+      const res = await fetch(`${DOM_BASE}/dem2.js`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const code = await res.text()
+      // dem2.js 内容是 window.DEM=...，替换成 window.DEM2，避免覆盖地1 的 window.DEM
+      const code2 = code.replace(/window\.DEM\s*=/g, 'window.DEM2 =')
+      new Function(code2)()
+      if (!(window as any).DEM2) throw new Error('dem2.js 未定义 window.DEM2')
+    } catch (e) {
+      console.warn('[DEM] 加载地2 dem2.js 失败，地2 区域保持地1 高程:', e)
+      return false
+    }
+  }
+  try {
+    // 强制重建 provider 实例：Cesium 的 terrainProvider setter 有引用相等检查，
+    // 赋同一个实例不会触发瓦片重建，必须换新实例让瓦片用合并后的 demHeight 重新生成。
+    cachedDemProvider = new DemTerrainProvider()
+    viewer.scene.terrainProvider = cachedDemProvider
+    console.log('[DEM] 已重建合并地形（地1 DEM1 + 地2 DEM2 共存）')
+    return true
+  } catch (e) {
+    console.warn('[DEM] 设置合并地形失败:', e)
     return false
   }
 }

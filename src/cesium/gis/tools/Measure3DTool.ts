@@ -611,11 +611,17 @@ export class Measure3DTool extends BaseTool {
       result.endPoint.position,
       new Cesium.Cartesian3()
     )
-    gisStore.addAnalysisResult({
+    const resultId = gisStore.addAnalysisResult({
       type: 'measure3d',
       name: `3D测量 #${gisStore.analysisResults.length + 1}`,
       data: result,
       position: midPoint,
+    })
+    // 给本次创建的结果实体（测量线 + 起终点标记）打上分析结果 ID 标签，
+    // 删除该结果时 store 据此把实体从地图上同步移除。
+    // 只标本次的实体，不遍历 this.resultEntities（它是跨多次分析的累积数组）
+    ;[mainLine, startMarker, endMarker].forEach((e) => {
+      ;(e as any).analysisResultId = resultId
     })
   }
 

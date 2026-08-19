@@ -19,7 +19,7 @@ import type {
 import { useGISStore } from '@/stores/gis'
 import * as orchardApi from '@/api/orchard'
 import { growthIndexToHealth, normalizeToClosedRing } from '@/utils/spatial'
-import { countTilesetContent, computeAreaFromDem, computeAreaFromRect } from '@/utils/mapStats'
+import { countTilesetContent, computeAreaFromDem } from '@/utils/mapStats'
 import { DOM_RECT } from '@/utils/orchardPreview'
 import { buildChartFromLoadedTileset } from '@/utils/chartFromBasemap'
 
@@ -67,9 +67,7 @@ export const useOrchardStore = defineStore('orchard', () => {
     ready: false,
   })
 
-  /**
-   * 地1 数据源（OrchardTilesetLayer 加载时写入），供"显示原地块"开关恢复统计时复用。
-   */
+  /** 地1 数据源（OrchardTilesetLayer 加载时写入），供驾驶舱统计回退时复用。 */
   const plot1DataBase = ref('')
 
   /** 从底图刷新统计（trees 瓦片加载成功后调用）。DEM 异步加载，未就绪时最多重试数秒。 */
@@ -105,8 +103,6 @@ export const useOrchardStore = defineStore('orchard', () => {
       await new Promise((r) => setTimeout(r, 500))
       areaMu = computeAreaFromDem((window as any).DEM)
     }
-    // 若用户已切到地2（隐藏了原地块），不覆盖地2 的驾驶舱统计
-    if (!plot1Visible.value) return
     mapStats.value = { totalTrees, areaMu, ready: true }
     console.log(`[mapStats] 底图统计: ${totalTrees} 棵树, ${areaMu.toFixed(1)} 亩`)
   }
@@ -114,7 +110,7 @@ export const useOrchardStore = defineStore('orchard', () => {
   // ---- 历史老树（开屏拾取点） ----
   const historicalTreesLoading = ref(false)
   const historicalTreePois = ref<FruitTreePoi[]>([])
-  const historicalTreesVisible = ref(true)
+  const historicalTreesVisible = ref(false) // 历史老树点默认隐藏（用户确认），避免与地2 树点混淆
 
   // ---- 选择范围 ----
   const selectionRange = ref<{
@@ -222,6 +218,20 @@ export const useOrchardStore = defineStore('orchard', () => {
     showDetailPanel.value = false
     queryLevel.value = 'menu'
     // 不清理 selectedPoiDetail，切回来还能看
+  }
+
+  /**
+   * 关闭搜索界面并清空查询结果。
+   * 与仅隐藏面板的 closeAllPanels 不同：关闭搜索面板时同时清空 tsomQueryResult，
+   * 触发 OrchardMainLayout 的标记 watch → clearTreeMarkers()，地图上的搜索树点随之消失。
+   * 注意：不清 selectionRange——底图上的框选是用户手画的，施肥方案/处方图要复用，
+   * 关搜索界面不该把框选数据一起抹掉（清框选走 PoiDrawToolbar 的🗑️清除按钮）。
+   * 互斥切换（开图层管理/图表时自动关闭查询）仍走 closeAllPanels，不清结果，可回看。
+   */
+  function closeSearchPanels() {
+    closeAllPanels()
+    selectedPois.value = []
+    tsomQueryResult.value = null
   }
 
   function goBackQueryLevel() {
@@ -608,8 +618,6 @@ export const useOrchardStore = defineStore('orchard', () => {
   // ---- 上传地块任务（地2 切换，与地1 共存叠加） ----
   const plotTasks = ref<UploadPlotTask[]>([])
   const activePlotTaskId = ref<string | null>(null)
-  /** 是否显示原地块（地1）。true = 原地块与上传地块（地2）共存叠加；false = 已选择隐藏原地块，只显示地2 且驾驶舱统计切到地2 */
-  const plot1Visible = ref(true)
 
   const activePlotTask = computed(() =>
     plotTasks.value.find((t) => t.id === activePlotTaskId.value) ?? null,
@@ -618,63 +626,8 @@ export const useOrchardStore = defineStore('orchard', () => {
   const POLL_INTERVAL_MS = 2000
 
   function removePlotTask(id: string) {
-    const wasActive = activePlotTaskId.value === id
-    const wasHidingPlot1 = !plot1Visible.value
     plotTasks.value = plotTasks.value.filter((t) => t.id !== id)
     if (activePlotTaskId.value === id) activePlotTaskId.value = null
-    // 删除的正是当前显示的地2 且地1 被隐藏 → 恢复显示地1
-    if (wasActive && wasHidingPlot1) {
-      plot1Visible.value = true
-      refreshMapStats()
-    }
-  }
-
-  /**
-   * 驾驶舱统计切到上传地块（地2）：每次切换都重新读取地块底图数据。
-   * 果树总数 = 地块范围内检测到的树数（重新调后端推理结果，地2 树不在 GeoScene，故不能走 bbox 查询）；
-   * 种植面积 = 地块包络矩形面积（与地1 DEM 面积同公式）。读取失败时回退本地任务缓存。
-   */
-  async function applyPlotStats(task: UploadPlotTask): Promise<void> {
-    let totalTrees = task.totalTrees || task.freshTrees?.length || 0
-    if (task.taskId) {
-      try {
-        const res = await orchardApi.getInterpretTask(task.taskId)
-        if (res.status === 'completed') {
-          totalTrees = res.total_trees
-        }
-      } catch (e) {
-        console.warn('[mapStats] 地2 重新读取失败，回退任务缓存:', e)
-      }
-    }
-    const areaMu = task.domRect ? computeAreaFromRect(task.domRect) : 0
-    // 等待期间用户已切回地1 → 不覆盖地1 统计（与 refreshMapStats 的守卫对称）
-    if (plot1Visible.value) return
-    mapStats.value = { totalTrees, areaMu, ready: true }
-    console.log(`[mapStats] 上传地块统计(地2): ${totalTrees} 棵树, ${areaMu.toFixed(1)} 亩`)
-  }
-
-  /**
-   * 侧边栏"显示原地块"开关：
-   *  on → 显示地1（地2 叠加保留），统计回地1；
-   *  off → 隐藏地1（地2 仍保留），统计切到地2；未加载地2 时自动加载第一个已完成任务。
-   * 地1 各图层的显隐由 CesiumViewer / OrchardTilesetLayer 监听 plot1Visible 处理。
-   */
-  function setPlot1Visible(v: boolean): void {
-    if (v) {
-      plot1Visible.value = true
-      refreshMapStats()
-      return
-    }
-    // 隐藏地1 → 确保地2 已加载（无激活任务则加载第一个已完成）
-    const active = activePlotTask.value
-    if (!active || active.status !== 'completed') {
-      const completed = plotTasks.value.filter((t) => t.status === 'completed')
-      if (completed.length === 0) return
-      loadPlot(completed[0].id)
-    }
-    plot1Visible.value = false
-    const cur = activePlotTask.value
-    if (cur && cur.status === 'completed') applyPlotStats(cur)
   }
 
   /** 上传 TIF 并启动后台分割 + 轮询（异步，不阻塞主界面） */
@@ -758,15 +711,11 @@ export const useOrchardStore = defineStore('orchard', () => {
     }, POLL_INTERVAL_MS)
   }
 
-  /**
-   * 点击"已完成"任务卡片 / 双击跳转 → 加载或叠加显示地2。
-   * 与"显示原地块"开关解耦：不改变 plot1Visible；仅当地1 已被隐藏时同步统计为该地块。
-   */
+  /** 点击"已完成"任务卡片 / 双击跳转 → 加载或叠加显示地2（与地1 恒共存）。 */
   function loadPlot(taskId: string) {
     const task = plotTasks.value.find((t) => t.id === taskId)
     if (!task || task.status !== 'completed') return
     activePlotTaskId.value = taskId
-    if (!plot1Visible.value) applyPlotStats(task)
   }
 
   // ---- 冠层图表统计 ----
@@ -897,8 +846,6 @@ export const useOrchardStore = defineStore('orchard', () => {
     plotTasks,
     activePlotTaskId,
     activePlotTask,
-    plot1Visible,
-    setPlot1Visible,
     plot1DataBase,
     removePlotTask,
     uploadTifAndInterpret,
@@ -916,6 +863,7 @@ export const useOrchardStore = defineStore('orchard', () => {
     openResultPanel,
     openDetailPanel,
     closeAllPanels,
+    closeSearchPanels,
     goBackQueryLevel,
     executeTsomQuery,
     executeFilterQuery,

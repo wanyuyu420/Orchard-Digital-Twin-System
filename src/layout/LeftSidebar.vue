@@ -113,15 +113,6 @@
         <div class="section" v-if="completedPlotTasks.length > 0">
           <div class="section-title">
             上传地块
-            <!-- 隐藏/显示原地块（地1）：关 = 隐藏地1 并加载地2，驾驶舱统计切到地块 -->
-            <label class="plot1-toggle" title="隐藏/显示原地块">
-              <span>显示原地块</span>
-              <el-switch
-                :model-value="orchardStore.plot1Visible"
-                size="small"
-                @change="onPlot1Toggle"
-              />
-            </label>
           </div>
           <div
             v-for="task in completedPlotTasks"
@@ -394,11 +385,6 @@ function onPlotLayerClick(task: UploadPlotTask) {
   orchardStore.loadPlot(task.id)
 }
 
-/** "显示原地块"开关：on = 回地1，off = 隐藏地1 并加载地2 */
-function onPlot1Toggle(v: string | number | boolean) {
-  orchardStore.setPlot1Visible(Boolean(v))
-}
-
 function onDeletePlotTask(task: UploadPlotTask) {
   orchardStore.removePlotTask(task.id)
 }
@@ -649,20 +635,6 @@ function zoomToGeometry(geo: any) {
     }
   }
 
-  .plot1-toggle {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    font-weight: 500;
-    color: $text-sub;
-    text-transform: none;
-    letter-spacing: 0;
-    white-space: nowrap;
-    cursor: pointer;
-    user-select: none;
-  }
 }
 
 .layer-item,

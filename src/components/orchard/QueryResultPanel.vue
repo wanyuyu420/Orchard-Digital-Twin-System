@@ -12,7 +12,7 @@
             {{ orchardStore.tsomQueryResult.totalTrees }} 棵果树
           </span>
         </div>
-        <button class="close-btn" @click="orchardStore.closeAllPanels">
+        <button class="close-btn" @click="orchardStore.closeSearchPanels">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>

@@ -386,11 +386,17 @@ export class VolumeTool extends BaseTool {
     // 添加分析结果到store（面板式管理）
     const gisStore = useGISStore()
     const centroid = this.calculateCentroid(result.positions)
-    gisStore.addAnalysisResult({
+    const resultId = gisStore.addAnalysisResult({
       type: 'volume',
       name: `方量分析 #${gisStore.analysisResults.length + 1}`,
       data: result,
       position: centroid,
+    })
+    // 给本次创建的结果实体（分析面 + 底面）打上分析结果 ID 标签，
+    // 删除该结果时 store 据此把实体从地图上同步移除。
+    // 只标本次的实体，不遍历 this.resultEntities（它是跨多次分析的累积数组）
+    ;[analysisPolygon, basePolygon].forEach((e) => {
+      ;(e as any).analysisResultId = resultId
     })
   }
 

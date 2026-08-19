@@ -1307,6 +1307,8 @@ async function onDeleteLayer(layer: GISLayer) {
  * Toggle draw/analysis tool
  */
 function toggleDrawTool(toolId: GISToolType) {
+	// 图层管理发起的绘制不触发 TSOM 查询（右上角 POI 工具栏才会置位 queryOnDrawComplete）
+	gisStore.queryOnDrawComplete = false
 	if (gisStore.toolType === toolId) {
 		gisStore.setTool(null) // Deactivate if clicking same tool
 	} else {

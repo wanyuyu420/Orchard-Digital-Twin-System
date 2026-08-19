@@ -17,17 +17,16 @@
  *  2. 叠加加载地2：DOM2 瓦片 + 3D Tiles，高德底图已存在时不重复叠加；
  *  3. 用 GeoAI 分割结果（freshTrees，带经纬度+生长字段）画点标记，点击弹窗显示字段。
  *
- * 显隐控制："显示原地块"开关（orchardStore.plot1Visible）只控制地1 各图层显隐
- * （由 CesiumViewer / OrchardTilesetLayer 处理），地2 始终保留；
- * 地形跟随开关：显示地1 → DEM1，隐藏地1 → DEM2。
+ * 显隐控制：地1 与地2 恒共存显示（已移除"显示原地块"开关）。地形为合并 DEM：
+ * 地1 区域走 DEM1、地2 区域并入 DEM2（applyPlotDem2Terrain），两区域各有正确地表。
  */
 import { ref, watch, onUnmounted } from 'vue'
 import { useCesiumStore } from '@/stores/cesium'
 import { useOrchardStore } from '@/stores/orchard'
+import { applyPlotDem2Terrain } from '@/utils/orchardPreview'
 import {
   UPLOAD_PLOT_TILESETS,
   UPLOAD_PLOT_DOM,
-  UPLOAD_PLOT_DEM,
   GAODE_IMAGERY_URL,
 } from '@/config/uploadPlot'
 import type { FreshTree, UploadPlotTask } from '@/types/orchard'
@@ -44,8 +43,6 @@ let plotTreesTileset: any = null
 let dom2Layer: any = null
 let treeEntities: any[] = []
 let clickHandler: any = null
-/** 复用的地2 DEM Provider 实例（避免重复设置时瓦片重载闪烁） */
-let cachedPlotDemProvider: any = null
 
 // 属性浮窗
 const propCardRef = ref<HTMLElement | null>(null)
@@ -83,16 +80,6 @@ watch(
   { immediate: true },
 )
 
-// 隐藏地1（开关 off）→ 切到地2 的 DEM 地形贴合地块高程；显示地1 时由 CesiumViewer 恢复 DEM1
-watch(
-  () => orchardStore.plot1Visible,
-  (v) => {
-    if (!v && loadedPlot && cesiumStore.viewer) {
-      setupPlotDemTerrain(cesiumStore.viewer)
-    }
-  },
-)
-
 async function loadPlot(task: UploadPlotTask) {
   const viewer = cesiumStore.viewer
   if (!viewer || isLoading.value) return
@@ -102,8 +89,8 @@ async function loadPlot(task: UploadPlotTask) {
     disposePlot2(viewer)
     addGaodeImagery(viewer)
     dom2Layer = addPlotDomImagery(viewer, task.domRect)
-    // 地形跟随开关：地1 显示中保持 DEM1，地1 已隐藏才切 DEM2
-    if (!orchardStore.plot1Visible) await setupPlotDemTerrain(viewer)
+    // 地2 区域并入 DEM2 地形（与地1 的 DEM1 合并共存），树点/模型才贴地
+    await applyPlotDem2Terrain(viewer)
     await loadPlotTileset(viewer)
     renderTreeMarkers(viewer, task.freshTrees)
     flyToPlot(viewer, task)
@@ -176,123 +163,15 @@ function addPlotDomImagery(
   )
 }
 
-/** 地2 DEM 高程插值（仿地1 demHeight，读取 window.DEM2，范围外略低避免穿模） */
-function plotDemHeight(lonDeg: number, latDeg: number): number {
-  const D = (window as any).DEM2
-  if (!D || lonDeg < D.minLon || lonDeg > D.maxLon || latDeg < D.minLat || latDeg > D.maxLat) {
-    return D ? D.zMin - 2 : 0
-  }
-  const fx = ((lonDeg - D.minLon) / (D.maxLon - D.minLon)) * (D.nx - 1)
-  const fy = ((latDeg - D.minLat) / (D.maxLat - D.minLat)) * (D.ny - 1)
-  const x0 = Math.floor(fx)
-  const y0 = Math.floor(fy)
-  const x1 = Math.min(x0 + 1, D.nx - 1)
-  const y1 = Math.min(y0 + 1, D.ny - 1)
-  const tx = fx - x0
-  const ty = fy - y0
-  const d = D.data
-  const nx = D.nx
-  const z00 = d[y0 * nx + x0]
-  const z10 = d[y0 * nx + x1]
-  const z01 = d[y1 * nx + x0]
-  const z11 = d[y1 * nx + x1]
-  return (z00 * (1 - tx) + z10 * tx) * (1 - ty) + (z01 * (1 - tx) + z11 * tx) * ty
-}
-
-/** 地2 DEM 地形 Provider（模块级复用，避免重复设置时瓦片重载闪烁） */
-class PlotDemTerrainProvider {
-  errorEvent: any
-  credit: any
-  hasWaterMask = false
-  hasVertexNormals = false
-  private _tilingScheme = new Cesium.GeographicTilingScheme()
-  private _w = 65
-  private _h = 65
-  private _levelZeroGeometricError: number
-  /** heightmap 瓦片缓存：地形 Provider 互换时 Cesium 会整盘重建可见瓦片，按瓦片坐标缓存可复用插值结果 */
-  private _tileCache = new Map<string, any>()
-
-  constructor() {
-    this._levelZeroGeometricError =
-      Cesium.TerrainProvider.getEstimatedLevelZeroGeometricErrorForAHeightmap(
-        this._tilingScheme.ellipsoid,
-        this._w,
-        this._tilingScheme.getNumberOfXTilesAtLevel(0),
-      )
-  }
-
-  get tilingScheme(): any {
-    return this._tilingScheme
-  }
-
-  requestTileGeometry(x: number, y: number, level: number): any {
-    const key = `${level}/${x}/${y}`
-    const hit = this._tileCache.get(key)
-    if (hit) return hit
-    const rect = this._tilingScheme.tileXYToRectangle(x, y, level)
-    const w = this._w
-    const h = this._h
-    const buf = new Float32Array(w * h)
-    for (let j = 0; j < h; j++) {
-      const lat = Cesium.Math.toDegrees(rect.north - ((rect.north - rect.south) * j) / (h - 1))
-      for (let i = 0; i < w; i++) {
-        const lon = Cesium.Math.toDegrees(rect.west + ((rect.east - rect.west) * i) / (w - 1))
-        buf[j * w + i] = plotDemHeight(lon, lat)
-      }
-    }
-    const data = new Cesium.HeightmapTerrainData({ buffer: buf, width: w, height: h })
-    // 有界缓存，超限整体清空（实际可见瓦片仅几十~几百，2000 足够；每次互换都重写同一批 key）
-    if (this._tileCache.size >= 2000) this._tileCache.clear()
-    this._tileCache.set(key, data)
-    return data
-  }
-
-  getLevelMaximumGeometricError(level: number): number {
-    return this._levelZeroGeometricError / (1 << level)
-  }
-
-  getTileDataAvailable(): boolean {
-    return true
-  }
-}
-
-/**
- * 应用地2 DEM 地形（幂等，可复用）：确保 dem2.js 已加载到 window.DEM2 后，
- * 用缓存的 PlotDemTerrainProvider 覆盖地形（保持 DEM 基准，绝不回退到扁平椭球，地2 树根贴地）。
- */
-async function setupPlotDemTerrain(viewer: any): Promise<void> {
-  if (!(window as any).DEM2) {
-    try {
-      const res = await fetch(UPLOAD_PLOT_DEM)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const code = await res.text()
-      // dem2.js 内容是 window.DEM=...，替换成 window.DEM2，避免覆盖地1 的 window.DEM
-      const code2 = code.replace(/window\.DEM\s*=/g, 'window.DEM2 =')
-      new Function(code2)()
-      if (!(window as any).DEM2) throw new Error('dem2.js 未定义 window.DEM2')
-    } catch (e) {
-      console.warn('[UploadPlotLayer] 加载地2 dem2.js 失败，保持当前地形:', e)
-      return
-    }
-  }
-  if (!cachedPlotDemProvider) cachedPlotDemProvider = new PlotDemTerrainProvider()
-  try {
-    // 已是地2 DEM 地形时不再赋值，避免 Cesium 整盘重建地形瓦片
-    if (viewer.scene.terrainProvider !== cachedPlotDemProvider) {
-      viewer.scene.terrainProvider = cachedPlotDemProvider
-    }
-  } catch (e) {
-    console.warn('[UploadPlotLayer] 设置地2 地形失败:', e)
-  }
-}
-
 // ==================== 3D Tiles ====================
 
 async function loadPlotTileset(viewer: any): Promise<void> {
   try {
     const treeTiles = await Cesium.Cesium3DTileset.fromUrl(UPLOAD_PLOT_TILESETS.trees, {
       maximumScreenSpaceError: 4,
-      cacheBytes: 2 * 1024 * 1024 * 1024,
+      // cacheBytes 必须大于地2 瓦片总量（495 × 4MB ≈ 2GB），否则瓦片加载后立即被缓存驱逐，
+      // 导致 tileset 一直加载不出（地1 瓦片总量 ~1GB 未触发该问题）
+      cacheBytes: 4 * 1024 * 1024 * 1024,
       maximumCacheOverflowBytes: 512 * 1024 * 1024,
     })
     viewer.scene.primitives.add(treeTiles)

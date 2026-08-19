@@ -20,9 +20,6 @@ export const UPLOAD_PLOT_DOM = {
   maxLevel: 23,
 }
 
-/** 地2 DEM 起伏地形（云服务器 C:\data\dem2.js，URL /dem2.js） */
-export const UPLOAD_PLOT_DEM = `${UPLOAD_PLOT_DATA_BASE}/dem2.js`
-
 /** 高德卫星影像（园外大范围背景，与地1 一致） */
 export const GAODE_IMAGERY_URL =
   'https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}'

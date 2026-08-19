@@ -166,9 +166,22 @@ const setTool = (tool: 'rectangle' | 'circle' | 'polygon') => {
   } else {
     activeTool.value = tool
     selectMode.value = false
+    // 顶栏（右上角绘制工具栏）发起的绘制完成后要触发 TSOM 空间查询。
+    // GISLayer 的 DrawTool onComplete 靠该标志区分：顶栏=true → 查询；
+    // 图层管理发起的绘制经 LayerControl.toggleDrawTool 强制 false → 只记录图层。
+    gisStore.queryOnDrawComplete = true
     gisStore.startDrawing(tool)
   }
 }
+
+// 工具被外部停用（如查询完成后自动停用）时，同步取消按钮高亮，
+// 避免"按钮还高亮但其实工具已停、点一下变成取消工具"的困惑
+watch(
+  () => gisStore.toolType,
+  (t) => {
+    if (!t) activeTool.value = null
+  }
+)
 
 // 删除所有选中的图形
 const deleteSelected = () => {
@@ -215,8 +228,7 @@ const toggleLayerManager = () => {
 
 const resetView = () => {
   try {
-    // 回到地1：显示原地块（地2 叠加保留）+ 清地2 + 相机飞回
-    orchardStore.setPlot1Visible(true)
+    // 回到地1（地1 与地2 恒共存显示）+ 清地2 + 相机飞回
     orchardStore.activePlotTaskId = null
     cesiumStore.zoomToHome()
     ElMessage.success('已回到初始视角')

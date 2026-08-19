@@ -853,7 +853,12 @@ function activateTool(toolType: DrawToolType) {
 
 					// 仅面状选择范围（矩形/圆形/多边形）同步到 selectionRange 供查询面板使用，
 					// 点/线不参与 TSOM 空间查询
-					if (['rectangle', 'circle', 'polygon'].includes(geomType)) {
+					// 且只有右上角 POI 工具栏发起的绘制（queryOnDrawComplete=true）才触发查询，
+					// 图层管理发起的绘制只记录图层不查询
+					if (
+						['rectangle', 'circle', 'polygon'].includes(geomType) &&
+						gisStore.queryOnDrawComplete
+					) {
 						const shapeType = geomType as 'rectangle' | 'circle' | 'polygon'
 						orchardStore
 							.setSelectionRange({
@@ -863,6 +868,11 @@ function activateTool(toolType: DrawToolType) {
 								radius: shapeType === 'circle' ? (feature as any).radius : undefined,
 							})
 							.catch(() => ElMessage.error('查询失败，请重试'))
+						ElMessage.success('已选定范围，正在查询TSOM数据...')
+						// 查询已触发，自动停用绘制工具：顶栏按钮回到未选中态，
+						// 下次点击重新激活即可画新框（避免"点了已激活的按钮变成取消"的困惑）。
+						// 仅 POI 工具栏路径（queryOnDrawComplete=true）如此；图层管理绘制不查询、保持连续绘制。
+						gisStore.deactivateTool()
 					}
 				}
 
@@ -875,6 +885,8 @@ function activateTool(toolType: DrawToolType) {
 			onCancel: () => {
 				// User cancelled drawing
 				console.log('Drawing cancelled')
+				// 取消绘制时清掉查询意图，避免残留给下一个工具
+				gisStore.queryOnDrawComplete = false
 			},
 		})
 
@@ -906,6 +918,10 @@ function deactivateTool() {
 			console.error('Failed to deactivate tool:', error)
 		}
 	}
+	// 注意：这里不要清 gisStore.queryOnDrawComplete。
+	// toolType 切换（如矩形→多边形）会先走到这里再激活新工具，
+	// 若清标志，PoiDrawToolbar 刚置位 true 的查询意图会被抹掉导致拉框查询失效。
+	// 查询意图的清理只在：绘制取消(onCancel)、store.deactivateTool、LayerControl.toggleDrawTool。
 }
 
 /**

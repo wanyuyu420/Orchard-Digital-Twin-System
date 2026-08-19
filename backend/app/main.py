@@ -21,6 +21,14 @@ async def lifespan(app: FastAPI):
         print('[FATAL] Please verify GEOSCENE_* settings in backend/.env')
         import sys
         sys.exit(1)
+
+    # 预热 FeatureServer 查询缓存：冷缓存首次空间查询可达 12s+，易超 30s 后端超时 → 503。
+    # 启动时打一次轻量 count 查询把缓存打热，首次用户查询即可快速返回。失败不阻断启动。
+    try:
+        n = GeoSceneService.count_features(where='1=1', timeout=40)
+        print(f'[Startup] FeatureServer warm-up OK - {n} trees cached')
+    except Exception as e:
+        print(f'[Startup] FeatureServer warm-up skipped (non-fatal): {e}')
     yield
 
 

@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useOrchardStore } from '@/stores/orchard'
 import { useGISStore } from '@/stores/gis'
 import { ElMessage } from 'element-plus'
@@ -69,11 +69,6 @@ const rangeTypeLabel = computed(() => {
   }
 })
 
-function getRangeLabel(): string {
-  if (!orchardStore.selectionRange) return ''
-  return rangeTypeLabel.value
-}
-
 function setTool(tool: 'rectangle' | 'circle' | 'polygon') {
   if (activeTool.value === tool) {
     activeTool.value = null
@@ -82,55 +77,12 @@ function setTool(tool: 'rectangle' | 'circle' | 'polygon') {
   }
   activeTool.value = tool
 
+  // 置位查询意图：本工具栏（右上角 POI 选择）绘制完成后要触发 TSOM 查询；
+  // 图层管理发起的绘制不置位，仅记录图层。GISLayer 的 DrawTool onComplete 是唯一查询触发点。
+  gisStore.queryOnDrawComplete = true
+
   // 设置工具类型，GISLayer 监听 toolType 变化后实例化 DrawTool
   gisStore.setTool(`draw-${tool}` as DrawToolType)
-
-  // 监听绘制完成事件
-  setupDrawListener(tool)
-}
-
-function setupDrawListener(tool: 'rectangle' | 'circle' | 'polygon') {
-  // 通过gisStore监听feature添加事件，在绘制完成后触发TSOM查询
-  const stopWatch = watch(
-    () => gisStore.features.size,
-    (newSize, oldSize) => {
-      if (newSize > oldSize) {
-        const features = Array.from(gisStore.features.values())
-        const latest = features[features.length - 1]
-        if (latest) {
-          const graphic = gisStore.graphics.get(latest.id)
-          if (graphic) {
-            const positions = graphic.getPositions()
-            if (positions && positions.length > 0) {
-              const Cesium = (window as any).Cesium
-              const coordinates = positions.map((p: any) => {
-                const carto = Cesium.Cartographic.fromCartesian(p)
-                return [
-                  Cesium.Math.toDegrees(carto.longitude),
-                  Cesium.Math.toDegrees(carto.latitude),
-                ]
-              })
-
-              if (tool === 'polygon' && coordinates.length > 0) {
-                coordinates.push([...coordinates[0]])
-              }
-
-              orchardStore
-                .setSelectionRange({
-                  type: tool,
-                  coordinates: tool === 'polygon' ? [coordinates] : coordinates,
-                })
-                .catch(() => ElMessage.error('查询失败，请重试'))
-
-              ElMessage.success(`${getRangeLabel()}已选定，正在查询TSOM数据...`)
-              stopWatch()
-              activeTool.value = null
-            }
-          }
-        }
-      }
-    },
-  )
 }
 
 function clearSelection() {

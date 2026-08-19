@@ -73,6 +73,12 @@ export const useGISStore = defineStore('gis', () => {
   /** Current drawing/editing mode */
   const mode = ref<DrawMode>('none')
 
+  /**
+   * 仅右上角工具栏（POI 选择）发起的绘制为 true：
+   * 绘制完成后触发 TSOM 空间查询；图层管理发起的绘制不查询，只记录图层。
+   */
+  const queryOnDrawComplete = ref(false)
+
   // ========== Feature Management ==========
 
   /** All features (id -> Feature) */
@@ -354,6 +360,8 @@ export const useGISStore = defineStore('gis', () => {
     // Always reset toolType and mode, even if no tool is active
     toolType.value = null
     mode.value = 'none'
+    // 工具停用时清掉查询意图，避免下一个工具误触发 TSOM 查询
+    queryOnDrawComplete.value = false
   }
 
   /**
@@ -1327,11 +1335,27 @@ export const useGISStore = defineStore('gis', () => {
     const index = analysisResults.value.findIndex((r) => r.id === id)
     if (index !== -1) {
       analysisResults.value.splice(index, 1)
+      // 同步把地图上带该结果 ID 标签的实体（剖面线/3D测量线/方量面）移除
+      removeAnalysisEntities(id)
       // 如果删除的是当前选中项，清除选中
       if (selectedResultId.value === id) {
         selectedResultId.value = null
       }
     }
+  }
+
+  /**
+   * 按分析结果 ID 移除地图上打了 analysisResultId 标签的实体。
+   * 工具创建结果时通过 (entity as any).analysisResultId = resultId 打标。
+   */
+  function removeAnalysisEntities(id: string): void {
+    const viewerInstance = viewer.value
+    if (!viewerInstance) return
+    const targets: Cesium.Entity[] = []
+    viewerInstance.entities.values.forEach((e) => {
+      if ((e as any).analysisResultId === id) targets.push(e)
+    })
+    targets.forEach((e) => viewerInstance.entities.remove(e))
   }
 
   /**
@@ -1347,6 +1371,14 @@ export const useGISStore = defineStore('gis', () => {
   function clearAllAnalysisResults(): void {
     analysisResults.value = []
     selectedResultId.value = null
+    // 同步移除地图上所有带分析结果标签的实体（剖面线/3D测量线/方量面）
+    const viewerInstance = viewer.value
+    if (viewerInstance) {
+      const targets = viewerInstance.entities.values.filter(
+        (e) => (e as any).analysisResultId !== undefined
+      )
+      targets.forEach((e) => viewerInstance.entities.remove(e))
+    }
   }
 
   // ========== STORE EXPORT ==========
@@ -1357,6 +1389,7 @@ export const useGISStore = defineStore('gis', () => {
     currentTool,
     toolType,
     mode,
+    queryOnDrawComplete,
     features,
     graphics,
     selectedFeatureIds,

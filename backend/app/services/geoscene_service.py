@@ -210,6 +210,9 @@ class GeoSceneService:
             out_fields='*',
             limit=1000,
             return_geometry=False,
+            # GeoScene FeatureServer 冷缓存/慢查询单次可达 12s+，
+            # 默认 30s 在冷态下超时导致 spatial-diagnose 503，放宽到 60s
+            timeout=60,
         )
 
         if not features:

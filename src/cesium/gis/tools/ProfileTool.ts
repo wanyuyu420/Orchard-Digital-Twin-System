@@ -579,11 +579,17 @@ export class ProfileTool extends BaseTool {
     const gisStore = useGISStore()
     const midIndex = Math.floor(result.samples.length / 2)
     const midPoint = result.samples[midIndex].position
-    gisStore.addAnalysisResult({
+    const resultId = gisStore.addAnalysisResult({
       type: 'profile',
       name: `剖面分析 #${gisStore.analysisResults.length + 1}`,
       data: result,
       position: midPoint,
+    })
+    // 给本次创建的结果实体（剖面线 + 起终点标记）打上分析结果 ID 标签，
+    // 删除该结果时 store 据此把实体从地图上同步移除。
+    // 只标本次的实体，不遍历 this.resultEntities（它是跨多次分析的累积数组）
+    ;[profileLine, startMarker, endMarker].forEach((e) => {
+      ;(e as any).analysisResultId = resultId
     })
   }
 

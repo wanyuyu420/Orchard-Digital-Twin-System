@@ -8,7 +8,7 @@
           </button>
           <span class="panel-title">查询条件 - {{ orchardStore.activeMenuLabel }}</span>
         </div>
-        <button class="close-btn" @click="orchardStore.closeAllPanels">
+        <button class="close-btn" @click="orchardStore.closeSearchPanels">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
@@ -50,7 +50,7 @@
 
       <!-- 底部操作 - 2点击查询 -->
       <div class="panel-footer">
-        <el-button @click="orchardStore.closeAllPanels">取消</el-button>
+        <el-button @click="orchardStore.closeSearchPanels">取消</el-button>
         <el-button type="primary" @click="executeQuery" :loading="querying">
           <i class="fa-solid fa-magnifying-glass"></i>
           查询
