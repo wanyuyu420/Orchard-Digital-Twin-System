@@ -14,6 +14,23 @@
       </div>
 
       <div class="panel-body">
+        <!-- 框选区域选择：多个框选图层时指定施肥方案作用区域 -->
+        <div v-if="areaGeoms.length > 0" class="region-select">
+          <span class="region-label">
+            <i class="fa-solid fa-draw-polygon"></i>
+            框选区域
+          </span>
+          <el-select
+            v-model="selectedGeomId"
+            size="small"
+            placeholder="选择框选区域"
+            style="flex: 1"
+            @change="onRegionChange"
+          >
+            <el-option v-for="g in areaGeoms" :key="g.id" :value="g.id" :label="geomLabel(g)" />
+          </el-select>
+        </div>
+
         <!-- 计算中 -->
         <div v-if="orchardStore.fertilizationLoading" class="loading-state">
           <i class="fa-solid fa-circle-notch fa-spin loading-icon"></i>
@@ -132,25 +149,75 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useOrchardStore } from '@/stores/orchard'
 
 const orchardStore = useOrchardStore()
 
 const applyOnWrite = ref(false)
 
-const hasSelection = computed(() => !!orchardStore.selectionRange)
+// ---- 框选区域选择：多个框选图层时指定施肥方案作用区域 ----
+const areaGeoms = computed(() =>
+  orchardStore.drawnGeometries.filter(
+    (g) => g.type === 'rectangle' || g.type === 'circle' || g.type === 'polygon',
+  ),
+)
+const selectedGeomId = ref<string>('')
+const selectedGeom = computed(
+  () => areaGeoms.value.find((g) => g.id === selectedGeomId.value) ?? null,
+)
+
+// 面板打开 / 新增或删除框选图层时，默认选最近一个（列表头部）框选区域；选中项被删则回退到最新一个
+watch(
+  areaGeoms,
+  (geoms) => {
+    if (!geoms.some((g) => g.id === selectedGeomId.value)) {
+      selectedGeomId.value = geoms[0]?.id ?? ''
+    }
+  },
+  { immediate: true },
+)
+
+/** 切换区域后清掉旧方案，避免展示上一个区域的施肥结果 */
+function onRegionChange() {
+  orchardStore.fertilizerPlan = null
+  orchardStore.fertilizationError = null
+}
+
+/** 图层名与左侧图层管理栏一致（#1、#2…） */
+function geomLabel(g: { name: string }): string {
+  return g.name
+}
+
+/** 选中的框选区域（无选中 → undefined，走 store 内 selectionRange 兜底） */
+function currentRegion() {
+  const g = selectedGeom.value
+  if (!g) return undefined
+  return {
+    type: g.type as 'rectangle' | 'circle' | 'polygon',
+    coordinates: g.coordinates as number[][],
+    radius: g.radius,
+  }
+}
+
+const hasSelection = computed(
+  () => !!selectedGeom.value || !!orchardStore.selectionRange,
+)
 
 function onGenerate() {
-  orchardStore.generateFertilizationPlan({ apply: applyOnWrite.value }).catch(() => {})
+  orchardStore
+    .generateFertilizationPlan({ apply: applyOnWrite.value, region: currentRegion() })
+    .catch(() => {})
 }
 
 function onRegenerate() {
-  orchardStore.generateFertilizationPlan({ apply: applyOnWrite.value }).catch(() => {})
+  orchardStore
+    .generateFertilizationPlan({ apply: applyOnWrite.value, region: currentRegion() })
+    .catch(() => {})
 }
 
 function onExport(format: 'csv' | 'geojson') {
-  orchardStore.exportFertilizationPlan(format).catch(() => {})
+  orchardStore.exportFertilizationPlan(format, currentRegion()).catch(() => {})
 }
 
 /** 施肥等级 → 中文标签（1 轻度 / 2 中度 / 3 重度） */
@@ -230,6 +297,39 @@ function levelClass(level: number): string {
   flex: 1;
   overflow-y: auto;
   padding: 18px;
+}
+
+// 框选区域选择器
+.region-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+
+  .region-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: $text-sub;
+    white-space: nowrap;
+
+    i { color: $neon-cyan; }
+  }
+
+  :deep(.el-select__wrapper) {
+    background: rgba(15, 23, 42, 0.6);
+    box-shadow: 0 0 0 1px $border-subtle inset;
+  }
+
+  :deep(.el-select__selected-item) {
+    color: $text-main;
+    font-size: 12px;
+  }
+
+  :deep(.el-select__placeholder) {
+    color: $text-dim;
+  }
 }
 
 .panel-footer {

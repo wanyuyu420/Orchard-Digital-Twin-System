@@ -814,13 +814,6 @@ const drawTools: Array<{
 	},
 	// ---- 3D 分析工具（需 DEM 地形） ----
 	{
-		id: 'volume',
-		name: '方量分析',
-		icon: 'fa-solid fa-cubes',
-		tooltip: '方量分析 - 框选区域计算挖填方量（需地形）',
-		analysis: true,
-	},
-	{
 		id: 'profile',
 		name: '剖面分析',
 		icon: 'fa-solid fa-mountain',

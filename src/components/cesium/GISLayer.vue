@@ -849,6 +849,8 @@ function activateTool(toolType: DrawToolType) {
 						type: geomType,
 						coordinates: coords,
 						featureId: feature.id,
+						// 圆形需要半径才能构造多边形环（施肥/查询用）；矩形/多边形无需
+						radius: geomType === 'circle' ? (feature as any).radius : undefined,
 					})
 
 					// 仅面状选择范围（矩形/圆形/多边形）同步到 selectionRange 供查询面板使用，

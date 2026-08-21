@@ -34,10 +34,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useOrchardStore } from '@/stores/orchard'
 
 const orchardStore = useOrchardStore()
+
+// 树点数据源随上传状态切换（地1 果园范围 → 上传文件范围）后，重新统计果树总数
+watch(
+  () => orchardStore.treePointSourceBbox,
+  () => {
+    orchardStore.refreshMapStats()
+  },
+)
 
 function formatNumber(n: number): string {
   return n.toLocaleString('zh-CN', { maximumFractionDigits: 0 })

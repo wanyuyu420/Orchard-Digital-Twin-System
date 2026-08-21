@@ -13,6 +13,8 @@ import type {
   FertilizerPlanOut,
   AlertsOut,
   InterpretTask,
+  BasemapCanopyMetric,
+  BasemapCanopyOverview,
 } from '@/types/orchard'
 
 /** 根据POI ID获取果树详细信息 */
@@ -52,17 +54,21 @@ export async function queryTsom(params: TsomQueryParams): Promise<{ data: TsomQu
 /**
  * 精确查询 - 全量果树按条件过滤（不需要绘制范围）
  *
- * 走后端 /orange/trees/filter：全量扫描 FeatureServer 后按健康状态过滤，
- * 时间字段在 FeatureServer 中不存在，不参与过滤。响应与拉框一致（DiagnoseResult），
- * 复用 mapDiagnoseToTsomResult 映射。GeoScene 全量扫描较慢，覆盖默认 5s 超时。
+ * 走后端 /orange/trees/filter：扫描 FeatureServer 后按健康状态过滤。
+ * 可传 treeId 只查某一棵（精确单树），否则查底图范围内全部树（bbox 限制）。
+ * 响应与拉框一致（DiagnoseResult），复用 mapDiagnoseToTsomResult 映射。
+ * GeoScene 全量扫描较慢，覆盖默认 5s 超时。
  */
 export async function queryTreesByFilter(params: TsomQueryParams): Promise<{ data: TsomQueryResult }> {
-  // 只查底图（DOM 影像）范围内的树，排除底图外的树
-  const payload = {
+  const payload: Record<string, unknown> = {
     healthStatuses: params.healthStatuses,
-    startDate: params.startDate,
-    endDate: params.endDate,
-    bbox: [DOM_RECT.west, DOM_RECT.south, DOM_RECT.east, DOM_RECT.north],
+  }
+  if (params.treeId) {
+    // 精确单树：只查这一棵，不受底图范围限制
+    payload.tree_id = params.treeId
+  } else {
+    // 只查底图（DOM 影像）范围内的树，排除底图外的树
+    payload.bbox = [DOM_RECT.west, DOM_RECT.south, DOM_RECT.east, DOM_RECT.north]
   }
   const res = await apiClient.post<DiagnoseResult>(
     '/orange/trees/filter',
@@ -193,6 +199,58 @@ export function downloadAnalysisFile(fileId: string) {
 /** 获取冠层图表统计数据 */
 export function getChartStatistics() {
   return apiClient.get('/orchard/chart-data')
+}
+
+/**
+ * 范围内树点冠层概览（树点数据，非 3D 树模型）。
+ * 经 /orange/trees/filter(bbox) 查询 GeoScene FeatureServer 范围内的树点，
+ * 再聚合冠层高度 / 冠层体积 / 冠幅面积（平均·最小·最大）。
+ * bbox 缺省为地1 果园范围 DOM_RECT；上传文件后由调用方传入上传文件范围。
+ * GeoScene 空间查询较慢，沿用精细查询 90s 超时。
+ */
+export async function fetchBasemapCanopyOverview(
+  bbox: [number, number, number, number] = [
+    DOM_RECT.west,
+    DOM_RECT.south,
+    DOM_RECT.east,
+    DOM_RECT.north,
+  ],
+): Promise<BasemapCanopyOverview> {
+  const res = await apiClient.post<DiagnoseResult>(
+    '/orange/trees/filter',
+    {
+      // 只查范围内树点，排除范围外（与精细查询同口径）
+      bbox,
+    },
+    { timeout: 90000 },
+  )
+  const trees = res.data.trees ?? []
+
+  const readAll = (name: 'height_m' | 'volume_m3' | 'area_m2'): number[] =>
+    trees.map((t) => t[name]).filter((v): v is number => typeof v === 'number' && isFinite(v))
+
+  const specs: [BasemapCanopyMetric['key'], string, string, number[]][] = [
+    ['canopyHeight', '冠层高度', 'm', readAll('height_m')],
+    ['canopyVolume', '冠层体积', 'm³', readAll('volume_m3')],
+    ['canopyArea', '冠幅面积', 'm²', readAll('area_m2')],
+  ]
+
+  const metrics: BasemapCanopyMetric[] = []
+  for (const [key, label, unit, values] of specs) {
+    if (!values.length) continue
+    const avg = values.reduce((s, v) => s + v, 0) / values.length
+    metrics.push({
+      key,
+      label,
+      unit,
+      avg: +avg.toFixed(2),
+      min: +Math.min(...values).toFixed(2),
+      max: +Math.max(...values).toFixed(2),
+      count: values.length,
+    })
+  }
+
+  return { totalTrees: trees.length, metrics, timestamp: new Date().toISOString() }
 }
 
 // ── 上传 TIF 分割（地2 切换）──────────────────────────────

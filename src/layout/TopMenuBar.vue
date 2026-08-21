@@ -96,8 +96,18 @@
         </button>
       </el-tooltip>
       <el-tooltip content="图表统计" placement="bottom">
-        <button class="action-btn" @click="orchardStore.showChartDialog = !orchardStore.showChartDialog">
+        <button class="action-btn" @click="toggleChart">
           <i class="fa-solid fa-chart-simple"></i>
+        </button>
+      </el-tooltip>
+      <el-tooltip content="巡园漫游" placement="bottom">
+        <button
+          class="action-btn"
+          :class="{ active: cruiseStore.isCruising }"
+          :disabled="!cesiumStore.viewer || cesiumStore.is2D"
+          @click="cruiseStore.toggle()"
+        >
+          <i class="fa-solid fa-route"></i>
         </button>
       </el-tooltip>
       <el-tooltip content="回到初始视角" placement="bottom">
@@ -122,6 +132,7 @@ import { useOrchardStore } from '@/stores/orchard'
 import { useGISStore } from '@/stores/gis'
 import { useCesiumStore } from '@/stores/cesium'
 import { useLayerStore } from '@/stores/layers'
+import { useCruiseStore } from '@/stores/cruise'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ModuleMenuItem } from '@/types/orchard'
 
@@ -131,6 +142,7 @@ const orchardStore = useOrchardStore()
 const gisStore = useGISStore()
 const cesiumStore = useCesiumStore()
 const layerStore = useLayerStore()
+const cruiseStore = useCruiseStore()
 
 const activeTool = ref<'rectangle' | 'circle' | 'polygon' | null>(null)
 // 选择模式：点击地图图形进行选中/取消选中
@@ -219,15 +231,24 @@ const deleteSelected = () => {
 }
 
 const openQueryPanel = () => {
+  if (cruiseStore.isCruising) return ElMessage.info('巡园中，请先退出巡航')
   orchardStore.showQueryPanel = !orchardStore.showQueryPanel
 }
 
 const toggleLayerManager = () => {
+  if (cruiseStore.isCruising) return ElMessage.info('巡园中，请先退出巡航')
   layerStore.toggleManager()
+}
+
+const toggleChart = () => {
+  if (cruiseStore.isCruising) return ElMessage.info('巡园中，请先退出巡航')
+  orchardStore.showChartDialog = !orchardStore.showChartDialog
 }
 
 const resetView = () => {
   try {
+    // 巡园中先退出巡航（飞回启动视角），再回到地1 总览
+    if (cruiseStore.isCruising) cruiseStore.stop()
     // 回到地1（地1 与地2 恒共存显示）+ 清地2 + 相机飞回
     orchardStore.activePlotTaskId = null
     cesiumStore.zoomToHome()
@@ -426,6 +447,11 @@ $orchard-orange: #fb923c;
     color: #ffffff;
     background: rgba(251, 146, 60, 0.35);
     border: 1px solid rgba(251, 146, 60, 0.5);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 }
 

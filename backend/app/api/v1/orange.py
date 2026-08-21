@@ -87,10 +87,10 @@ def _health_label(index: float | None) -> str:
 class FilterQuerySchema(BaseModel):
     """精确查询（按健康状态过滤；可附加 bbox 限制到底图范围）请求参数。"""
     healthStatuses: Optional[List[str]] = None
-    startDate: Optional[str] = None
-    endDate: Optional[str] = None
     # 可选：底图范围 [west, south, east, north]（WGS84），只查该包络内的树
     bbox: Optional[List[float]] = None
+    # 可选：指定单棵树编号（FeatureServer id），只查这一棵；优先于 bbox
+    tree_id: Optional[str] = None
 
 
 
@@ -182,9 +182,18 @@ async def filter_trees(payload: FilterQuerySchema):
             "return_geometry": True,
             "timeout": 90,
         }
+        # 指定单棵树：按 FeatureServer id 精确匹配，不受底图范围限制
+        if payload.tree_id:
+            tree_id = payload.tree_id.strip()
+            if tree_id:
+                try:
+                    query_kwargs["where"] = f"id={int(tree_id)}"
+                except ValueError:
+                    # 非数字编号：直接查不到任何树，避免 500
+                    query_kwargs["where"] = "1=0"
         # 附加底图范围限制：前端传 [west, south, east, north]（WGS84 包络），
         # 只查 DOM 影像覆盖区域内的树，排除底图外的树。
-        if payload.bbox and len(payload.bbox) == 4:
+        elif payload.bbox and len(payload.bbox) == 4:
             west, south, east, north = payload.bbox
             query_kwargs["geometry"] = {
                 "xmin": west, "ymin": south, "xmax": east, "ymax": north,
@@ -289,6 +298,8 @@ async def get_historical_trees():
             out_sr=4326,
             limit=10000,
             return_geometry=True,
+            # 冷缓存全量扫描较慢，默认 30s 不够；60s 与前端 getHistoricalTrees 请求超时对齐
+            timeout=60,
         )
     except GeoSceneError as e:
         raise HTTPException(

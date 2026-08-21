@@ -46,6 +46,9 @@
 
     <!-- 图层详细信息面板(右下角) -->
     <LayerDetailPanel />
+
+    <!-- 巡园漫游控制条(底部居中，巡航时显示) -->
+    <CruiseControlBar />
   </div>
 </template>
 
@@ -61,6 +64,7 @@ import HistoricalTreeLayer from '@/components/cesium/HistoricalTreeLayer.vue'
 import AlertsLayer from '@/components/cesium/AlertsLayer.vue'
 import LayerControl from '@/components/business/LayerControl.vue'
 import { useLayerStore } from '@/stores/layers'
+import { useCruiseStore } from '@/stores/cruise'
 import QueryPanel from '@/components/orchard/QueryPanel.vue'
 import QueryResultPanel from '@/components/orchard/QueryResultPanel.vue'
 import DetailPanel from '@/components/orchard/DetailPanel.vue'
@@ -69,12 +73,14 @@ import FertilizationWindow from '@/components/orchard/FertilizationWindow.vue'
 import AlertsWindow from '@/components/orchard/AlertsWindow.vue'
 import LayerDetailPanel from '@/components/orchard/LayerDetailPanel.vue'
 import OrchardChartDialog from '@/components/charts/OrchardChartDialog.vue'
+import CruiseControlBar from '@/components/cesium/CruiseControlBar.vue'
 
 declare const Cesium: any
 
 const cesiumStore = useCesiumStore()
 const orchardStore = useOrchardStore()
 const layerStore = useLayerStore()
+const cruiseStore = useCruiseStore()
 
 // ── 右上角功能面板互斥:打开一个关闭上一个 ──
 // 三个"功能"槽:图层管理 / 查询(查询条件+查询结果同属一个功能) / 冠层图表。
@@ -205,6 +211,8 @@ watch(
 onUnmounted(() => {
   clearTreeMarkers()
   destroyTreeClickHandler()
+  // 布局销毁时结束巡航，防止 onTick 监听泄漏
+  cruiseStore.exit()
 })
 </script>
 

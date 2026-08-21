@@ -35,6 +35,8 @@ export interface TsomQueryParams {
   healthStatuses?: string[]
   /** 批次过滤：地1='historical_zone'，地2='orange_tree'，不传则查全量 */
   batchId?: string
+  /** 精确查询单棵树：输入树编号（FeatureServer id），只查这一棵；不传则查全部 */
+  treeId?: string
 }
 
 /** TSOM查询结果 */
@@ -180,6 +182,8 @@ export interface InterpretTask {
 /** 前端侧边栏"上传地块"任务卡片 */
 export interface UploadPlotTask {
   id: string
+  /** 关联的数据管理页上传文件 id（仅数据管理页上传同步生成时有，侧边栏上传无） */
+  fileId?: string
   taskId: string
   fileName: string
   fileSize: number
@@ -228,6 +232,27 @@ export interface ChartStatistics {
 
 /** 图表视图类型 */
 export type ChartViewType = 'bar' | 'pie' | 'line'
+
+// ── 底图范围内树点冠层概览（冠层解析数据框用） ──────────────
+
+/** 单个冠层指标的概览（平均/最小/最大） */
+export interface BasemapCanopyMetric {
+  key: 'canopyHeight' | 'canopyVolume' | 'canopyArea'
+  label: string
+  unit: string
+  avg: number
+  min: number
+  max: number
+  count: number
+}
+
+/** 底图范围内树点冠层概览（数据来自后端树点，非 3D 树模型） */
+export interface BasemapCanopyOverview {
+  /** 底图范围内树点数 */
+  totalTrees: number
+  metrics: BasemapCanopyMetric[]
+  timestamp: string
+}
 
 // ── 变量施肥推荐（后端 /orange/fertilizer-plan） ──────────────
 

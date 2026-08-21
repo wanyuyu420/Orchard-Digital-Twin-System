@@ -23,19 +23,15 @@
           </el-select>
         </div>
 
-        <!-- 时间范围 -->
-        <div class="form-group">
-          <label>时间范围</label>
-          <el-date-picker
-            v-model="dateRange"
-            type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            style="width: 100%"
+        <!-- POI 精确查询：输入树编号只查这一棵，留空则查全部 -->
+        <div class="form-group" v-if="queryType === 'poi'">
+          <label>果树POI / 树编号</label>
+          <el-input
+            v-model="poiId"
+            placeholder="输入树编号查单棵，留空查询全部"
+            clearable
           />
         </div>
-
 
         <!-- 健康状态筛选 -->
         <div class="form-group" v-if="queryType === 'health'">
@@ -70,7 +66,7 @@ const orchardStore = useOrchardStore()
 const querying = ref(false)
 
 const queryType = ref('poi')
-const dateRange = ref<[Date, Date] | null>(null)
+const poiId = ref('')
 const healthFilter = ref<string[]>(['healthy', 'warning', 'critical'])
 
 async function executeQuery() {
@@ -79,9 +75,8 @@ async function executeQuery() {
     const params: TsomQueryParams = {
       healthStatuses: healthFilter.value.length > 0 ? healthFilter.value : undefined,
     }
-    if (dateRange.value) {
-      params.startDate = dateRange.value[0].toISOString()
-      params.endDate = dateRange.value[1].toISOString()
+    if (poiId.value.trim()) {
+      params.treeId = poiId.value.trim()
     }
 
     // 菜单精细查询查底图范围内的树（bbox 限制到底图 DOM 范围，见 api/orchard.ts）

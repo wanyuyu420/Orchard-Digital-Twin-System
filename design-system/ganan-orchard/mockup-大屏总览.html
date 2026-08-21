@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>赣南脐橙果园数字孪生 · 大屏总览（设计原型）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============ 设计令牌（与 MASTER.md 一致） ============ */
+:root{
+  --bg-base:#020617;
+  --bg-card:#0E1223;
+  --bg-elevated:#1A1E2F;
+  --bg-input:#0B0F1F;
+  --border-subtle:#1E293B;
+  --border:#334155;
+  --text-primary:#F8FAFC;
+  --text-secondary:#CBD5E1;
+  --text-muted:#94A3B8;
+  --accent:#F97316;
+  --on-accent:#0F172A;
+  --tech:#22D3EE;
+  --health-ok:#22C55E;
+  --health-warn:#F59E0B;
+  --health-crit:#EF4444;
+  --info:#38BDF8;
+  --radius-s:4px; --radius-m:8px;
+  --font-num:'Rajdhani', sans-serif;
+  --font-mono:'Roboto Mono', monospace;
+  --font-cn:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:var(--font-cn);
+  background:var(--bg-base); color:var(--text-primary);
+  font-size:13px; overflow:hidden; user-select:none;
+}
+.num{font-family:var(--font-num); font-variant-numeric:tabular-nums; font-weight:600}
+.mono{font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:12px}
+/* ============ 大屏骨架：grid 24 列 ============ */
+.screen{display:grid; height:100vh;
+  grid-template-rows:56px 1fr 48px;
+  grid-template-columns:320px 1fr 320px;
+  grid-template-areas:"top top top" "left scene right" "bot bot bot";}
+/* ============ 顶部栏 ============ */
+.topbar{grid-area:top; display:flex; align-items:center; gap:24px;
+  padding:0 20px; background:linear-gradient(180deg,#0B0F20 0%,#0A0E1E 100%);
+  border-bottom:1px solid var(--border); position:relative;}
+.brand{display:flex; align-items:center; gap:10px; white-space:nowrap}
+.brand-logo{width:28px;height:28px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #FDBA74, var(--accent) 55%, #C2410C);
+  box-shadow:0 0 10px rgba(249,115,22,.55); position:relative}
+.brand-logo::after{content:''; position:absolute; inset:7px; border-radius:50%;
+  background:#020617; transform:scale(.55);}
+.brand-name{font-size:17px; font-weight:700; letter-spacing:1px;
+  background:linear-gradient(90deg,#FDBA74,#F97316 60%,#FB923C);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  text-shadow:0 0 14px rgba(249,115,22,.25)}
+.brand-sub{font-size:11px; color:var(--text-muted); letter-spacing:2px}
+.mod-nav{display:flex; align-items:center; gap:2px; margin-left:8px; height:100%}
+.mod{display:flex; align-items:center; gap:6px; height:100%; padding:0 14px;
+  font-size:13px; color:var(--text-secondary); cursor:pointer; position:relative;
+  border:none; background:none; font-family:var(--font-cn); transition:color .15s}
+.mod:hover{color:var(--text-primary)}
+.mod.active{color:var(--accent); font-weight:600}
+.mod.active::after{content:''; position:absolute; left:10px; right:10px; bottom:0; height:2px;
+  background:var(--accent); box-shadow:0 0 8px rgba(249,115,22,.6); border-radius:2px 2px 0 0}
+.top-right{margin-left:auto; display:flex; align-items:center; gap:16px}
+.clock{text-align:right; line-height:1.15}
+.clock .t{font-family:var(--font-num); font-size:20px; font-weight:700; letter-spacing:1px}
+.clock .d{font-size:11px; color:var(--text-muted)}
+.weather{display:flex; align-items:center; gap:8px; color:var(--text-secondary); font-size:13px}
+/* ============ 面板通用 ============ */
+.panel{background:var(--bg-card); border:1px solid var(--border); position:relative;
+  border-radius:var(--radius-m); display:flex; flex-direction:column; overflow:hidden}
+.panel::before{content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,rgba(249,115,22,.6), rgba(34,211,238,.35) 40%, transparent 80%)}
+.panel-h{display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--border-subtle)}
+.panel-h .dot{width:3px;height:12px;border-radius:2px;background:var(--accent); box-shadow:0 0 6px rgba(249,115,22,.7)}
+.panel-h .ttl{font-size:13px; font-weight:600; color:var(--text-primary)}
+.panel-h .hint{margin-left:auto; font-size:11px; color:var(--text-muted)}
+.panel-b{padding:12px; flex:1; overflow:auto}
+/* HUD 角标 */
+.corner{position:absolute; width:12px; height:12px; border-color:var(--tech); opacity:.7; pointer-events:none}
+.c-tl{top:-1px; left:-1px; border-top:1px solid; border-left:1px solid}
+.c-tr{top:-1px; right:-1px; border-top:1px solid; border-right:1px solid}
+.c-bl{bottom:-1px; left:-1px; border-bottom:1px solid; border-left:1px solid}
+.c-br{bottom:-1px; right:-1px; border-bottom:1px solid; border-right:1px solid}
+/* ============ 左侧栏 ============ */
+.left{grid-area:left; padding:10px; display:flex; flex-direction:column; gap:10px}
+/* 图层管理 */
+.layer-row{display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--radius-s);
+  cursor:pointer; transition:background .15s}
+.layer-row:hover{background:var(--bg-elevated)}
+.layer-row .eye{width:22px;height:22px; display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border); border-radius:var(--radius-s); color:var(--text-muted); font-size:11px; flex:none}
+.layer-row.on .eye{background:var(--accent); border-color:var(--accent); color:var(--on-accent)}
+.layer-row .nm{font-size:12.5px; color:var(--text-secondary)}
+.layer-row.on .nm{color:var(--text-primary)}
+.layer-row .cnt{margin-left:auto; font-family:var(--font-num); font-size:12px; color:var(--text-muted)}
+.layer-row .cnt.ok{color:var(--health-ok)}
+.layer-row .cnt.warn{color:var(--health-warn)}
+.layer-row .cnt.crit{color:var(--health-crit)}
+/* 工具箱 */
+.tools{display:flex; flex-direction:column; gap:6px}
+.tool{display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--border-subtle);
+  border-radius:var(--radius-s); background:var(--bg-input); color:var(--text-secondary); cursor:pointer; font-size:12.5px; transition:all .15s}
+.tool:hover{color:var(--text-primary); border-color:var(--accent)}
+.tool .ic{width:16px;height:16px; flex:none}
+/* ============ 中央三维场景 ============ */
+.scene{grid-area:scene; position:relative; margin:10px; border-radius:var(--radius-m);
+  border:1px solid var(--border); overflow:hidden; background:#04101f}
+/* 模拟地形（渐变层） */
+.terrain{position:absolute; inset:0; pointer-events:none}
+.terrain .sky{position:absolute; inset:0;
+  background:radial-gradient(120% 90% at 50% -10%, #0a1e38 0%, #071226 45%, #04101f 100%)}
+.terrain .ground{position:absolute; left:-10%; right:-10%; bottom:-22%; height:78%;
+  background:
+    radial-gradient(120% 80% at 50% 100%, rgba(34,197,94,.14), transparent 60%),
+    linear-gradient(180deg,#123a22 0%,#0e2b1b 55%,#0a1c14 100%);
+  transform:perspective(600px) rotateX(38deg); transform-origin:50% 100%; border-radius:50% 50% 0 0;
+  box-shadow:inset 0 0 120px rgba(0,0,0,.6)}
+.terrain .glowline{position:absolute; left:0; right:0; bottom:18%; height:1px;
+  background:linear-gradient(90deg,transparent, rgba(34,211,238,.5), transparent); opacity:.5}
+/* 等值线（模拟 DEM 等高线） */
+.contour{position:absolute; left:-10%; right:-10%; bottom:-16%; height:72%;
+  transform:perspective(600px) rotateX(38deg); transform-origin:50% 100%; opacity:.18; pointer-events:none}
+.contour i{position:absolute; left:0; right:0; border:1px solid rgba(34,211,238,.6); border-radius:50%}
+/* 果树点云 */
+.trees{position:absolute; inset:0; pointer-events:none}
+.tree{position:absolute; width:7px; height:7px; border-radius:50%; transform:translate(-50%,-50%);
+  transition:box-shadow .2s}
+.tree.ok{background:var(--health-ok); box-shadow:0 0 5px rgba(34,197,94,.7)}
+.tree.warn{background:var(--health-warn); box-shadow:0 0 5px rgba(245,158,11,.7)}
+.tree.crit{background:var(--health-crit); box-shadow:0 0 5px rgba(239,68,68,.7)}
+.tree.selected{outline:2px solid var(--tech); outline-offset:2px; box-shadow:0 0 12px rgba(34,211,238,.9); width:10px; height:10px}
+/* 选中标注 */
+.sel-tag{position:absolute; transform:translate(-50%,-130%); font-family:var(--font-mono); font-size:10.5px;
+  color:var(--tech); background:rgba(2,6,23,.85); border:1px solid var(--tech); border-radius:var(--radius-s);
+  padding:2px 6px; white-space:nowrap; pointer-events:none}
+/* 场景工具条 */
+.scene-tools{position:absolute; top:12px; left:12px; display:flex; gap:6px}
+.st-btn{width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+  background:rgba(14,18,35,.85); border:1px solid var(--border); border-radius:var(--radius-s);
+  color:var(--text-secondary); cursor:pointer; font-size:13px; transition:all .15s; backdrop-filter:blur(8px)}
+.st-btn:hover{color:var(--tech); border-color:var(--tech)}
+.scene-coord{position:absolute; bottom:12px; left:12px; font-family:var(--font-mono); font-size:11px;
+  color:var(--text-muted); background:rgba(14,18,35,.8); border:1px solid var(--border-subtle);
+  padding:5px 8px; border-radius:var(--radius-s); backdrop-filter:blur(8px)}
+.scene-legend{position:absolute; bottom:12px; right:12px; display:flex; gap:12px;
+  background:rgba(14,18,35,.85); border:1px solid var(--border-subtle); border-radius:var(--radius-s);
+  padding:6px 10px; backdrop-filter:blur(8px); font-size:11.5px; color:var(--text-secondary)}
+.scene-legend .lg{display:flex; align-items:center; gap:5px}
+.scene-legend .p{width:8px;height:8px;border-radius:50%}
+/* ============ 右侧栏 ============ */
+.right{grid-area:right; padding:10px; display:flex; flex-direction:column; gap:10px}
+.kpis{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.kpi{background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-m);
+  padding:10px 12px; position:relative; overflow:hidden}
+.kpi .lbl{font-size:11px; color:var(--text-muted)}
+.kpi .val{font-family:var(--font-num); font-size:30px; font-weight:700; line-height:1.1; letter-spacing:.5px}
+.kpi .unit{font-size:12px; color:var(--text-muted); margin-left:2px}
+.kpi .delta{font-size:10.5px; margin-top:2px}
+.kpi.accent .val{color:var(--accent); text-shadow:0 0 10px rgba(249,115,22,.4)}
+.kpi.green .val{color:var(--health-ok)}
+.kpi.cyan .val{color:var(--tech)}
+.kpi .spark{position:absolute; right:8px; bottom:8px; opacity:.6}
+/* 环形图 */
+.chart-box{display:flex; align-items:center; gap:14px}
+.donut{position:relative; width:104px; height:104px; flex:none}
+.donut svg{transform:rotate(-90deg)}
+.donut .center{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center}
+.donut .cval{font-family:var(--font-num); font-size:22px; font-weight:700; line-height:1}
+.donut .clbl{font-size:10px; color:var(--text-muted)}
+.legend-col{display:flex; flex-direction:column; gap:7px; flex:1}
+.legend-row{display:flex; align-items:center; gap:7px; font-size:12px}
+.legend-row .p{width:9px;height:9px;border-radius:2px}
+.legend-row .nm{color:var(--text-secondary)}
+.legend-row .v{margin-left:auto; font-family:var(--font-num); font-weight:600}
+/* 横向条形（施肥等级） */
+.hbars{display:flex; flex-direction:column; gap:9px}
+.hbar .hl{display:flex; justify-content:space-between; font-size:12px; color:var(--text-secondary); margin-bottom:3px}
+.hbar .hl b{font-family:var(--font-num); font-weight:600}
+.hbar .track{height:8px; background:var(--bg-input); border:1px solid var(--border-subtle); border-radius:99px; overflow:hidden}
+.hbar .fill{height:100%; border-radius:99px; width:0; transition:width .6s ease}
+/* 施肥建议卡 */
+.advice{border:1px solid var(--border); border-radius:var(--radius-m); background:var(--bg-card); padding:12px; position:relative; overflow:hidden}
+.advice::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:linear-gradient(180deg,var(--accent),var(--tech))}
+.advice .ttl{font-size:12.5px; font-weight:600; color:var(--text-primary)}
+.advice .zone{font-size:11px; color:var(--text-muted); margin:3px 0 8px}
+.advice .lvl{display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:2px 8px; border-radius:99px; margin-bottom:8px}
+.advice .lvl.mid{background:rgba(245,158,11,.15); color:var(--health-warn); border:1px solid rgba(245,158,11,.4)}
+.advice .rows{display:flex; flex-direction:column; gap:5px; font-size:11.5px; color:var(--text-secondary)}
+.advice .rows div{display:flex; justify-content:space-between}
+.advice .rows b{color:var(--text-primary); font-family:var(--font-num); font-weight:600}
+/* ============ 底部控制条 ============ */
+.bottombar{grid-area:bot; display:flex; align-items:center; gap:22px; padding:0 20px;
+  background:linear-gradient(0deg,#0B0F20, #0A0E1E); border-top:1px solid var(--border)}
+.bb-group{display:flex; align-items:center; gap:10px}
+.bb-lbl{font-size:12px; color:var(--text-muted)}
+.switch{width:32px; height:17px; border-radius:99px; background:var(--bg-elevated); border:1px solid var(--border);
+  position:relative; cursor:pointer; transition:background .15s}
+.switch::after{content:''; position:absolute; top:2px; left:2px; width:11px; height:11px; border-radius:50%;
+  background:var(--text-muted); transition:all .15s}
+.switch.on{background:var(--accent); border-color:var(--accent)}
+.switch.on::after{left:auto; right:2px; background:var(--on-accent)}
+.range{width:120px; accent-color:var(--accent)}
+.sel-info{display:flex; align-items:center; gap:10px; margin-left:auto; font-size:12px}
+.sel-info .chip{font-family:var(--font-mono); font-size:11px; color:var(--tech); border:1px solid rgba(34,211,238,.4);
+  padding:3px 8px; border-radius:99px}
+.badge{display:inline-block; width:7px;height:7px;border-radius:50%; vertical-align:middle}
+/* ============ 动效 ============ */
+.panel,.kpi,.advice{animation:rise .4s ease both}
+.panel:nth-child(1){animation-delay:.05s}.panel:nth-child(2){animation-delay:.12s}.panel:nth-child(3){animation-delay:.19s}
+@keyframes rise{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+@media (prefers-reduced-motion: reduce){ *{animation:none!important; transition:none!important} .hbar .fill{width:auto!important} }
+</style>
+</head>
+<body>
+<div class="screen">
+
+  <!-- ============ 顶部栏 ============ -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"></div>
+      <div>
+        <div class="brand-name">赣南脐橙果园数字孪生</div>
+        <div class="brand-sub">GANNAN ORCHARD DIGITAL TWIN</div>
+      </div>
+    </div>
+    <nav class="mod-nav">
+      <button class="mod active">三维大屏总览</button>
+      <button class="mod">拉框空间诊断</button>
+      <button class="mod">精细查询</button>
+      <button class="mod">TIF 上传分割</button>
+      <button class="mod">变量施肥</button>
+      <button class="mod">图层管理</button>
+      <button class="mod">三维测量</button>
+    </nav>
+    <div class="top-right">
+      <div class="weather">
+        <span style="font-size:15px;color:var(--info)">☀</span>
+        <span>晴 32°C</span>
+        <span class="mono" style="color:var(--text-muted)">2026-08-20 15:42:36</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ 左侧栏 ============ -->
+  <aside class="left">
+    <section class="panel" style="flex:1.4">
+      <span class="corner c-tl"></span><span class="corner c-tr"></span>
+      <div class="panel-h"><span class="dot"></span><span class="ttl">图层管理</span><span class="hint">GIS 图层</span></div>
+      <div class="panel-b" id="layerList">
+        <div class="layer-row on" data-layer="terrain"><span class="eye">✓</span><span class="nm">地形 DEM</span><span class="cnt mono">EPSG:32650</span></div>
+        <div class="layer-row on" data-layer="trees"><span class="eye">✓</span><span class="nm">果树要素（健康）</span><span class="cnt mono">12,486</span></div>
+        <div class="layer-row on" data-layer="old"><span class="eye">✓</span><span class="nm">历史老树</span><span class="cnt mono">248</span></div>
+        <div class="layer-row" data-layer="model"><span class="eye"></span><span class="nm">CityEngine 精模</span><span class="cnt mono">—</span></div>
+        <div class="layer-row on" data-layer="region"><span class="eye">✓</span><span class="nm">地2 上传地块</span><span class="cnt mono">DEM 合并</span></div>
+      </div>
+    </section>
+    <section class="panel" style="flex:1">
+      <span class="corner c-bl"></span><span class="corner c-br"></span>
+      <div class="panel-h"><span class="dot"></span><span class="ttl">工具箱</span></div>
+      <div class="panel-b">
+        <div class="tools">
+          <div class="tool"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="1"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg>拉框空间诊断</div>
+          <div class="tool"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M16 16l4 4"/><circle cx="9" cy="9" r="2" fill="currentColor"/></svg>精细查询</div>
+          <div class="tool"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/><path d="M12 8l2.2 4.5 4.5 2.2-4.5 2.2L12 21.5 9.8 16.9 5.3 14.7 9.8 12.5z"/></svg>三维测量</div>
+        </div>
+      </div>
+    </section>
+  </aside>
+
+  <!-- ============ 中央三维场景 ============ -->
+  <main class="scene" id="scene">
+    <div class="terrain" data-layer="terrain">
+      <div class="sky"></div>
+      <div class="ground"></div>
+      <div class="glowline"></div>
+      <div class="contour">
+        <i style="top:62%;height:150%;border-width:1px"></i>
+        <i style="top:66%;height:135%;border-width:1px"></i>
+        <i style="top:70%;height:120%;border-width:1px"></i>
+        <i style="top:74%;height:105%;border-width:1px"></i>
+      </div>
+    </div>
+    <div class="trees" data-layer="trees" id="trees"></div>
+    <div class="trees" data-layer="old" id="oldTrees" style="opacity:.5"></div>
+
+    <div class="scene-tools">
+      <button class="st-btn" title="拉框">⛶</button>
+      <button class="st-btn" title="放大">+</button>
+      <button class="st-btn" title="缩小">−</button>
+      <button class="st-btn" title="复位">⌂</button>
+    </div>
+    <div class="scene-coord">LAT 25.41207° N · LON 114.98630° E &nbsp;·&nbsp; H 185.2 m</div>
+    <div class="scene-legend">
+      <span class="lg"><span class="p" style="background:var(--health-ok)"></span>健康 8,490</span>
+      <span class="lg"><span class="p" style="background:var(--health-warn)"></span>预警 2,747</span>
+      <span class="lg"><span class="p" style="background:var(--health-crit)"></span>严重 1,249</span>
+    </div>
+  </main>
+
+  <!-- ============ 右侧栏 ============ -->
+  <aside class="right">
+    <div class="kpis">
+      <div class="kpi accent"><div class="lbl">果树总数</div><div class="val" id="kTotal">12,486</div><div class="delta" style="color:var(--health-ok)">▲ 较上次 +212</div></div>
+      <div class="kpi green"><div class="lbl">平均树高</div><div class="val">4.6 <span class="unit">m</span></div><div class="delta" style="color:var(--text-muted)">标准差 0.8</div></div>
+      <div class="kpi cyan"><div class="lbl">平均冠幅</div><div class="val">3.2 <span class="unit">m</span></div><div class="delta" style="color:var(--text-muted)">投影面积均 8.1 ㎡</div></div>
+      <div class="kpi"><div class="lbl">平均生长指数</div><div class="val" style="color:var(--health-warn)">0.61</div><div class="delta" style="color:var(--health-warn)">建议施肥</div></div>
+    </div>
+
+    <section class="panel" style="flex:1.2">
+      <span class="corner c-tl"></span><span class="corner c-tr"></span>
+      <div class="panel-h"><span class="dot"></span><span class="ttl">健康状态分布</span><span class="hint">实时</span></div>
+      <div class="panel-b">
+        <div class="chart-box">
+          <div class="donut">
+            <svg width="104" height="104" viewBox="0 0 104 104">
+              <circle cx="52" cy="52" r="38" fill="none" stroke="#1E293B" stroke-width="11"/>
+              <circle cx="52" cy="52" r="38" fill="none" stroke="#22C55E" stroke-width="11" stroke-dasharray="68 100" stroke-linecap="butt"/>
+              <circle cx="52" cy="52" r="38" fill="none" stroke="#F59E0B" stroke-width="11" stroke-dasharray="22 100" stroke-dashoffset="-68"/>
+              <circle cx="52" cy="52" r="38" fill="none" stroke="#EF4444" stroke-width="11" stroke-dasharray="10 100" stroke-dashoffset="-90"/>
+            </svg>
+            <div class="center"><div class="cval" style="color:var(--text-primary)">68%</div><div class="clbl">健康占比</div></div>
+          </div>
+          <div class="legend-col">
+            <div class="legend-row"><span class="p" style="background:var(--health-ok)"></span><span class="nm">健康</span><span class="v" style="color:var(--health-ok)">68%</span></div>
+            <div class="legend-row"><span class="p" style="background:var(--health-warn)"></span><span class="nm">预警</span><span class="v" style="color:var(--health-warn)">22%</span></div>
+            <div class="legend-row"><span class="p" style="background:var(--health-crit)"></span><span class="nm">严重</span><span class="v" style="color:var(--health-crit)">10%</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" style="flex:1.1">
+      <span class="corner c-bl"></span><span class="corner c-br"></span>
+      <div class="panel-h"><span class="dot"></span><span class="ttl">施肥等级分布</span><span class="hint">变量施肥</span></div>
+      <div class="panel-b">
+        <div class="hbars">
+          <div class="hbar"><div class="hl"><span>轻度（等级1）</span><b style="color:var(--health-ok)">6,240</b></div><div class="track"><div class="fill" data-w="50" style="background:var(--health-ok)"></div></div></div>
+          <div class="hbar"><div class="hl"><span>中度（等级2）</span><b style="color:var(--health-warn)">4,008</b></div><div class="track"><div class="fill" data-w="32" style="background:var(--health-warn)"></div></div></div>
+          <div class="hbar"><div class="hl"><span>重度（等级3）</span><b style="color:var(--health-crit)">2,238</b></div><div class="track"><div class="fill" data-w="18" style="background:var(--health-crit)"></div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="advice">
+      <div class="ttl">变量施肥建议</div>
+      <div class="zone">当前框选区 · 面积 12.4 亩 · 458 株</div>
+      <div class="lvl mid">◈ 建议中度施肥（等级 2）</div>
+      <div class="rows">
+        <div><span>氮肥 18-6-12</span><b>28.5 kg</b></div>
+        <div><span>预计增产</span><b style="color:var(--health-ok)">+9.2%</b></div>
+        <div><span>平均生长指数</span><b style="color:var(--health-warn)">0.58</b></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ 底部控制条 ============ -->
+  <footer class="bottombar">
+    <div class="bb-group">
+      <span class="bb-lbl">树冠透明度</span>
+      <input class="range" id="opacity" type="range" min="20" max="100" value="100">
+      <span class="mono" id="opacityVal" style="color:var(--text-muted)">100%</span>
+    </div>
+    <div class="bb-group">
+      <span class="bb-lbl">显示原地块</span>
+      <div class="switch on" id="swRegion"></div>
+    </div>
+    <div class="bb-group">
+      <span class="bb-lbl">精模懒加载</span>
+      <div class="switch on" id="swModel"></div>
+    </div>
+    <div class="sel-info" id="selInfo">
+      <span class="bb-lbl">已选中</span>
+      <span class="chip">ID 03472</span>
+      <span>树高 <b class="num" style="color:var(--text-primary)">4.8 m</b></span>
+      <span>冠幅 <b class="num" style="color:var(--text-primary)">3.4 m</b></span>
+      <span>生长指数 <b class="num" style="color:var(--health-warn)">0.52</b></span>
+      <span class="badge" style="background:var(--health-warn)"></span> 预警
+    </div>
+  </footer>
+</div>
+
+<script>
+/* 果树点云（伪随机，健康权重 68/22/10） */
+(function(){
+  const wrap=document.getElementById('trees');
+  const oldWrap=document.getElementById('oldTrees');
+  const oldCount=16;
+  const w=wrap.clientWidth||1600, h=wrap.clientHeight||900;
+  let seed=42;
+  const rand=()=>{seed=(seed*1664525+1013904223)>>>0; return seed/4294967296;};
+  const make=(el,count,small)=>{
+    const f=document.createDocumentFragment();
+    for(let i=0;i<count;i++){
+      const d=document.createElement('div');
+      d.className='tree';
+      const r=rand();
+      d.classList.add(r<0.68?'ok':r<0.90?'warn':'crit');
+      // 模拟山体起伏：中间偏高，分布略聚中
+      const x=8+rand()*84, y=12+rand()*62 + (small?20:0);
+      d.style.left=x+'%'; d.style.top=y+'%';
+      if(!small) d.style.width=d.style.height=(5+rand()*4)+'px';
+      f.appendChild(d);
+    }
+    el.appendChild(f);
+  };
+  make(wrap,300,false);
+  make(oldWrap,oldCount,true);
+})();
+
+/* 随机选一株树作为选中样例 */
+setTimeout(()=>{
+  const trees=[...document.querySelectorAll('.tree.ok')];
+  const t=trees[Math.floor(trees.length/2)];
+  t.classList.add('selected');
+  const tag=document.createElement('div');
+  tag.className='sel-tag';
+  tag.textContent='ID 03472 · 树高 4.8m · 指数 0.52';
+  t.parentElement.appendChild(tag);
+  const r=t.getBoundingClientRect(), pr=t.parentElement.getBoundingClientRect();
+  tag.style.left=(t.offsetLeft)+'px';
+  tag.style.top=(t.offsetTop-6)+'px';
+  t.style.left=t.style.left; // noop
+  tag.style.left=t.style.left; tag.style.top=t.style.top;
+},300);
+
+/* 图层显隐 */
+document.querySelectorAll('.layer-row').forEach(row=>{
+  row.addEventListener('click',()=>{
+    row.classList.toggle('on');
+    const key=row.dataset.layer;
+    if(key==='model'||key==='region') return; // 占位图层仅演示显隐
+    document.querySelectorAll(`[data-layer="${key}"]`).forEach(el=>{
+      el.style.opacity = row.classList.contains('on') ? (key==='old'?'.5':'1') : '0';
+    });
+  });
+});
+
+/* 透明度滑杆 */
+const op=document.getElementById('opacity'), ov=document.getElementById('opacityVal');
+op.addEventListener('input',()=>{
+  const v=op.value; ov.textContent=v+'%';
+  document.querySelectorAll('.tree').forEach(t=>t.style.opacity=v/100);
+});
+
+/* 开关 */
+[['swRegion','region'],['swModel','model']].forEach(([id,key])=>{
+  document.getElementById(id).addEventListener('click',function(){ this.classList.toggle('on'); });
+});
+
+/* 横向条形进入动画 */
+window.addEventListener('load',()=>{
+  document.querySelectorAll('.hbar .fill').forEach(f=>{
+    requestAnimationFrame(()=>{ f.style.width=f.dataset.w+'%'; });
+  });
+});
+</script>
+</body>
+</html>

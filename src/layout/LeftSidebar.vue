@@ -92,6 +92,7 @@
             class="layer-item"
             :class="{ active: orchardStore.activeAnalysisId === result.id }"
             @click="orchardStore.activeAnalysisId = result.id"
+            @dblclick.stop="zoomToAnalysisFile(result)"
           >
             <i
               class="fa-solid"
@@ -120,6 +121,7 @@
             class="layer-item"
             :class="{ active: orchardStore.activePlotTaskId === task.id }"
             @click="onPlotLayerClick(task)"
+            @dblclick.stop="zoomToPlotTask(task)"
           >
             <i class="fa-solid fa-map-location-dot text-cyan"></i>
             <span class="layer-name">{{ task.fileName }}</span>
@@ -387,6 +389,36 @@ function onPlotLayerClick(task: UploadPlotTask) {
 
 function onDeletePlotTask(task: UploadPlotTask) {
   orchardStore.removePlotTask(task.id)
+}
+
+// ---- 双击跳转：定位到上传地块（与 UploadPlotLayer.flyToPlot 同一套范围） ----
+function zoomToPlotTask(task: UploadPlotTask) {
+  const viewer = cesiumStore.viewer
+  if (!viewer) return
+  const Cesium = (window as any).Cesium
+  if (task.domRect) {
+    const [west, south, east, north] = task.domRect
+    viewer.camera.flyTo({
+      destination: Cesium.Rectangle.fromDegrees(west, south, east, north),
+      duration: 1.5,
+    })
+  } else if (task.freshTrees?.length) {
+    const t = task.freshTrees[0]
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(t.lng, t.lat, 800),
+      duration: 1.5,
+    })
+  } else {
+    return
+  }
+  ElMessage.success(`已定位: ${task.fileName}`)
+}
+
+/** 分析结果条目双击：若关联了上传地块则跳转定位 */
+function zoomToAnalysisFile(result: { fileId?: string }) {
+  if (!result.fileId) return
+  const task = orchardStore.plotTasks.find((t) => t.fileId === result.fileId)
+  if (task) zoomToPlotTask(task)
 }
 
 function onDeleteFile(file: UploadedFile) {

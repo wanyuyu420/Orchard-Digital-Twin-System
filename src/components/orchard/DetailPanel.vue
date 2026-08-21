@@ -74,6 +74,42 @@
           </div>
         </div>
 
+        <!-- 施肥建议（打开详情时自动调用变量施肥接口，以底图整园为群体评估本树需肥） -->
+        <div class="detail-section">
+          <div class="section-label">施肥建议</div>
+          <div v-if="fertilizerLoading" class="fert-state">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+            <span>正在评估施肥需求…</span>
+          </div>
+          <div v-else-if="fertilizerError" class="fert-state fert-error">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <span>{{ fertilizerError }}</span>
+          </div>
+          <div v-else-if="fertilizerRecommend" class="fert-result">
+            <div class="fert-demand">
+              <span class="fert-demand-label">需肥得分</span>
+              <span class="fert-demand-value">{{ (fertilizerRecommend.demand_score * 100).toFixed(0) }}%</span>
+            </div>
+            <div class="fert-rows">
+              <div class="fert-row">
+                <span class="fert-k">施肥等级</span>
+                <span class="fert-badge" :class="levelClass(fertilizerRecommend.recommended_level)">
+                  {{ levelLabel(fertilizerRecommend.recommended_level) }}施肥
+                </span>
+              </div>
+              <div class="fert-row">
+                <span class="fert-k">当前等级</span>
+                <span class="fert-v">{{ levelLabel(fertilizerRecommend.current_level) }}</span>
+              </div>
+            </div>
+            <div class="fert-verdict" :class="verdict.tone">{{ verdict.text }}</div>
+          </div>
+          <div v-else class="fert-state">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>该树不在底图施肥评估范围内</span>
+          </div>
+        </div>
+
       </div>
 
       <!-- 操作按钮 -->
@@ -82,19 +118,18 @@
           <i class="fa-solid fa-location-crosshairs"></i>
           地图定位
         </el-button>
-        <el-button type="primary" @click="viewAnalysis">
-          <i class="fa-solid fa-chart-simple"></i>
-          查看分析
-        </el-button>
       </div>
     </div>
   </transition>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useOrchardStore } from '@/stores/orchard'
 import { useCesiumStore } from '@/stores/cesium'
+import { generateFertilizationPlan } from '@/api/orchard'
+import { DOM_RECT } from '@/utils/orchardPreview'
+import type { FertilizerPlanItem } from '@/types/orchard'
 
 const orchardStore = useOrchardStore()
 const cesiumStore = useCesiumStore()
@@ -140,10 +175,67 @@ function locateOnMap() {
   }
 }
 
-function viewAnalysis() {
-  orchardStore.showDetailPanel = false
-  orchardStore.showAnalysisWindow = true
+// ---- 施肥建议（打开详情时自动评估本树需肥） ----
+const fertilizerLoading = ref(false)
+const fertilizerError = ref('')
+const fertilizerRecommend = ref<FertilizerPlanItem | null>(null)
+
+/** 以底图整园（DOM_RECT 范围）为评估群体调变量施肥接口，按 id 取本树的需肥等级。
+ *  apply=false 只读评估，不写回 GeoScene。min-max 归一化需要群体，单棵树没意义。 */
+async function loadFertilizerRecommend() {
+  const poi = detailPoi.value
+  if (!poi) return
+  fertilizerLoading.value = true
+  fertilizerError.value = ''
+  fertilizerRecommend.value = null
+  try {
+    // 底图范围矩形闭合环（后端 _normalize_envelope 自动识别经纬度）
+    const ring: number[][] = [
+      [DOM_RECT.west, DOM_RECT.south],
+      [DOM_RECT.east, DOM_RECT.south],
+      [DOM_RECT.east, DOM_RECT.north],
+      [DOM_RECT.west, DOM_RECT.north],
+      [DOM_RECT.west, DOM_RECT.south],
+    ]
+    const res = await generateFertilizationPlan({ coordinates: ring, apply: false })
+    const item = res.data.plan.find((p) => String(p.id) === String(poi.id))
+    fertilizerRecommend.value = item ?? null
+  } catch (e: any) {
+    fertilizerError.value = e?.response?.data?.detail || e?.message || '施肥评估失败'
+  } finally {
+    fertilizerLoading.value = false
+  }
 }
+
+const levelLabel = (lvl: number | null | undefined): string => {
+  if (lvl === 1) return '轻度'
+  if (lvl === 2) return '中度'
+  if (lvl === 3) return '重度'
+  return '--'
+}
+
+const levelClass = (lvl: number | null | undefined): string => {
+  if (lvl === 1) return 'lvl-light'
+  if (lvl === 2) return 'lvl-medium'
+  if (lvl === 3) return 'lvl-heavy'
+  return 'lvl-none'
+}
+
+const verdict = computed(() => {
+  const r = fertilizerRecommend.value
+  if (!r) return { text: '', tone: '' }
+  if (r.recommended_level >= 2) return { text: '建议施肥', tone: 'warn' }
+  return { text: '施肥需求较低', tone: 'ok' }
+})
+
+// 打开详情自动评估；关闭详情复位
+watch(detailPoi, (poi) => {
+  if (poi) loadFertilizerRecommend()
+  else {
+    fertilizerRecommend.value = null
+    fertilizerError.value = ''
+  }
+}, { immediate: true })
 </script>
 
 <style scoped lang="scss">
@@ -333,6 +425,112 @@ function viewAnalysis() {
       font-weight: 600;
       color: $text-main;
       font-family: $font-code;
+    }
+  }
+}
+
+// 施肥建议
+.fert-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  font-size: 12px;
+  color: $text-dim;
+
+  i { color: $text-dim; }
+
+  &.fert-error {
+    color: $alert-red;
+    i { color: $alert-red; }
+  }
+}
+
+.fert-result {
+  .fert-demand {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6px 0 10px;
+
+    .fert-demand-label {
+      font-size: 12px;
+      color: $text-dim;
+    }
+
+    .fert-demand-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: $orchard-orange;
+      font-family: $font-code;
+    }
+  }
+
+  .fert-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    .fert-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+
+      .fert-k {
+        font-size: 12px;
+        color: $text-dim;
+      }
+
+      .fert-v {
+        font-size: 13px;
+        color: $text-main;
+      }
+
+      .fert-badge {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 2px 10px;
+        border-radius: 12px;
+
+        &.lvl-light {
+          background: rgba(34, 197, 94, 0.12);
+          color: $success-green;
+        }
+
+        &.lvl-medium {
+          background: rgba(234, 179, 8, 0.12);
+          color: $warn-yellow;
+        }
+
+        &.lvl-heavy {
+          background: rgba(239, 68, 68, 0.12);
+          color: $alert-red;
+        }
+
+        &.lvl-none {
+          background: rgba(255, 255, 255, 0.08);
+          color: $text-dim;
+        }
+      }
+    }
+  }
+
+  .fert-verdict {
+    margin-top: 10px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+
+    &.warn {
+      background: rgba(234, 179, 8, 0.12);
+      color: $warn-yellow;
+    }
+
+    &.ok {
+      background: rgba(34, 197, 94, 0.1);
+      color: $success-green;
     }
   }
 }

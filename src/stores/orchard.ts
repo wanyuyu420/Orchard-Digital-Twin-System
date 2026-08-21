@@ -18,8 +18,9 @@ import type {
 } from '@/types/orchard'
 import { useGISStore } from '@/stores/gis'
 import * as orchardApi from '@/api/orchard'
+import type { TaskStatus } from '@/api/orchard'
 import { growthIndexToHealth, normalizeToClosedRing } from '@/utils/spatial'
-import { countTilesetContent, computeAreaFromDem } from '@/utils/mapStats'
+import { computeAreaFromDem } from '@/utils/mapStats'
 import { DOM_RECT } from '@/utils/orchardPreview'
 import { buildChartFromLoadedTileset } from '@/utils/chartFromBasemap'
 
@@ -72,30 +73,14 @@ export const useOrchardStore = defineStore('orchard', () => {
 
   /** 从底图刷新统计（trees 瓦片加载成功后调用）。DEM 异步加载，未就绪时最多重试数秒。 */
   async function refreshMapStats(): Promise<void> {
-    // 优先：底图范围内可查询的果树总数（后端 FeatureServer returnCountOnly，与精确查询口径一致）
+    // 树点计数：数据源随上传状态切换（地1 果园范围 → 上传文件范围）。
+    // 只读树点（后端 FeatureServer returnCountOnly），不数 3D 树模型。
     let totalTrees = 0
     try {
-      const res = await orchardApi.getTreeCountByBbox([
-        DOM_RECT.west,
-        DOM_RECT.south,
-        DOM_RECT.east,
-        DOM_RECT.north,
-      ])
+      const res = await orchardApi.getTreeCountByBbox(treePointSourceBbox.value)
       totalTrees = res.data.count
     } catch (e) {
-      console.warn('[mapStats] 底图范围内计数失败,回退瓦片统计:', e)
-    }
-
-    // 回退：后端不可用时从地1 树瓦片数树模型
-    if (!totalTrees && plot1DataBase.value) {
-      try {
-        const res = await fetch(`${plot1DataBase.value}/trees/tileset.json`)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const tileset = await res.json()
-        totalTrees = countTilesetContent(tileset)
-      } catch (e) {
-        console.warn('[mapStats] 从底图读取统计失败:', e)
-      }
+      console.warn('[mapStats] 树点计数失败:', e)
     }
 
     let areaMu = computeAreaFromDem((window as any).DEM)
@@ -104,7 +89,7 @@ export const useOrchardStore = defineStore('orchard', () => {
       areaMu = computeAreaFromDem((window as any).DEM)
     }
     mapStats.value = { totalTrees, areaMu, ready: true }
-    console.log(`[mapStats] 底图统计: ${totalTrees} 棵树, ${areaMu.toFixed(1)} 亩`)
+    console.log(`[mapStats] 树点统计: ${totalTrees} 棵树, ${areaMu.toFixed(1)} 亩`)
   }
 
   // ---- 历史老树（开屏拾取点） ----
@@ -168,6 +153,8 @@ export const useOrchardStore = defineStore('orchard', () => {
     coordinates: any
     /** Cesium 地图上的 feature ID，删除图层时同步移除地图图形 */
     featureId?: string
+    /** 圆形框选的半径(m)，矩形/多边形为 undefined（施肥/查询构造多边形环需要） */
+    radius?: number
     createdAt: string
     poiCount?: number
   }
@@ -366,6 +353,8 @@ export const useOrchardStore = defineStore('orchard', () => {
         uploadedFiles.value[idx].message = res.data.message
         uploadedFiles.value[idx].uploadProgress = Math.round(res.data.progress * 100)
         uploadedFiles.value[idx].totalTrees = res.data.total_trees
+        // 同步"上传地块"图层任务（进度 / 完成 / 失败），保证图层与文件行状态一致
+        syncPlotFromTask(row, res.data)
 
         if (status === 'completed') {
           stopPolling(row.id)
@@ -468,6 +457,39 @@ export const useOrchardStore = defineStore('orchard', () => {
     pollTimers.set(row.id, timer)
   }
 
+  /** 按关联文件 id 查找"上传地块"图层任务（数据管理页上传同步生成） */
+  function findPlotByFileId(fileId: string): UploadPlotTask | undefined {
+    return plotTasks.value.find((t) => t.fileId === fileId)
+  }
+
+  /** 把同一后端任务的轮询状态同步到"上传地块"图层任务（进度/完成/失败） */
+  function syncPlotFromTask(row: UploadedFile, status: TaskStatus) {
+    const pt = findPlotByFileId(row.id)
+    if (!pt) return
+    pt.taskId = row.taskId ?? pt.taskId
+    pt.analysisProgress = Math.round((status.progress ?? 0) * 100)
+    if (status.status === 'completed') {
+      pt.status = 'completed'
+      pt.analysisProgress = 100
+      pt.totalTrees = status.total_trees ?? 0
+      pt.freshTrees = (status.fresh_trees ?? []).map((t) => ({
+        id: String(t.id),
+        batch_id: 'orange_tree',
+        lng: t.lng,
+        lat: t.lat,
+        area_m2: t.area_m2,
+        height_m: t.height_m,
+        crown_diameter: t.crown_diameter,
+        volume_m3: t.volume_m3,
+        growth_index: t.growth_index,
+      }))
+    } else if (status.status === 'failed') {
+      pt.status = 'failed'
+    } else {
+      pt.status = 'processing'
+    }
+  }
+
   async function uploadSingleFile(file: File) {
     // 仅支持无人机正射影像 .tif/.tiff
     const lower = file.name.toLowerCase()
@@ -475,6 +497,14 @@ export const useOrchardStore = defineStore('orchard', () => {
       const err = new Error('仅支持 .tif/.tiff 无人机正射影像文件')
       console.error('[orchardStore]', err.message)
       throw err
+    }
+
+    // 读 TIF 边界（只解析文件头，不读像素），供"上传地块"图层贴位与双击跳转
+    let domRect: [number, number, number, number] | null = null
+    try {
+      domRect = await orchardApi.readTifBounds(file)
+    } catch (e) {
+      console.warn('[orchardStore] 读取 TIF 边界失败（图层仍可显示）:', e)
     }
 
     const row: UploadedFile = {
@@ -491,9 +521,28 @@ export const useOrchardStore = defineStore('orchard', () => {
     uploadedFiles.value.push(row)
     activeFileId.value = row.id
 
+    // 同步创建"上传地块"图层任务：完成后在图层区显示、可单击加载地2 / 双击跳转
+    // （与侧边栏 uploadTifAndInterpret 共用 plotTasks 数据结构，fileId 关联回本文件）
+    plotTasks.value.unshift({
+      id: 'plot-' + row.id,
+      fileId: row.id,
+      taskId: '',
+      fileName: file.name,
+      fileSize: file.size,
+      status: 'uploading',
+      uploadProgress: 0,
+      analysisProgress: 0,
+      totalTrees: 0,
+      freshTrees: [],
+      domRect,
+      createdAt: row.uploadedAt,
+    })
+
     try {
       const res = await orchardApi.uploadFile(file)
       row.taskId = res.data.task_id
+      const pt = findPlotByFileId(row.id)
+      if (pt) pt.status = 'processing'
       startPolling(row, res.data.task_id)
       return row
     } catch (err) {
@@ -502,6 +551,8 @@ export const useOrchardStore = defineStore('orchard', () => {
         uploadedFiles.value[idx].status = 'failed'
         uploadedFiles.value[idx].message = '上传失败'
       }
+      const pt = findPlotByFileId(row.id)
+      if (pt) pt.status = 'failed'
       console.error('[orchardStore] Upload failed:', err)
       throw err
     }
@@ -511,6 +562,10 @@ export const useOrchardStore = defineStore('orchard', () => {
     // 后端无删除接口，仅从本地会话列表移除并停止轮询
     stopPolling(fileId)
     uploadedFiles.value = uploadedFiles.value.filter((f) => f.id !== fileId)
+    // 同步移除关联的"上传地块"图层任务（数据管理页上传生成）
+    const linked = findPlotByFileId(fileId)
+    if (linked && activePlotTaskId.value === linked.id) activePlotTaskId.value = null
+    plotTasks.value = plotTasks.value.filter((t) => t.fileId !== fileId)
     if (activeFileId.value === fileId) {
       activeFileId.value = null
     }
@@ -552,12 +607,26 @@ export const useOrchardStore = defineStore('orchard', () => {
     })
   }
 
-  /** 生成变量施肥方案（apply=true 时同时把等级写回 GeoScene） */
-  async function generateFertilizationPlan(opts?: { apply?: boolean }) {
+  /** 施肥区域（面状框选图层），缺省回退当前 selectionRange */
+  interface FertRegion {
+    type: 'rectangle' | 'circle' | 'polygon'
+    coordinates: number[][]
+    radius?: number
+  }
+
+  /** 生成变量施肥方案（apply=true 时同时把等级写回 GeoScene）。
+   *  region 指定某个框选图层（矩形/圆形/多边形）；不传则用当前 selectionRange。 */
+  async function generateFertilizationPlan(opts?: { apply?: boolean; region?: FertRegion }) {
     fertilizationLoading.value = true
     fertilizationError.value = null
     try {
-      const coordinates = selectionCoordinates()
+      const coordinates = opts?.region
+        ? normalizeToClosedRing({
+            type: opts.region.type,
+            coordinates: opts.region.coordinates,
+            radius: opts.region.radius,
+          })
+        : selectionCoordinates()
       const res = await orchardApi.generateFertilizationPlan({
         coordinates,
         apply: opts?.apply ?? false,
@@ -573,9 +642,15 @@ export const useOrchardStore = defineStore('orchard', () => {
     }
   }
 
-  /** 导出处方图（CSV 喂无人机/施肥机，GeoJSON 供 Cesium 二次确认） */
-  async function exportFertilizationPlan(format: 'csv' | 'geojson') {
-    const coordinates = selectionCoordinates()
+  /** 导出处方图（CSV 喂无人机/施肥机，GeoJSON 供 Cesium 二次确认）。region 同 generateFertilizationPlan */
+  async function exportFertilizationPlan(format: 'csv' | 'geojson', region?: FertRegion) {
+    const coordinates = region
+      ? normalizeToClosedRing({
+          type: region.type,
+          coordinates: region.coordinates,
+          radius: region.radius,
+        })
+      : selectionCoordinates()
     const res = await orchardApi.exportFertilizationPlan({ coordinates }, format)
     triggerDownload(res.data as Blob, `fertilizer_plan.${format}`)
   }
@@ -623,11 +698,42 @@ export const useOrchardStore = defineStore('orchard', () => {
     plotTasks.value.find((t) => t.id === activePlotTaskId.value) ?? null,
   )
 
+  /**
+   * 当前树点数据源范围 [west, south, east, north]：
+   * 已上传地2（activePlotTask 优先，其次最近完成的上传地块）用上传文件 WGS84 边界；
+   * 未上传时用地1 果园范围 DOM_RECT。果园态势 / 冠层解析右侧面板的树点数据均以它为准。
+   */
+  const treePointSourceBbox = computed<[number, number, number, number]>(() => {
+    const uploaded = plotTasks.value.filter((t) => t.status === 'completed' && t.domRect)
+    if (uploaded.length > 0) {
+      const active = uploaded.find((t) => t.id === activePlotTaskId.value)
+      return (active ?? uploaded[0]).domRect!
+    }
+    return [DOM_RECT.west, DOM_RECT.south, DOM_RECT.east, DOM_RECT.north]
+  })
+
+  /** 树点数据源名称（用于面板标注：地1 果园范围 / 上传文件名） */
+  const treePointSourceLabel = computed(() => {
+    const uploaded = plotTasks.value.filter((t) => t.status === 'completed' && t.domRect)
+    if (uploaded.length > 0) {
+      const active = uploaded.find((t) => t.id === activePlotTaskId.value)
+      return (active ?? uploaded[0]).fileName
+    }
+    return '地1 果园范围'
+  })
+
   const POLL_INTERVAL_MS = 2000
 
   function removePlotTask(id: string) {
-    plotTasks.value = plotTasks.value.filter((t) => t.id !== id)
+    const t = plotTasks.value.find((x) => x.id === id)
+    plotTasks.value = plotTasks.value.filter((x) => x.id !== id)
     if (activePlotTaskId.value === id) activePlotTaskId.value = null
+    // 数据管理页上传生成的关联文件行一并移除
+    if (t?.fileId) {
+      stopPolling(t.fileId)
+      uploadedFiles.value = uploadedFiles.value.filter((f) => f.id !== t.fileId)
+      if (activeFileId.value === t.fileId) activeFileId.value = null
+    }
   }
 
   /** 上传 TIF 并启动后台分割 + 轮询（异步，不阻塞主界面） */
@@ -847,6 +953,9 @@ export const useOrchardStore = defineStore('orchard', () => {
     activePlotTaskId,
     activePlotTask,
     plot1DataBase,
+    // 树点数据源（果园态势 / 冠层解析面板用，随上传状态在地1 果园 ↔ 上传文件间切换）
+    treePointSourceBbox,
+    treePointSourceLabel,
     removePlotTask,
     uploadTifAndInterpret,
     loadPlot,
