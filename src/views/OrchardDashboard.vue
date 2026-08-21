@@ -52,8 +52,9 @@ function formatNumber(n: number): string {
 }
 
 // 底图统计（OrchardTilesetLayer 加载 trees 后填充），数据就绪前显示占位符
+// 树点计数可能因 GeoScene 瞬时不可达而失败，失败时显示占位符而非错误的 0
 const dashboardStats = computed(() => ({
-  treesLabel: orchardStore.mapStats.ready
+  treesLabel: orchardStore.mapStats.treeCountReady
     ? formatNumber(orchardStore.mapStats.totalTrees)
     : '...',
   areaLabel: orchardStore.mapStats.ready

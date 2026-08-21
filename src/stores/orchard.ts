@@ -62,10 +62,11 @@ export const useOrchardStore = defineStore('orchard', () => {
   const orchardStatistics = ref<OrchardStatistics | null>(null)
 
   // ---- 底图统计（读自 3D Tiles / DEM，绕开 GeoScene 挂起）----
-  const mapStats = ref<{ totalTrees: number; areaMu: number; ready: boolean }>({
+  const mapStats = ref<{ totalTrees: number; areaMu: number; ready: boolean; treeCountReady: boolean }>({
     totalTrees: 0,
     areaMu: 0,
     ready: false,
+    treeCountReady: false,
   })
 
   /** 地1 数据源（OrchardTilesetLayer 加载时写入），供驾驶舱统计回退时复用。 */
@@ -73,23 +74,34 @@ export const useOrchardStore = defineStore('orchard', () => {
 
   /** 从底图刷新统计（trees 瓦片加载成功后调用）。DEM 异步加载，未就绪时最多重试数秒。 */
   async function refreshMapStats(): Promise<void> {
-    // 树点计数：数据源随上传状态切换（地1 果园范围 → 上传文件范围）。
-    // 只读树点（后端 FeatureServer returnCountOnly），不数 3D 树模型。
-    let totalTrees = 0
-    try {
-      const res = await orchardApi.getTreeCountByBbox(treePointSourceBbox.value)
-      totalTrees = res.data.count
-    } catch (e) {
-      console.warn('[mapStats] 树点计数失败:', e)
-    }
-
     let areaMu = computeAreaFromDem((window as any).DEM)
     for (let i = 0; i < 12 && areaMu === 0; i++) {
       await new Promise((r) => setTimeout(r, 500))
       areaMu = computeAreaFromDem((window as any).DEM)
     }
-    mapStats.value = { totalTrees, areaMu, ready: true }
-    console.log(`[mapStats] 树点统计: ${totalTrees} 棵树, ${areaMu.toFixed(1)} 亩`)
+
+    // 树点计数：数据源随上传状态切换（地1 果园范围 → 上传文件范围）。
+    // 只读树点（后端 FeatureServer returnCountOnly），不数 3D 树模型。
+    // GeoScene 冷缓存/后端启动期首几次请求可能瞬时失败，这里重试最多 3 次；
+    // 全部失败则 treeCountReady=false（面板显示占位符），避免把错误的 0 展示出去。
+    let totalTrees = 0
+    let treeCountReady = false
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const res = await orchardApi.getTreeCountByBbox(treePointSourceBbox.value)
+        totalTrees = res.data.count
+        treeCountReady = true
+        break
+      } catch (e) {
+        console.warn(`[mapStats] 树点计数失败(第 ${attempt}/3 次):`, e)
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 600))
+      }
+    }
+
+    mapStats.value = { totalTrees, areaMu, ready: true, treeCountReady }
+    console.log(
+      `[mapStats] 树点统计: ${treeCountReady ? `${totalTrees} 棵树` : '计数失败(显示占位符)'}, ${areaMu.toFixed(1)} 亩`,
+    )
   }
 
   // ---- 历史老树（开屏拾取点） ----
