@@ -272,15 +272,15 @@ class GeoSceneService:
             raise GeoSceneError(f'GeoScene FeatureServer applyEdits failed: {e}')
 
     @classmethod
-    def delete_features_by_batch(cls, batch_id: str) -> int:
-        """删除指定 batch_id 的所有要素（重复上传时先清旧数据，避免 GeoScene 累积）。"""
+    def delete_features_where(cls, where_clause: str) -> int:
+        """按 where 条件删除所有命中要素（重复入库前清旧数据，避免 GeoScene 累积）。"""
         settings = get_settings()
         token = cls._get_token()
 
-        # 1) 查询旧 batch 的 objectId
+        # 1) 查询命中要素的 objectId
         try:
             features = cls.query_features(
-                where=f"batch_id='{batch_id}'",
+                where=where_clause,
                 return_geometry=False,
                 limit=2000,
                 timeout=60,
@@ -320,12 +320,17 @@ class GeoSceneService:
                 else:
                     err = result.get('error', resp.text)
                     raise GeoSceneError(f'deleteFeatures failed: {err}')
-            print(f'[GeoScene] Deleted {total_success} old trees of batch {batch_id}')
+            print(f'[GeoScene] Deleted {total_success} features ({where_clause})')
             return total_success
         except GeoSceneError:
             raise
         except Exception as e:
             raise GeoSceneError(f'GeoScene FeatureServer delete failed: {e}')
+
+    @classmethod
+    def delete_features_by_plot(cls, plot_type: str) -> int:
+        """删除指定 plot_type 的所有要素（语义化封装）。"""
+        return cls.delete_features_where(f"plot_type='{plot_type}'")
 
     @classmethod
     def update_features(cls, updates: list[dict]) -> dict:

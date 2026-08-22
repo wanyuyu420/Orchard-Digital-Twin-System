@@ -15,7 +15,8 @@ class OrangeTree(Base):
 
     # 1. 身份标识
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True, comment="树木唯一身份证号")
-    batch_id: Mapped[str] = mapped_column(String, index=True, default="historical_zone", comment="数据批次标签(如历史示范区或上传时间戳)")
+    tree_code: Mapped[str] = mapped_column(String, index=True, comment="每棵树唯一编号(如 TREE_0001)")
+    plot_type: Mapped[str] = mapped_column(String, index=True, default="plot1", comment="地块类型(plot1=历史老树, plot2=上传新树)")
     
     # 核心修正：类型提示统一标注为 Mapped[str]，彻底适配兼容层动态函数调用
     # 空间几何字段（SQLite下自动降级为Text存储WKT，Postgres下为原生PostGIS）

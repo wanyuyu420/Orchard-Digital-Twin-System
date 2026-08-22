@@ -53,7 +53,8 @@ def _build_orange_tree(a: dict, g: dict) -> OrangeTreeOut:
         lng, lat = round(_coord(g["x"]), 6), round(_coord(g["y"]), 6)
     return OrangeTreeOut(
         id=a.get("id"),
-        batch_id=a.get("batch_id") or "",
+        tree_code=a.get("tree_code") or "",
+        plot_type=a.get("plot_type") or "plot1",
         lng=lng or 0.0,
         lat=lat or 0.0,
         confidence=a.get("confidence"),
@@ -127,8 +128,8 @@ async def spatial_diagnose(
 
     geometry = {"rings": [ring], "spatialReference": {"wkid": 4326}}
 
-    # 按批次过滤，不传则查全量（后向兼容地1 旧前端）
-    where = f"batch_id='{payload.batch_id}'" if payload.batch_id else "1=1"
+    # 按地块类型过滤，不传则查全量
+    where = f"plot_type='{payload.plot_type}'" if payload.plot_type else "1=1"
 
     try:
         stats = GeoSceneService.query_stats(geometry=geometry, where=where)
@@ -287,14 +288,14 @@ async def count_trees(
 )
 async def get_historical_trees():
     """
-    大屏开屏时前端一次性拉取全部历史老树（batch_id=historical_zone）的
+    大屏开屏时前端一次性拉取全部历史老树（plot_type=plot1）的
     经纬度坐标与长势/施肥属性，用于在 3D 底图模型表面铺设隐形拾取点。
 
     所有空间数据查询均通过 GeoScene FeatureServer。
     """
     try:
         features = GeoSceneService.query_features(
-            where="batch_id='historical_zone'",
+            where="plot_type='plot1'",
             out_sr=4326,
             limit=10000,
             return_geometry=True,
@@ -473,7 +474,7 @@ def _calc_growth_fields(mask: np.ndarray, gsd: float, height_m: float = None) ->
 # ===== GeoScene Server integration now handled by GeoSceneService (see app/services/geoscene_service.py) =====
 
 
-def _persist_trees_sync(trees_data: list, batch_id: str):
+def _persist_trees_sync(trees_data: list):
     """Persist detected trees to DB via sync connection (runs in background thread)."""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
@@ -488,7 +489,8 @@ def _persist_trees_sync(trees_data: list, batch_id: str):
         with Session(engine) as session:
             for tree in trees_data:
                 session.add(OrangeTree(
-                    batch_id=batch_id,
+                    tree_code=tree.get("tree_code") or "",
+                    plot_type=tree.get("plot_type") or "plot2",
                     geom=f"POINT({tree['utm_x']} {tree['utm_y']})",
                     confidence=tree.get("iou_score"),
                     compactness=tree.get("compactness"),
@@ -505,7 +507,7 @@ def _persist_trees_sync(trees_data: list, batch_id: str):
                     fertilizer_level=tree.get("fertilizer_level", 0),
                 ))
             session.commit()
-            print(f"[Persist] {len(trees_data)} trees saved to DB (batch: {batch_id})")
+            print(f"[Persist] {len(trees_data)} trees saved to DB")
     except Exception as e:
         print(f"[Persist] Failed to save trees: {e}")
     finally:
@@ -555,7 +557,7 @@ def _make_geojson_from_mask(
     return {"type": "Polygon", "coordinates": [coords]}
 
 
-def _detect_trees(file_path: str, batch_id: str, progress_cb=None) -> list[dict]:
+def _detect_trees(file_path: str, progress_cb=None) -> list[dict]:
     """核心推理：YOLO 检测 + SAM 分割 + 计算生长字段，返回检测到的树列表（不含入库发布）。
 
     上传推理和一次性入库脚本共用此函数，保证字段计算完全一致。
@@ -654,7 +656,8 @@ def _detect_trees(file_path: str, batch_id: str, progress_cb=None) -> list[dict]
             tree_uuid = f"tree_{uuid.uuid4().hex[:8]}"
             all_detected_trees.append({
                 "id": tree_uuid,
-                "batch_id": batch_id,
+                "tree_code": f"TREE_{uuid.uuid4().hex[:8].upper()}",
+                "plot_type": "plot2",
                 "lng": round(lng, 8),
                 "lat": round(lat, 8),
                 "utm_x": round(utm_x, 4),
@@ -681,16 +684,14 @@ def _run_inference_task(task_id: str, file_path: str):
     with _task_lock:
         _task_store[task_id]["status"] = "processing"
 
-    batch_id = os.path.splitext(os.path.basename(file_path))[0]
-
     def _progress_cb(tile_count, total_tiles):
         _update_progress(task_id, tile_count, total_tiles)
 
     try:
-        all_detected_trees = _detect_trees(file_path, batch_id, _progress_cb)
+        all_detected_trees = _detect_trees(file_path, _progress_cb)
 
         # Persist detected trees to database for spatial-diagnose
-        _persist_trees_sync(all_detected_trees, batch_id)
+        _persist_trees_sync(all_detected_trees)
 
         with _task_lock:
             _task_store[task_id]["status"] = "completed"

@@ -280,13 +280,13 @@ export const useOrchardStore = defineStore('orchard', () => {
   function setSelectionRange(range: NonNullable<typeof selectionRange.value>) {
     selectionRange.value = range
     // 选定范围后默认触发TSOM查询
-    // 地2（上传地块）激活时传 batch_id='orange_tree'，地1 不传（查 historical_zone 为主）
-    const batchId = activePlotTaskId.value ? 'orange_tree' : undefined
+    // 地2（上传地块）激活时传 plot_type='plot2'，地1 不传（查 plot1 为主）
+    const plotType = activePlotTaskId.value ? 'plot2' : undefined
     const params: TsomQueryParams = {
       rangeType: range.type,
       coordinates: range.coordinates,
       radius: range.radius,
-      batchId,
+      plotType,
     }
     return executeTsomQuery(params)
   }
@@ -486,7 +486,8 @@ export const useOrchardStore = defineStore('orchard', () => {
       pt.totalTrees = status.total_trees ?? 0
       pt.freshTrees = (status.fresh_trees ?? []).map((t) => ({
         id: String(t.id),
-        batch_id: 'orange_tree',
+        tree_code: t.tree_code ?? '',
+        plot_type: 'plot2',
         lng: t.lng,
         lat: t.lat,
         area_m2: t.area_m2,
@@ -883,7 +884,7 @@ export const useOrchardStore = defineStore('orchard', () => {
       const res = await orchardApi.getHistoricalTrees()
       const pois: FruitTreePoi[] = res.data.trees.map((t) => ({
         id: String(t.id),
-        name: t.batch_id || `历史树${t.id}`,
+        name: t.tree_code || `历史树${t.id}`,
         longitude: t.lng,
         latitude: t.lat,
         altitude: undefined,

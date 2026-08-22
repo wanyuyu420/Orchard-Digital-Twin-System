@@ -38,8 +38,8 @@ export async function queryTsom(params: TsomQueryParams): Promise<{ data: TsomQu
       radius: params.radius,
     }),
   }
-  // 按批次过滤（地1='historical_zone'，地2='orange_tree'），不传则查全量
-  if (params.batchId) payload.batch_id = params.batchId
+  // 按地块类型过滤（地1='plot1'，地2='plot2'），不传则查全量
+  if (params.plotType) payload.plot_type = params.plotType
   // GeoScene FeatureServer 空间查询较慢，覆盖默认 5s 超时。
   // 后端 spatial-diagnose 串行跑两次空间查询（query_stats + query_features），
   // 冷缓存/慢查询时单次可达 12s+，30s 不够 → 放宽到 90s
@@ -81,7 +81,7 @@ export async function queryTreesByFilter(params: TsomQueryParams): Promise<{ dat
 /**
  * 历史老树 - 大屏开屏拉取全部历史老树坐标与属性
  *
- * 走后端 /orange/historical-trees：GeoScene FeatureServer 中 batch_id='historical_zone'
+ * 走后端 /orange/historical-trees：GeoScene FeatureServer 中 plot_type='plot1'
  * 的全量坐标 + 长势/施肥属性，用于在地图上铺设可拾取点。
  */
 /** 底图范围内可查询的果树总数（GeoScene returnCountOnly，果园态势驾驶舱用） */
@@ -164,6 +164,8 @@ export interface TaskStatus {
   total_trees: number
   fresh_trees: Array<{
     id: number
+    tree_code?: string
+    plot_type?: string
     lng: number
     lat: number
     growth_index?: number | null
@@ -349,7 +351,8 @@ interface DiagnoseResult {
   }
   trees: Array<{
     id: number
-    batch_id: string
+    tree_code: string
+    plot_type?: string
     lng: number
     lat: number
     height_m?: number | null
@@ -370,7 +373,7 @@ export interface HistoricalTreesResponse {
 function mapDiagnoseToTsomResult(params: TsomQueryParams, d: DiagnoseResult): TsomQueryResult {
   const pois: FruitTreePoi[] = d.trees.map((t) => ({
     id: String(t.id),
-    name: t.batch_id || `树${t.id}`,
+    name: t.tree_code || `树${t.id}`,
     longitude: t.lng,
     latitude: t.lat,
     altitude: undefined,

@@ -12,7 +12,7 @@ from app.config import get_settings
 from app.models.orange import OrangeTree
 
 TARGET_SRID = 32650
-BATCH_ID = "historical_zone"
+PLOT_TYPE = "plot1"
 
 
 def seed_shp_data():
@@ -41,18 +41,19 @@ def seed_shp_data():
 
     with Session() as db:
         print("正在清空历史批次数据...")
-        db.execute(delete(OrangeTree).where(OrangeTree.batch_id == BATCH_ID))
+        db.execute(delete(OrangeTree).where(OrangeTree.plot_type == PLOT_TYPE))
         db.flush()
 
         print("开始写入...")
         trees = []
-        for _, row in gdf.iterrows():
+        for i, (_, row) in enumerate(gdf.iterrows(), start=1):
             # shp 存的是树冠多边形，取其质心作为中心点入库
             point = row["geometry"].centroid
             geom = from_shape(point, srid=TARGET_SRID)
 
             trees.append(OrangeTree(
-                batch_id=BATCH_ID,
+                tree_code=f"TREE_{i:04d}",
+                plot_type=PLOT_TYPE,
                 geom=geom,
                 shape_length=_float(row, "Shape_Leng"),
                 confidence=_float(row, "Confidence"),

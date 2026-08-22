@@ -17,7 +17,7 @@ import fiona  # noqa: E402
 from app.services.geoscene_service import GeoSceneService  # noqa: E402
 
 SHP_PATH = r"D:\Esri_data_4people\地2入库数据\treetree.shp"
-BATCH_ID = "orange_tree"
+PLOT_TYPE = "plot2"
 CHUNK_SIZE = 50
 
 
@@ -47,7 +47,7 @@ def _to_float(v):
 def main():
     rows = []
     with fiona.open(SHP_PATH) as src:
-        for feat in src:
+        for i, feat in enumerate(src, start=1):
             props = feat["properties"]
             # geometry 是 Polygon（树冠轮廓），取外环顶点平均作为树的中心点
             ring = feat["geometry"]["coordinates"][0]
@@ -63,7 +63,8 @@ def main():
             rows.append({
                 "attributes": {
                     "id": str(props.get("OBJECTID_1") or props.get("OBJECTID_2") or ""),
-                    "batch_id": BATCH_ID,
+                    "tree_code": f"TREE_{i:04d}",
+                    "plot_type": PLOT_TYPE,
                     "confidence": _to_float(props.get("Confidence")),
                     "compactness": _to_float(props.get("Compactnes")),
                     "shape_length": _to_float(props.get("Shape_Leng")),
@@ -85,8 +86,11 @@ def main():
 
     print(f"[Seed] 读取 shp 共 {len(rows)} 棵树")
 
-    deleted = GeoSceneService.delete_features_by_batch(BATCH_ID)
-    print(f"[Seed] 删除旧 batch 数据 {deleted} 条")
+    # 先清掉「字段改名前入库、plot_type 还是空」的旧 orange_tree 数据，再清掉本 plot2 旧数据
+    deleted_old = GeoSceneService.delete_features_where("tree_code='orange_tree'")
+    print(f"[Seed] 删除旧 orange_tree 数据 {deleted_old} 条")
+    deleted = GeoSceneService.delete_features_by_plot(PLOT_TYPE)
+    print(f"[Seed] 删除旧 plot2 数据 {deleted} 条")
 
     total = 0
     for i in range(0, len(rows), CHUNK_SIZE):

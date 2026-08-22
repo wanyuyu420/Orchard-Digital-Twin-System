@@ -33,8 +33,8 @@ export interface TsomQueryParams {
   endDate?: string
   /** 健康状态筛选 */
   healthStatuses?: string[]
-  /** 批次过滤：地1='historical_zone'，地2='orange_tree'，不传则查全量 */
-  batchId?: string
+  /** 地块类型过滤：地1='plot1'，地2='plot2'，不传则查全量 */
+  plotType?: string
   /** 精确查询单棵树：输入树编号（FeatureServer id），只查这一棵；不传则查全部 */
   treeId?: string
 }
@@ -150,7 +150,8 @@ export type QueryLevel = 'menu' | 'query' | 'result' | 'detail'
 /** 后端返回的单棵分割树冠（fresh_trees 元素） */
 export interface FreshTree {
   id: string
-  batch_id: string
+  tree_code?: string
+  plot_type?: string
   lng: number
   lat: number
   area_m2?: number | null

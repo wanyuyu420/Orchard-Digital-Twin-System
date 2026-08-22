@@ -24,7 +24,7 @@ class SpatialQuerySchema(BaseModel):
         ],
         description="首尾相连的闭合经纬度多边形顶点数组，格式为 [[Lng, Lat], ...]"
     )
-    batch_id: Optional[str] = Field(None, description="可选批次标签过滤（如 historical_zone / orange_tree），不传则查全量")
+    plot_type: Optional[str] = Field(None, description="可选地块类型过滤（plot1=历史老树 / plot2=上传新树），不传则查全量")
 
     @model_validator(mode="after")
     def _check_closed(self) -> Self:
@@ -40,7 +40,8 @@ class SpatialQuerySchema(BaseModel):
 class OrangeTreeOut(BaseModel):
     """单棵脐橙树输出（供列表接口序列化）。"""
     id: int
-    batch_id: str
+    tree_code: str = ""
+    plot_type: str = "plot1"
     lng: float
     lat: float
     confidence: Optional[float] = None
