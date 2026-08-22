@@ -12,7 +12,7 @@
     "type-check": "vue-tsc --noEmit",
     "format": "prettier --write \"src/**/*.{js,ts,vue,json,css,scss,md}\"",
     "format:check": "prettier --check \"src/**/*.{js,ts,vue,json,css,scss,md}\"",
-    "dev:backend": "cd backend && python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload",
+    "dev:backend": "cd backend && python -m uvicorn app.main:app --host 127.0.0.1 --port 8000",
     "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev\""
   },
   "dependencies": {

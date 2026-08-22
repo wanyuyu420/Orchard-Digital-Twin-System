@@ -514,6 +514,57 @@ def _persist_trees_sync(trees_data: list):
         engine.dispose()
 
 
+def _publish_to_geoscene(trees_data: list) -> int:
+    """把推理结果批量发布到 GeoScene FeatureServer（自动入库，替代人工 seed）。
+
+    先清掉上一批 plot2 旧数据再写入，避免重复上传累积；整个过程尽力而为，
+    发布失败只打日志、不阻塞识别任务（识别结果照常 completed 并打点展示）。
+    """
+    if not trees_data:
+        return 0
+    try:
+        deleted = GeoSceneService.delete_features_by_plot("plot2")
+        print(f"[Publish] 清理旧 plot2 数据 {deleted} 条")
+
+        rows = []
+        for idx, t in enumerate(trees_data, start=1):
+            rows.append({
+                "attributes": {
+                    "id": str(idx),
+                    "tree_code": t.get("tree_code") or "",
+                    "plot_type": t.get("plot_type") or "plot2",
+                    "confidence": t.get("iou_score"),
+                    "compactness": t.get("compactness"),
+                    "shape_length": t.get("shape_length"),
+                    "shape_area": t.get("area_m2"),
+                    "count": t.get("area_pixels"),
+                    "value": t.get("value"),
+                    "area_m2": t.get("area_m2"),
+                    "height_m": t.get("height_m"),
+                    "crown_diameter": t.get("crown_diameter"),
+                    "volume_m3": t.get("volume_m3"),
+                    "growth_index": t.get("growth_index"),
+                    "slope_degree": t.get("slope_degree"),
+                    "aspect": t.get("aspect"),
+                    "fertilizer_level": t.get("fertilizer_level") or 0,
+                    "fertilizer_kg": t.get("fertilizer_kg"),
+                    "growth_status": t.get("growth_status"),
+                },
+                "geometry": {
+                    "x": t.get("utm_x"),
+                    "y": t.get("utm_y"),
+                    "spatialReference": {"wkid": 32650},
+                },
+            })
+
+        total = GeoSceneService.add_features(rows)
+        print(f"[Publish] 已发布 {total} 棵树到 GeoScene")
+        return total
+    except Exception as e:
+        print(f"[Publish] 自动发布到 GeoScene 失败（不影响识别结果）: {e}")
+        return 0
+
+
 def _make_geojson_from_mask(
     mask: np.ndarray,
     window_x: int,
@@ -692,6 +743,9 @@ def _run_inference_task(task_id: str, file_path: str):
 
         # Persist detected trees to database for spatial-diagnose
         _persist_trees_sync(all_detected_trees)
+
+        # 自动入库发布到 GeoScene：推理完即发布，拉框查询立刻有数据（尽力而为，失败不阻塞任务）
+        _publish_to_geoscene(all_detected_trees)
 
         with _task_lock:
             _task_store[task_id]["status"] = "completed"
